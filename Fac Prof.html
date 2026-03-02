@@ -321,6 +321,9 @@
                     <button onclick="switchTemplate('proforma')" id="btn-proforma"
                         class="pb-2 px-2 text-gray-400 hover:text-gray-600 transition-all uppercase text-xs tracking-widest whitespace-nowrap">Modelo
                         Factura Proforma</button>
+                    <button onclick="switchTemplate('propuesta')" id="btn-propuesta"
+                        class="pb-2 px-2 text-gray-400 hover:text-gray-600 transition-all uppercase text-xs tracking-widest whitespace-nowrap">Propuesta
+                        Formal</button>
                 </div>
             </div>
         </div>
@@ -346,6 +349,18 @@
             <button onclick="window.print()"
                 class="bg-[#2d5a43] hover:bg-[#1e3a2c] text-white px-6 py-2 rounded-lg font-bold shadow-md transition-all uppercase text-[10px]">
                 Imprimir / PDF
+            </button>
+            <button onclick="desestimarGrupo()"
+                class="p-2 hover:bg-red-50 text-red-300 hover:text-red-500 rounded-lg transition-colors border border-transparent hover:border-red-100"
+                title="Desestimar / Borrar">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M3 6h18" />
+                    <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+                    <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+                    <line x1="10" x2="10" y1="11" y2="17" />
+                    <line x1="14" x2="14" y1="11" y2="17" />
+                </svg>
             </button>
         </div>
     </div>
@@ -578,28 +593,134 @@
             </table>
         </div>
 
-        <div class="no-print flex justify-center mb-4 mt-2">
-            <button onclick="addRow()"
-                class="bg-gray-100 hover:bg-gray-200 text-gray-600 px-4 py-1 rounded-full text-[9px] uppercase font-bold tracking-widest transition border border-gray-300">
-                + Añadir Concepto
-            </button>
-        </div>
+        <div id="tpl-propuesta" class="template-content hidden font-pro text-black">
+            <div class="mb-8 text-center">
+                <h1
+                    class="text-4xl font-black uppercase tracking-[0.2em] text-slate-800 border-b-4 border-slate-800 inline-block px-8 pb-2">
+                    Propuesta Formal</h1>
+                <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mt-4 italic">Documento de
+                    Presentación de Servicios y Tarifas</p>
+            </div>
 
-        <!-- TOTALES Y FOOTER -->
-        <div class="mt-auto">
-            <!-- Totales Dinámicos -->
-            <div id="footer-totals" class="w-full"></div>
-
-            <!-- Políticas de Reserva (Solo en Confirmación) -->
-            <div id="tpl-policies" class="hidden"></div>
-
-            <!-- Pie de Página Premium: Configuración 100% Dinámica (Casi vacío ahora que la info está arriba) -->
-            <div id="common-footer" class="mt-8 border-t border-slate-50 font-pro">
-                <div class="mt-4 flex flex-col items-center gap-2">
-                    <p class="hotel-legal-footer hidden"></p>
+            <div class="bg-slate-50 p-6 rounded-[2rem] border border-slate-200 mb-8 flex justify-between items-center">
+                <div>
+                    <h2 class="text-xl font-black text-slate-800 uppercase tracking-tight" id="programa-3">---</h2>
+                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Organizado por: <span
+                            id="solicitante-org-3" class="text-slate-600">---</span></p>
+                </div>
+                <div class="text-right">
+                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Periodo de Estancia</p>
+                    <p class="text-sm font-black text-slate-700"><span id="reserva-entrada-3">---</span> al <span
+                            id="reserva-salida-3">---</span></p>
                 </div>
             </div>
+
+            <h3 class="text-xs font-black text-[#2d5a43] uppercase tracking-[0.2em] mb-4 flex items-center gap-3">
+                <span class="w-8 h-px bg-[#2d5a43]"></span>
+                Desglose de Itinerario y Servicios
+                <span class="flex-1 h-px bg-slate-100"></span>
+            </h3>
+
+            <table
+                class="w-full text-[10px] mb-8 border-collapse overflow-hidden rounded-2xl shadow-sm border border-slate-200">
+                <thead>
+                    <tr class="bg-slate-800 text-white uppercase text-[9px] font-black tracking-widest">
+                        <th class="p-4 text-left">Fecha / Estancia</th>
+                        <th class="p-4 text-center">Régimen</th>
+                        <th class="p-4 text-left">Distribución de Habitaciones</th>
+                        <th class="p-4 text-right">Subtotal Noche</th>
+                    </tr>
+                </thead>
+                <tbody class="propuesta-items divide-y divide-slate-100 bg-white">
+                </tbody>
+            </table>
+
+            <div class="grid grid-cols-2 gap-8 mb-8">
+                <div class="bg-white p-6 rounded-[2rem] border border-slate-200">
+                    <h4 class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Información de
+                        Contacto</h4>
+                    <div class="space-y-3">
+                        <div class="flex items-center gap-3">
+                            <div class="w-8 h-8 rounded-xl bg-slate-50 flex items-center justify-center text-slate-400">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"
+                                    fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
+                                    <circle cx="12" cy="7" r="4" />
+                                </svg>
+                            </div>
+                            <span class="text-xs font-black text-slate-700" id="solicitante-nombre-3">---</span>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <div class="w-8 h-8 rounded-xl bg-slate-50 flex items-center justify-center text-slate-400">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"
+                                    fill="none" stroke="currentColor" stroke-width="2">
+                                    <rect width="20" height="16" x="2" y="4" rx="2" />
+                                    <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
+                                </svg>
+                            </div>
+                            <span class="text-xs font-bold text-slate-500" id="solicitante-email-3">---</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-indigo-50/50 p-6 rounded-[2rem] border border-indigo-100">
+                    <h4 class="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-4">Servicios
+                        Incluidos</h4>
+                    <ul class="text-[10px] space-y-2 text-indigo-900/70 font-bold">
+                        <li class="flex items-center gap-2"><svg xmlns="http://www.w3.org/2000/svg" width="10"
+                                height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4"
+                                class="text-indigo-500">
+                                <path d="M20 6 9 17l-5-5" />
+                            </svg> Acceso a áreas comunes</li>
+                        <li class="flex items-center gap-2"><svg xmlns="http://www.w3.org/2000/svg" width="10"
+                                height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4"
+                                class="text-indigo-500">
+                                <path d="M20 6 9 17l-5-5" />
+                            </svg> Gestión personalizada de grupo</li>
+                        <li class="flex items-center gap-2"><svg xmlns="http://www.w3.org/2000/svg" width="10"
+                                height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4"
+                                class="text-indigo-500">
+                                <path d="M20 6 9 17l-5-5" />
+                            </svg> Conexión Wi-Fi de alta velocidad</li>
+                    </ul>
+                </div>
+                </ul>
+            </div>
         </div>
+
+        <div class="mt-8 pt-8 border-t border-slate-100">
+            <h4 class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Notas y Comentarios
+                Especiales</h4>
+            <div class="p-8 rounded-[2.5rem] bg-slate-50 border border-slate-100 italic text-xs text-slate-600 leading-relaxed min-h-[100px] editable"
+                contenteditable="true" id="propuesta-notas">
+                Escriba aquí cualquier observación adicional, términos de cancelación específicos o detalles de
+                servicios personalizados para este grupo...
+            </div>
+        </div>
+    </div>
+    </div>
+
+    <div class="no-print flex justify-center mb-4 mt-2">
+        <button onclick="addRow()"
+            class="bg-gray-100 hover:bg-gray-200 text-gray-600 px-4 py-1 rounded-full text-[9px] uppercase font-bold tracking-widest transition border border-gray-300">
+            + Añadir Concepto
+        </button>
+    </div>
+
+    <!-- TOTALES Y FOOTER -->
+    <div class="mt-auto">
+        <!-- Totales Dinámicos -->
+        <div id="footer-totals" class="w-full"></div>
+
+        <!-- Políticas de Reserva (Solo en Confirmación) -->
+        <div id="tpl-policies" class="hidden"></div>
+
+        <!-- Pie de Página Premium: Configuración 100% Dinámica (Casi vacío ahora que la info está arriba) -->
+        <div id="common-footer" class="mt-8 border-t border-slate-50 font-pro">
+            <div class="mt-4 flex flex-col items-center gap-2">
+                <p class="hotel-legal-footer hidden"></p>
+            </div>
+        </div>
+    </div>
     </div>
     </div>
 
@@ -633,6 +754,10 @@
 
     <!-- Configuración Centralizada -->
     <script src="js/firebase-config.js"></script>
+    <!-- Módulos Compartidos -->
+    <script src="js/utils.js"></script>
+    <script src="js/gemini.js"></script>
+    <script src="js/firebase-init.js"></script>
 
     <script>
         const HOTELS = {
@@ -771,62 +896,63 @@
             doRedirect();
         }
 
-        async function callGemini(prompt) {
-            let dynamicKey = window.firebaseConfig?.apiKey || "";
-            let model = "gemini-1.5-flash";
-
-            try {
-                if (typeof db !== 'undefined') {
-                    const settingsDoc = await db.collection("settings").doc("main").get();
-                    if (settingsDoc.exists) {
-                        const s = settingsDoc.data().system || {};
-                        if (s.geminiApiKey) dynamicKey = s.geminiApiKey;
-                        if (s.geminiModel) model = s.geminiModel;
-                    }
-                }
-            } catch (e) {
-                console.warn("Fallback to config key.");
-            }
-
-            if (!dynamicKey || dynamicKey === "TU_API_KEY_AQUI") {
-                return "⚠️ ERROR: No se ha configurado la API Key en el panel de Configuración.";
-            }
-
-            const url = `https://generativelanguage.googleapis.com/v1/models/${model}:generateContent?key=${dynamicKey}`;
+        // callGemini base cargado desde js/gemini.js
+        // Wrapper con contexto de hotel para Fac Prof
+        async function callGeminiHotel(prompt) {
             const hotelName = HOTELS[currentHotel]?.name + " " + HOTELS[currentHotel]?.subname;
             const fullPrompt = `Eres un asistente de recepción de un hotel de lujo (${hotelName}). Tu tono es profesional, cortés y servicial. Siempre respondes en español.\n\n` + prompt;
-
-            try {
-                const response = await fetch(url, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ contents: [{ parts: [{ text: fullPrompt }] }] })
-                });
-
-                if (!response.ok) {
-                    const error = await response.json();
-                    const msg = error.error?.message || "";
-                    if (msg.includes("blocked") || msg.includes("PERMISSION_DENIED")) {
-                        return "🚫 ACCESO DENEGADO: Tu API Key está bloqueada o no tiene los permisos necesarios (Generative Language API) en Google Cloud Console.";
-                    }
-                    throw new Error(msg || "Error en la llamada a la API");
-                }
-
-                const data = await response.json();
-                return data.candidates[0].content.parts[0].text;
-            } catch (e) {
-                console.error(e);
-                return `Error de conexión con la IA: ${e.message}`;
-            }
+            return window.callGemini(fullPrompt);
         }
 
         async function generateAIEmail() {
             showAIModal("✨ Redactando Email Profesional");
             const total = items.reduce((acc, curr) => acc + (curr.precio || 0), 0);
-            const cliente = document.getElementById('solicitante-org-1').innerText;
-            const prompt = `Redacta un correo electrónico profesional para enviar esta factura proforma. Cliente: ${cliente}, Total: ${formatNum(total)} €. Tono amable y profesional.`;
+            const cliente = document.getElementById('solicitante-nombre-1')?.innerText || document.getElementById('solicitante-org-1')?.innerText || "estimado cliente";
+            const grupoName = document.getElementById('programa-1')?.innerText || "vuestro grupo";
+            const entrada = document.getElementById('reserva-entrada-1')?.innerText || "--/--/--";
+            const hotelName = HOTELS[currentHotel]?.name + " " + HOTELS[currentHotel]?.subname;
+
+            let context = `documento de confirmación`;
+            if (currentTemplate === 'proforma') context = `factura proforma`;
+            if (currentTemplate === 'propuesta') context = `propuesta formal de servicios`;
+
+            const prompt = `Redacta un correo electrónico de acompañamiento para enviar una ${context} a un cliente. 
+            Detalles:
+            - Cliente: ${cliente}
+            - Grupo: ${grupoName}
+            - Hotel: ${hotelName}
+            - Fecha de entrada: ${entrada}
+            - Total: ${formatNum(total)} €
+            
+            El tono debe ser amable, profesional y comercial si es una propuesta, o administrativo y claro si es una proforma/confirmación.
+            Asegúrate de invitar al cliente a revisar el ${context} adjunto y quedar a su disposición para cualquier duda.`;
+
             const result = await callGemini(prompt);
             document.getElementById('ai-content').innerText = result;
+        }
+
+        async function desestimarGrupo() {
+            const saved = localStorage.getItem('selectedGroup');
+            if (!saved) return;
+            const group = JSON.parse(saved);
+            const reservaId = group.Reserva || group.id;
+
+            if (confirm(`¿Estás seguro de que deseas marcar la reserva ${reservaId} como DESESTIMADA?`)) {
+                try {
+                    const normId = String(reservaId).trim().replace(/\.0$/, "").replace(/[\/\\]/g, "-");
+                    await db.collection("groups").doc(normId).set({
+                        "Com_Estado_Interno": "DESESTIMADO",
+                        "updatedAt": firebase.firestore.FieldValue.serverTimestamp()
+                    }, { merge: true });
+
+                    // Actualizar local y salir
+                    group["Com_Estado_Interno"] = "DESESTIMADO";
+                    localStorage.setItem('selectedGroup', JSON.stringify(group));
+                    saveAndExit();
+                } catch (e) {
+                    alert("Error al desestimar el grupo: " + e.message);
+                }
+            }
         }
 
         async function generateAIPlan() {
@@ -1112,9 +1238,12 @@
             currentTemplate = tpl;
             document.getElementById('tpl-confirmacion').classList.toggle('hidden', tpl !== 'confirmacion');
             document.getElementById('tpl-proforma').classList.toggle('hidden', tpl !== 'proforma');
+            document.getElementById('tpl-propuesta').classList.toggle('hidden', tpl !== 'propuesta');
+
             document.getElementById('tpl-policies').classList.toggle('hidden', tpl !== 'confirmacion');
             document.getElementById('btn-confirmacion').className = tpl === 'confirmacion' ? 'pb-2 px-2 tab-active transition-all uppercase text-xs tracking-widest' : 'pb-2 px-2 text-gray-400 transition-all uppercase text-xs tracking-widest';
             document.getElementById('btn-proforma').className = tpl === 'proforma' ? 'pb-2 px-2 tab-active transition-all uppercase text-xs tracking-widest' : 'pb-2 px-2 text-gray-400 transition-all uppercase text-xs tracking-widest';
+            document.getElementById('btn-propuesta').className = tpl === 'propuesta' ? 'pb-2 px-2 tab-active transition-all uppercase text-xs tracking-widest' : 'pb-2 px-2 text-gray-400 transition-all uppercase text-xs tracking-widest';
 
             const docTitle = document.getElementById('doc-type-title');
             const docLabel = document.getElementById('doc-type-label');
@@ -1123,7 +1252,8 @@
 
             const titleContainer = document.querySelector('.header-title-container');
             const infoContainer = document.querySelector('.header-info-container');
-            if (tpl === 'proforma') {
+
+            if (tpl === 'proforma' || tpl === 'propuesta') {
                 if (titleContainer) titleContainer.style.display = 'none';
                 if (infoContainer) {
                     infoContainer.style.textAlign = 'left';
@@ -1330,6 +1460,93 @@
                     document.querySelector('#tpl-proforma .invoice-items').insertAdjacentHTML('beforeend', row);
                 }
             });
+
+            if (currentTemplate === 'propuesta') {
+                const dailyC = groupData.dailyConfig || {};
+                const dates = Object.keys(dailyC).sort();
+                const container = document.querySelector('.propuesta-items');
+                container.innerHTML = '';
+
+                // 1. Mostrar Desglose por Noche
+                dates.forEach((date, idx) => {
+                    const rooms = dailyC[date];
+                    const roomEntries = Object.entries(rooms);
+                    let dailyTotal = 0;
+                    let dailyRegimen = "";
+
+                    const roomHtml = roomEntries.map(([type, cfg]) => {
+                        const count = (groupData.roomCounts || {})[type] || 0;
+                        const sub = count * (parseFloat(cfg.price) || 0);
+                        dailyTotal += sub;
+                        dailyRegimen = cfg.board || dailyRegimen;
+                        return `<div class="flex justify-between items-center py-1">
+                                    <span class="font-bold text-slate-600">${count}x ${type} <span class="text-[8px] font-normal text-slate-400">(a ${formatNum(cfg.price)}€)</span></span>
+                                    <span class="font-black text-slate-800">${formatNum(sub)}€</span>
+                                </div>`;
+                    }).join('');
+
+                    const row = `
+                        <tr class="bg-white">
+                            <td class="p-6 align-top">
+                                <span class="bg-indigo-50 text-indigo-700 px-3 py-1 rounded-lg text-xs font-black uppercase tracking-widest">${formatDate(date)}</span>
+                                <p class="text-[9px] font-bold text-slate-400 uppercase mt-2">Noche ${idx + 1}</p>
+                            </td>
+                            <td class="p-6 text-center align-middle">
+                                <span class="px-3 py-1 bg-slate-100 rounded-full text-[9px] font-black text-slate-600 uppercase tracking-widest">${dailyRegimen}</span>
+                            </td>
+                            <td class="p-6 align-top">
+                                <div class="space-y-1">
+                                    ${roomHtml}
+                                </div>
+                            </td>
+                            <td class="p-6 text-right align-middle">
+                                <span class="text-sm font-black text-[#2d5a43]">${formatNum(dailyTotal)}€</span>
+                            </td>
+                        </tr>
+                    `;
+                    container.insertAdjacentHTML('beforeend', row);
+                });
+
+                // 2. Mostrar Otros Conceptos si existen
+                if (items.length > 0) {
+                    const otherItemsHeader = `
+                        <tr class="bg-slate-50 border-y border-slate-200">
+                            <td colspan="4" class="px-6 py-3 text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">Otros Servicios y Conceptos Adicionales</td>
+                        </tr>
+                    `;
+                    container.insertAdjacentHTML('beforeend', otherItemsHeader);
+
+                    items.forEach((item, idx) => {
+                        const sub = (parseFloat(item.precio) || 0) * (parseFloat(item.hab) || 1) * (parseFloat(item.cant) || 1) * (parseFloat(item.dias) || 1);
+                        const row = `
+                            <tr class="bg-white/50">
+                                <td class="p-6 text-[10px] font-bold text-slate-400 uppercase">${formatDate(item.fecha)}</td>
+                                <td class="p-6 text-center">
+                                    <span class="px-3 py-1 bg-amber-50 rounded-full text-[9px] font-black text-amber-600 uppercase tracking-widest">${item.regimen || '-'}</span>
+                                </td>
+                                <td class="p-6">
+                                    <div class="flex justify-between items-center">
+                                        <span class="font-black text-slate-700 uppercase">${item.concepto}</span>
+                                        <span class="text-[9px] font-bold text-slate-400">UNID: ${item.cant}</span>
+                                    </div>
+                                </td>
+                                <td class="p-6 text-right">
+                                    <span class="text-sm font-black text-slate-800">${formatNum(sub)}€</span>
+                                </td>
+                            </tr>
+                        `;
+                        container.insertAdjacentHTML('beforeend', row);
+                    });
+                }
+
+                // Sync the shared headers
+                document.querySelectorAll('#programa-3').forEach(el => el.innerText = document.getElementById('programa-1')?.innerText || groupData["Nombre del Grupo"] || '---');
+                document.querySelectorAll('#solicitante-org-3').forEach(el => el.innerText = document.getElementById('solicitante-org-1')?.innerText || groupData["Empresa/Agencia"] || '---');
+                document.querySelectorAll('#reserva-entrada-3').forEach(el => el.innerText = document.getElementById('reserva-entrada-1')?.innerText || groupData["Entrada"] || '---');
+                document.querySelectorAll('#reserva-salida-3').forEach(el => el.innerText = document.getElementById('reserva-salida-1')?.innerText || groupData["Salida"] || '---');
+                document.querySelectorAll('#solicitante-nombre-3').forEach(el => el.innerText = document.getElementById('solicitante-nombre-1')?.innerText || groupData["Com_Nombre_Contacto"] || '---');
+                document.querySelectorAll('#solicitante-email-3').forEach(el => el.innerText = document.getElementById('solicitante-email-1')?.innerText || groupData["Com_Email_Contacto"] || '---');
+            }
 
             if (totalComision > 0) {
                 const uniquePercs = new Set();

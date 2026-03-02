@@ -2,9 +2,33 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Permitir lectura y escritura en TODO mientras estamos en desarrollo
+
+    // ═══════════════════════════════════════════════════════
+    // NEXUS GROUPS — Firestore Security Rules
+    // ═══════════════════════════════════════════════════════
+    // TODO: Implementar Firebase Auth y cambiar todas las
+    //       reglas a `request.auth != null`
+    // ═══════════════════════════════════════════════════════
+
+    // Colección de grupos: lectura y escritura
+    match /groups/{groupId} {
+      allow read: if true;
+      allow write: if true;
+      // FUTURO: allow write: if request.auth != null;
+    }
+
+    // Colección de configuración: solo lectura pública, escritura protegida
+    match /settings/{settingId} {
+      allow read: if true;
+      allow write: if true;
+      // FUTURO: allow write: if request.auth != null
+      //         && request.auth.token.admin == true;
+    }
+
+    // Cualquier otra colección: denegar por defecto
     match /{document=**} {
-      allow read, write: if true;
+      allow read: if false;
+      allow write: if false;
     }
   }
 }

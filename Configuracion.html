@@ -7,7 +7,8 @@
     <title>Nexus Groups - Configuración del Sistema</title>
     <link rel="icon" type="image/png" href="Nexus Groups/Nexus_Groups_ICO-removebg-preview.png">
 
-    <!-- Static Styles (Tailwind Compiled) -->
+    <!-- Tailwind CSS (CDN necesario para clases dinámicas en JSX) -->
+    <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="style.css">
 
     <!-- Google Fonts -->
@@ -19,8 +20,8 @@
     <script src="https://unpkg.com/lucide@latest"></script>
 
     <!-- React & ReactDOM -->
-    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
-    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 
     <!-- Babel -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -54,38 +55,19 @@
 
     <!-- Configuración Firebase Centralizada -->
     <script src="js/firebase-config.js"></script>
+    <!-- Módulos Compartidos -->
+    <script src="js/utils.js"></script>
+    <script src="js/gemini.js"></script>
+    <script src="js/icons.js"></script>
+    <script src="js/firebase-init.js"></script>
 
     <script type="text/babel">
         const { useState, useEffect, useRef } = React;
 
-        const LucideIcon = ({ name, size = 20, className = "" }) => {
-            const iconRef = useRef(null);
-            useEffect(() => {
-                if (iconRef.current && window.lucide) {
-                    const icon = window.lucide.icons[name];
-                    if (icon) {
-                        const svgElement = window.lucide.createIcon(icon, {
-                            width: size,
-                            height: size,
-                            class: className,
-                            'stroke-width': 2
-                        });
-                        iconRef.current.innerHTML = '';
-                        iconRef.current.appendChild(svgElement);
-                    }
-                }
-            }, [name, size, className]);
-            return <span ref={iconRef} className={`inline-flex items-center justify-center ${className}`} />;
-        };
+        // LucideIcon cargado desde js/icons.js (window.LucideIcon)
 
-        // --- CONFIGURACIÓN FIREBASE ---
-        // Se carga desde js/firebase-config.js
-        const firebaseConfig = window.firebaseConfig;
-
-        if (!firebase.apps.length) {
-            firebase.initializeApp(firebaseConfig);
-        }
-        const db = firebase.firestore();
+        // --- FIREBASE ---
+        const db = window.db;
 
         const App = () => {
             const [activeHotel, setActiveHotel] = useState('guadiana');
