@@ -208,24 +208,49 @@
             const calculateTotal = (data) => {
                 if (!data) return 0;
                 let total = 0;
-                const dCounts = data.roomCounts || {};
+
+                // Normalizar accounts evitando duplicar mayus y minus
+                const normalizedRoomCounts = {};
+                Object.entries(data.roomCounts || {}).forEach(([t, c]) => {
+                    const lowerT = t.toLowerCase();
+                    normalizedRoomCounts[lowerT] = (normalizedRoomCounts[lowerT] || 0) + Number(c);
+                });
+
                 const dConfig = data.dailyConfig || {};
                 const dates = generateDates(data.Entrada, data.Salida);
 
                 if (dates.length > 0 && Object.keys(dConfig).length > 0) {
                     dates.forEach(date => {
                         const dayData = dConfig[date] || {};
-                        Object.keys(dCounts).forEach(type => {
-                            if (dCounts[type] > 0 && dayData[type]) {
-                                const price = parseFloat(dayData[type].price) || 0;
-                                total += price * (parseInt(dCounts[type]) || 0);
+                        Object.entries(normalizedRoomCounts).forEach(([type, count]) => {
+                            if (count > 0) {
+                                let lineSubtotal = 0;
+                                if (dayData.prices) {
+                                    const priceKey = Object.keys(dayData.prices).find(k => k.toLowerCase() === type);
+                                    const p = priceKey ? parseFloat(dayData.prices[priceKey] || 0) : 0;
+                                    lineSubtotal = p * count;
+                                } else {
+                                    const typeKey = Object.keys(dayData).find(k => k.toLowerCase() === type);
+                                    if (typeKey && dayData[typeKey]) {
+                                        const price = parseFloat(dayData[typeKey].price) || 0;
+                                        const discount = parseFloat(dayData[typeKey].discount) || 0;
+                                        const gratuities = parseInt(dayData[typeKey].gratuities) || 0;
+                                        const billableCount = Math.max(0, count - gratuities);
+                                        lineSubtotal = billableCount * price * (1 - discount / 100);
+                                    }
+                                }
+                                total += lineSubtotal;
                             }
                         });
                     });
+                    // Suplementos y Descuentos Globales
+                    const suplementos = parseFloat(data.Suplementos) || 0;
+                    const descuentos = parseFloat(data.Descuentos) || 0;
+                    total = total + suplementos - descuentos;
                 } else {
                     total = parseFloat(data["Importe(*)"]) || 0;
                 }
-                return total;
+                return total > 0 ? total : 0;
             };
 
             // callGemini cargado desde js/gemini.js (window.callGemini)
@@ -245,8 +270,8 @@
                 - "Régimen": (HD, AD, MP, PC, TI, SA).
                 - "Habitaciones": resumen en texto de la distribución solicitada (ej. 10 dobles, 5 triples).
                 - "roomCounts": objeto JSON con el desglose numérico por tipo de habitación. USA ESTOS TIPOS SEGÚN EL HOTEL SI SE IDENTIFICA (si no, usa los de Sercotel Guadiana):
-                  * Sercotel Guadiana: {"Doble Individual": 0, "Doble 2 Camas": 0, "Doble Matrimonial": 0, "Triple": 0}
-                  * Cumbria Spa & Hotel: {"Doble de Uso Individual": 0, "Doble": 0, "Doble + Supletoria": 0, "Triple": 0, "Junior Suite": 0}
+                  * Sercotel Guadiana: {"DOBLE DE USO INDIVIDUAL": 0, "DOBLE": 0, "DOBLE + SUPLETORIA": 0, "CUÁDRUPLE": 0}
+                  * Cumbria Spa & Hotel: {"DOBLE DE USO INDIVIDUAL": 0, "DOBLE": 0, "DOBLE + SUPLETORIA": 0}
                   Extrae SOLO los números que encuentres.
                 - "Importe(*)": precio unitario o total si se menciona, si no 0.
                 - "Hotel": "Sercotel Guadiana" o "Cumbria Spa & Hotel" si se menciona o deduce.

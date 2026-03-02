@@ -632,19 +632,21 @@
         const today = new Date().toISOString().split("T")[0];
         const arrival = toInputDate(arrivalDate);
 
-        // 0. CANCELADO / ANULADO / BAJA (PREFERENCIA MÁXIMA)
+        // 0. CANCELADO / ANULADO / BAJA / DESESTIMADO (PREFERENCIA MÁXIMA)
         if (
           s.includes("CANC") ||
           s.includes("ANUL") ||
           s.includes("BAJA") ||
+          s.includes("DESESTIMADO") ||
           e.includes("CANC") ||
           e.includes("ANUL") ||
-          e.includes("BAJA")
+          e.includes("BAJA") ||
+          e.includes("DESESTIMADO")
         )
           return {
             color: "bg-red-500/80",
             text: "bg-red-100 text-red-700",
-            label: "CANCELADO",
+            label: "DESESTIMADO",
           };
 
         // 1. PASADO (Si la fecha de entrada ya pasó)
@@ -953,13 +955,13 @@
             );
             const label = stateProps.label.toLowerCase();
 
-            if (filterStatus === "activos") return label !== "cancelado";
+            if (filterStatus === "activos") return label !== "cancelado" && label !== "desestimado" && label !== "pasado";
+            if (filterStatus === "activos_y_desestimados") return label !== "pasado";
             if (filterStatus === "confirmada") return label === "confirmado";
             if (filterStatus === "tentativa") return label === "tentativa";
             if (filterStatus === "presupuesto")
               return label === "presupuesto";
-            if (filterStatus === "prospecto") return label === "prospecto";
-            if (filterStatus === "anulada") return label === "cancelado";
+            if (filterStatus === "desestimada") return label === "cancelado" || label === "desestimado";
             if (filterStatus === "pasado") return label === "pasado";
 
             // Fallback case just in case something didn't match
@@ -968,7 +970,7 @@
         }
 
         // 2. Filtro de Tiempo
-        if (filterTime !== "all") {
+        if (filterTime !== "all" && filterStatus !== "pasado") {
           filtered = filtered.filter((row) => {
             const arrival = toInputDate(row["Entrada"]);
             if (!arrival) return false;
@@ -1099,26 +1101,32 @@
             }
             if (kpiFilter === "release") {
               let isReleaseUrgent = false;
-              const roomListStr = row.RoomingList_JSON;
-              if (roomListStr) {
-                try {
-                  const roomList = JSON.parse(roomListStr);
-                  roomList.forEach((item) => {
-                    const dIn = new Date(toInputDate(item.dateIn));
-                    if (!isNaN(dIn.getTime())) {
-                      const diff = Math.ceil(
-                        (dIn - now) / (1000 * 60 * 60 * 24),
-                      );
-                      if (diff <= 7) isReleaseUrgent = true;
-                    }
-                  });
-                } catch (e) { }
-              }
-              const comRelease = row.Com_Vencimiento_Rel
-                ? new Date(row.Com_Vencimiento_Rel)
-                : null;
-              if (comRelease && !isNaN(comRelease.getTime())) {
-                if (comRelease <= sevenDaysFromNow) isReleaseUrgent = true;
+              const manualPaidVal = parseNum(row["Com_Pagado"] || "0");
+              const currentForecast = parseNum(row["Importe(*)"]);
+              const isFullyPaid = manualPaidVal >= currentForecast - 0.01;
+
+              if (!isFullyPaid) {
+                const roomListStr = row.RoomingList_JSON;
+                if (roomListStr) {
+                  try {
+                    const roomList = JSON.parse(roomListStr);
+                    roomList.forEach((item) => {
+                      const dIn = new Date(toInputDate(item.dateIn));
+                      if (!isNaN(dIn.getTime())) {
+                        const diff = Math.ceil(
+                          (dIn - now) / (1000 * 60 * 60 * 24),
+                        );
+                        if (diff <= 7) isReleaseUrgent = true;
+                      }
+                    });
+                  } catch (e) { }
+                }
+                const comRelease = row.Com_Vencimiento_Rel
+                  ? new Date(row.Com_Vencimiento_Rel)
+                  : null;
+                if (comRelease && !isNaN(comRelease.getTime())) {
+                  if (comRelease <= sevenDaysFromNow) isReleaseUrgent = true;
+                }
               }
               return isReleaseUrgent;
             }
@@ -4503,11 +4511,11 @@
                     >
                       <option value="all">Todos</option>
                       <option value="activos">Activos</option>
+                      <option value="activos_y_desestimados">Activos y Desestimados</option>
                       <option value="confirmada">Confirmados</option>
                       <option value="tentativa">Tentativas</option>
                       <option value="presupuesto">Presupuestos</option>
-                      <option value="prospecto">Prospectos</option>
-                      <option value="anulada">Anulados</option>
+                      <option value="desestimada">Desestimados</option>
                       <option value="pasado">Pasados</option>
                     </select>
                   </div>
@@ -4626,7 +4634,13 @@
                 >
                   <IconFileInvoice size={18} /> Seg Presup{" "}
                   <span className="text-[10px] bg-indigo-100 text-indigo-700 px-1.5 rounded-full font-bold">
-                    {data.filter(r => String(r.Reserva || '').startsWith('PRES-') || (r.Estado || '').toUpperCase() === 'PRESUPUESTO').length}
+                    {data.filter(r => {
+                      const est = (r.Estado || "").toUpperCase();
+                      const intEst = (r.Com_Estado_Interno || "").toUpperCase();
+                      const isBudget = String(r.Reserva || "").startsWith("PRES-") || est.includes("PRESUPUESTO") || intEst.includes("PRESUPUESTO") || intEst.includes("ENVIADO") || intEst.includes("SEGUIMIENTO") || intEst.includes("PENDIENTE");
+                      if (!isBudget) return false;
+                      return !["CANCEL", "ANUL", "GASTOS", "DESESTIMADO"].some(status => intEst.includes(status) || est.includes(status));
+                    }).length}
                   </span>
                 </button>
                 <button

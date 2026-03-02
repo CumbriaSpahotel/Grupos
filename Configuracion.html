@@ -91,7 +91,13 @@
                     web: "www.hotelguadiana.es",
                     bank: "Globalcaja",
                     iban: "ES30 3190 3953 1851 8526 3521",
-                    paymentGateway: ""
+                    paymentGateway: "",
+                    clauses: [
+                        { title: "Cupo y Disponibilidad", body: "La presente oferta es válida por 48 horas. Dado que se requiere el bloqueo total de instalaciones, la disponibilidad no se garantiza hasta el primer depósito." },
+                        { title: "Confirmación y Depósito", body: "Bloqueo confirmado al recibir el 30% del total ({DEP_30}). El 70% restante deberá liquidarse 7 días antes de la entrada." },
+                        { title: "Política de Cancelación", body: "Al ser un evento de carácter exclusivo con bloqueo de inventario, todos los depósitos entregados tienen carácter de NO REEMBOLSABLES." },
+                        { title: "Rooming List", body: "La relación detallada de ocupantes deberá entregarse 5 días hábiles antes de la llegada del primer pasajero." }
+                    ]
                 },
                 cumbria: {
                     name: "Hotel",
@@ -108,7 +114,13 @@
                     web: "www.hotelcumbria.es",
                     bank: "Caixabank",
                     iban: "ES19 3081 0601 0850 0004 8966",
-                    paymentGateway: ""
+                    paymentGateway: "",
+                    clauses: [
+                        { title: "Cupo y Disponibilidad", body: "La presente oferta es válida por 48 horas. Dado que se requiere el bloqueo total de instalaciones, la disponibilidad no se garantiza hasta el primer depósito." },
+                        { title: "Confirmación y Depósito", body: "Bloqueo confirmado al recibir el 30% del total ({DEP_30}). El 70% restante deberá liquidarse 7 días antes de la entrada." },
+                        { title: "Política de Cancelación", body: "Al ser un evento de carácter exclusivo con bloqueo de inventario, todos los depósitos entregados tienen carácter de NO REEMBOLSABLES." },
+                        { title: "Rooming List", body: "La relación detallada de ocupantes deberá entregarse 5 días hábiles antes de la llegada del primer pasajero." }
+                    ]
                 },
                 system: {
                     pin: "1234",
@@ -466,70 +478,150 @@
                                         </div>
                                     </div>
                                 ) : (
-                                    <div className="grid grid-cols-2 gap-8">
-                                        <div className="space-y-6">
-                                            <div>
-                                                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 ml-1">Razón Social</label>
-                                                <input type="text" value={config[activeHotel].company} onChange={(e) => handleChange(activeHotel, 'company', e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-700 font-semibold focus:border-[#2d5a43] outline-none transition-all" />
-                                            </div>
-                                            <div>
-                                                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 ml-1">NIF / CIF</label>
-                                                <input type="text" value={config[activeHotel].nif} onChange={(e) => handleChange(activeHotel, 'nif', e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-700 font-semibold focus:border-[#2d5a43] outline-none transition-all" />
-                                            </div>
-                                            <div>
-                                                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 ml-1">Inscripción Registro Mercantil</label>
-                                                <textarea rows="2" value={config[activeHotel].legal} onChange={(e) => handleChange(activeHotel, 'legal', e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-700 font-semibold focus:border-[#2d5a43] outline-none transition-all resize-none" />
-                                            </div>
-                                            <div className="grid grid-cols-1 gap-4">
+                                    <>
+                                        <div className="grid grid-cols-2 gap-8">
+                                            <div className="space-y-6">
                                                 <div>
-                                                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 ml-1">Entidad Bancaria</label>
-                                                    <input type="text" value={config[activeHotel].bank || ""} onChange={(e) => handleChange(activeHotel, 'bank', e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-700 font-semibold focus:border-[#2d5a43] outline-none transition-all" placeholder="Nombre del Banco" />
+                                                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 ml-1">Razón Social</label>
+                                                    <input type="text" value={config[activeHotel].company} onChange={(e) => handleChange(activeHotel, 'company', e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-700 font-semibold focus:border-[#2d5a43] outline-none transition-all" />
                                                 </div>
                                                 <div>
-                                                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 ml-1">IBAN de Cobro</label>
-                                                    <input type="text" value={config[activeHotel].iban} onChange={(e) => handleChange(activeHotel, 'iban', e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-emerald-700 font-bold focus:border-[#2d5a43] outline-none transition-all tracking-tighter text-sm" />
+                                                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 ml-1">NIF / CIF</label>
+                                                    <input type="text" value={config[activeHotel].nif} onChange={(e) => handleChange(activeHotel, 'nif', e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-700 font-semibold focus:border-[#2d5a43] outline-none transition-all" />
                                                 </div>
-                                                <div className="col-span-2">
-                                                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 ml-1">Enlace Pasarela TPV (Banco)</label>
-                                                    <input type="text" value={config[activeHotel].paymentGateway || ""} onChange={(e) => handleChange(activeHotel, 'paymentGateway', e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-700 font-semibold focus:border-[#2d5a43] outline-none transition-all text-xs" placeholder="https://..." />
+                                                <div>
+                                                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 ml-1">Inscripción Registro Mercantil</label>
+                                                    <textarea rows="2" value={config[activeHotel].legal} onChange={(e) => handleChange(activeHotel, 'legal', e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-700 font-semibold focus:border-[#2d5a43] outline-none transition-all resize-none" />
+                                                </div>
+                                                <div className="grid grid-cols-1 gap-4">
+                                                    <div>
+                                                        <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 ml-1">Entidad Bancaria</label>
+                                                        <input type="text" value={config[activeHotel].bank || ""} onChange={(e) => handleChange(activeHotel, 'bank', e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-700 font-semibold focus:border-[#2d5a43] outline-none transition-all" placeholder="Nombre del Banco" />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 ml-1">IBAN de Cobro</label>
+                                                        <input type="text" value={config[activeHotel].iban} onChange={(e) => handleChange(activeHotel, 'iban', e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-emerald-700 font-bold focus:border-[#2d5a43] outline-none transition-all tracking-tighter text-sm" />
+                                                    </div>
+                                                    <div className="col-span-2">
+                                                        <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 ml-1">Enlace Pasarela TPV (Banco)</label>
+                                                        <input type="text" value={config[activeHotel].paymentGateway || ""} onChange={(e) => handleChange(activeHotel, 'paymentGateway', e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-700 font-semibold focus:border-[#2d5a43] outline-none transition-all text-xs" placeholder="https://..." />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div className="space-y-6">
+                                                <div>
+                                                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 ml-1">Dirección Física</label>
+                                                    <input type="text" value={config[activeHotel].address} onChange={(e) => handleChange(activeHotel, 'address', e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-700 font-semibold focus:border-[#2d5a43] outline-none transition-all" />
+                                                </div>
+                                                <div className="grid grid-cols-3 gap-4">
+                                                    <div className="col-span-1">
+                                                        <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 ml-1">IRUS</label>
+                                                        <input type="text" value={config[activeHotel].irus || ""} onChange={(e) => handleChange(activeHotel, 'irus', e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-700 font-semibold focus:border-[#2d5a43] outline-none transition-all" />
+                                                    </div>
+                                                    <div className="col-span-1">
+                                                        <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 ml-1">C.P.</label>
+                                                        <input type="text" value={config[activeHotel].cp} onChange={(e) => handleChange(activeHotel, 'cp', e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-700 font-semibold focus:border-[#2d5a43] outline-none transition-all" />
+                                                    </div>
+                                                    <div className="col-span-1">
+                                                        <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 ml-1">Ciudad</label>
+                                                        <input type="text" value={config[activeHotel].city} onChange={(e) => handleChange(activeHotel, 'city', e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-700 font-semibold focus:border-[#2d5a43] outline-none transition-all" />
+                                                    </div>
+                                                </div>
+                                                <div className="grid grid-cols-2 gap-4">
+                                                    <div>
+                                                        <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 ml-1">Email</label>
+                                                        <input type="email" value={config[activeHotel].email} onChange={(e) => handleChange(activeHotel, 'email', e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-700 font-semibold focus:border-[#2d5a43] outline-none transition-all" />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 ml-1">Teléfono</label>
+                                                        <input type="text" value={config[activeHotel].tel} onChange={(e) => handleChange(activeHotel, 'tel', e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-700 font-semibold focus:border-[#2d5a43] outline-none transition-all" />
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 ml-1">Web Oficial</label>
+                                                    <input type="text" value={config[activeHotel].web || ""} onChange={(e) => handleChange(activeHotel, 'web', e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-700 font-semibold focus:border-[#2d5a43] outline-none transition-all" />
                                                 </div>
                                             </div>
                                         </div>
-                                        <div className="space-y-6">
-                                            <div>
-                                                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 ml-1">Dirección Física</label>
-                                                <input type="text" value={config[activeHotel].address} onChange={(e) => handleChange(activeHotel, 'address', e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-700 font-semibold focus:border-[#2d5a43] outline-none transition-all" />
-                                            </div>
-                                            <div className="grid grid-cols-3 gap-4">
-                                                <div className="col-span-1">
-                                                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 ml-1">IRUS</label>
-                                                    <input type="text" value={config[activeHotel].irus || ""} onChange={(e) => handleChange(activeHotel, 'irus', e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-700 font-semibold focus:border-[#2d5a43] outline-none transition-all" />
-                                                </div>
-                                                <div className="col-span-1">
-                                                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 ml-1">C.P.</label>
-                                                    <input type="text" value={config[activeHotel].cp} onChange={(e) => handleChange(activeHotel, 'cp', e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-700 font-semibold focus:border-[#2d5a43] outline-none transition-all" />
-                                                </div>
-                                                <div className="col-span-1">
-                                                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 ml-1">Ciudad</label>
-                                                    <input type="text" value={config[activeHotel].city} onChange={(e) => handleChange(activeHotel, 'city', e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-700 font-semibold focus:border-[#2d5a43] outline-none transition-all" />
-                                                </div>
-                                            </div>
-                                            <div className="grid grid-cols-2 gap-4">
-                                                <div>
-                                                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 ml-1">Email</label>
-                                                    <input type="email" value={config[activeHotel].email} onChange={(e) => handleChange(activeHotel, 'email', e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-700 font-semibold focus:border-[#2d5a43] outline-none transition-all" />
+
+                                        {/* CLÁUSULAS */}
+                                        <div className="mt-12 pt-10 border-t border-slate-100">
+                                            <div className="flex items-center gap-3 mb-6">
+                                                <div className="p-2 bg-slate-100 rounded-lg">
+                                                    <LucideIcon name="file-text" className="w-5 h-5 text-slate-600" />
                                                 </div>
                                                 <div>
-                                                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 ml-1">Teléfono</label>
-                                                    <input type="text" value={config[activeHotel].tel} onChange={(e) => handleChange(activeHotel, 'tel', e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-700 font-semibold focus:border-[#2d5a43] outline-none transition-all" />
+                                                    <h4 className="text-lg font-bold text-slate-800 tracking-tight">Cláusulas y Condiciones</h4>
+                                                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Textos legales para el final del presupuesto</p>
                                                 </div>
                                             </div>
-                                            <div>
-                                                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 ml-1">Web Oficial</label>
-                                                <input type="text" value={config[activeHotel].web || ""} onChange={(e) => handleChange(activeHotel, 'web', e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-700 font-semibold focus:border-[#2d5a43] outline-none transition-all" />
+
+                                            <div className="bg-slate-50 border border-slate-200 rounded-3xl p-6 md:p-8">
+                                                <div className="mb-4 p-4 bg-indigo-50 border border-indigo-100 rounded-xl flex items-start gap-3">
+                                                    <LucideIcon name="info" className="w-4 h-4 text-indigo-500 mt-0.5 shrink-0" />
+                                                    <div className="text-xs text-indigo-700 leading-relaxed">
+                                                        <strong>Variables disponibles:</strong> Puedes usar <code>{'{DEP_30}'}</code> en el texto; el sistema lo reemplazará automáticamente por el 30% del presupuesto para indicarlo en la cláusula. Puedes añadir tantas cláusulas como consideres necesarias.
+                                                    </div>
+                                                </div>
+
+                                                <div className="space-y-6">
+                                                    {config[activeHotel].clauses && config[activeHotel].clauses.map((clause, idx) => (
+                                                        <div key={idx} className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm relative group">
+                                                            <button
+                                                                onClick={() => {
+                                                                    const newClauses = [...config[activeHotel].clauses];
+                                                                    newClauses.splice(idx, 1);
+                                                                    handleChange(activeHotel, 'clauses', newClauses);
+                                                                }}
+                                                                className="absolute top-4 right-4 text-slate-300 hover:text-red-500 transition-colors bg-white p-1 rounded opacity-0 group-hover:opacity-100"
+                                                                title="Eliminar cláusula">
+                                                                <LucideIcon name="trash-2" size={16} />
+                                                            </button>
+
+                                                            <div className="flex items-center gap-4 mb-4 pr-8">
+                                                                <span className="w-6 h-6 shrink-0 bg-slate-100 rounded-full flex items-center justify-center font-black text-slate-600 text-xs">
+                                                                    {idx + 1}
+                                                                </span>
+                                                                <input
+                                                                    type="text"
+                                                                    value={clause.title}
+                                                                    placeholder="Título de la cláusula (ej. Cupo y Disponibilidad)"
+                                                                    onChange={(e) => {
+                                                                        const newClauses = [...config[activeHotel].clauses];
+                                                                        newClauses[idx].title = e.target.value;
+                                                                        handleChange(activeHotel, 'clauses', newClauses);
+                                                                    }}
+                                                                    className="flex-1 bg-transparent border-b border-slate-200 py-1 text-sm font-bold text-slate-800 outline-none focus:border-[#2d5a43] transition-colors"
+                                                                />
+                                                            </div>
+                                                            <textarea
+                                                                rows="2"
+                                                                value={clause.body}
+                                                                placeholder="Contenido descriptivo de la cláusula..."
+                                                                onChange={(e) => {
+                                                                    const newClauses = [...config[activeHotel].clauses];
+                                                                    newClauses[idx].body = e.target.value;
+                                                                    handleChange(activeHotel, 'clauses', newClauses);
+                                                                }}
+                                                                className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-slate-600 text-sm outline-none focus:border-[#2d5a43] transition-all resize-y ml-10 w-[calc(100%-2.5rem)]"
+                                                            />
+                                                        </div>
+                                                    ))}
+
+                                                    <button
+                                                        onClick={() => {
+                                                            const current = config[activeHotel].clauses || [];
+                                                            handleChange(activeHotel, 'clauses', [...current, { title: "Nueva Cláusula", body: "" }]);
+                                                        }}
+                                                        className="w-full flex items-center justify-center gap-2 py-4 border-2 border-dashed border-slate-200 rounded-2xl text-slate-400 font-bold hover:border-[#2d5a43] hover:text-[#2d5a43] hover:bg-emerald-50/50 transition-all text-sm"
+                                                    >
+                                                        <LucideIcon name="plus" className="w-4 h-4" />
+                                                        Añadir Nueva Cláusula
+                                                    </button>
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
+                                    </>
                                 )}
                             </div>
                         </div>

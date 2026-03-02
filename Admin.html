@@ -457,8 +457,14 @@
               s.includes("TENTATI")
             ) {
               tentative++;
-            } else if (s.includes("SEGUIMIENTO")) {
-              bSeg++;
+            } else if (s.includes("SEGUIMIENTO") || String(id).startsWith("PRES-")) {
+              if (s.includes("SEGUIMIENTO")) {
+                bSeg++;
+              } else if (s.includes("ENVIADO")) {
+                bEnv++;
+              } else {
+                bPend++;
+              }
               prospect++;
             } else if (s.includes("ENVIADO")) {
               bEnv++;
@@ -1374,8 +1380,10 @@
       const budgetData = data.filter((g) => {
         const isBudget =
           String(g.Reserva || "").startsWith("PRES-") ||
-          (g.Estado || "").toUpperCase() === "PRESUPUESTO" ||
-          (g.Com_Estado_Interno || "").toUpperCase() === "PRESUPUESTO";
+          (g.Estado || "").toUpperCase().includes("PRESUPUESTO") ||
+          (g.Com_Estado_Interno || "").toUpperCase().includes("PRESUPUESTO") ||
+          (g.Com_Estado_Interno || "").toUpperCase().includes("ENVIADO") ||
+          (g.Com_Estado_Interno || "").toUpperCase().includes("SEGUIMIENTO");
 
         if (!isBudget) return false;
 
