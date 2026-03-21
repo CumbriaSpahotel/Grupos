@@ -458,6 +458,10 @@
                 </thead>
                 <tbody class="invoice-items"></tbody>
             </table>
+            <!-- NOTA IMPUESTOS -->
+            <div class="text-[8px] font-bold text-slate-500 tracking-wider text-right uppercase mb-4" style="-webkit-print-color-adjust: exact; print-color-adjust: exact;">
+                * Todos los importes llevan incluido el impuesto correspondiente
+            </div>
         </div>
 
         <div id="tpl-proforma" class="template-content hidden font-pro text-black">
@@ -476,11 +480,9 @@
                                 <div>Pag.</div>
                             </div>
                             <div class="proforma-box-row text-center">
-                                <div class="border-r border-black font-bold text-[10px] editable" id="reserva-id-2"
-                                    contenteditable="true">Proforma</div>
-                                <div class="border-r border-black text-xs"><span class="editable" id="fecha-proforma-2"
-                                        contenteditable="true">12-02-2026</span></div>
-                                <div class="text-xs">1</div>
+                                <div class="border-r border-black font-bold text-[10px] leading-tight flex flex-col items-center justify-center py-0.5">Prof: <span class="editable inline-block" id="reserva-id-2" contenteditable="true">---</span></div>
+                                <div class="border-r border-black text-xs flex items-center justify-center"><span class="editable" id="fecha-proforma-2" contenteditable="true">12-02-2026</span></div>
+                                <div class="text-xs flex items-center justify-center editable" contenteditable="true">1</div>
                             </div>
                         </div>
                     </td>
@@ -591,6 +593,10 @@
                 </thead>
                 <tbody class="invoice-items"></tbody>
             </table>
+            <!-- NOTA IMPUESTOS -->
+            <div class="text-[8px] font-bold text-slate-500 tracking-wider text-right uppercase mb-4" style="-webkit-print-color-adjust: exact; print-color-adjust: exact;">
+                * Todos los importes llevan incluido el impuesto correspondiente
+            </div>
         </div>
 
         <div id="tpl-propuesta" class="template-content hidden font-pro text-black">
@@ -906,28 +912,53 @@
 
         async function generateAIEmail() {
             showAIModal("✨ Redactando Email Profesional");
-            const total = items.reduce((acc, curr) => acc + (curr.precio || 0), 0);
-            const cliente = document.getElementById('solicitante-nombre-1')?.innerText || document.getElementById('solicitante-org-1')?.innerText || "estimado cliente";
-            const grupoName = document.getElementById('programa-1')?.innerText || "vuestro grupo";
-            const entrada = document.getElementById('reserva-entrada-1')?.innerText || "--/--/--";
+            
+            let grandTotal = 0;
+            const resumenServicios = items.map(item => {
+                const p = parseFloat(item.precio || 0);
+                const cant = parseFloat(item.cant || 1);
+                const hab = parseFloat(item.hab || 1);
+                const dias = parseFloat(item.dias || 1);
+                const sub = (p * cant * hab * dias).toFixed(2);
+                grandTotal += parseFloat(sub);
+                
+                let text = `- `;
+                text += `${item.cant ? item.cant + 'x ' : ''}`;
+                text += `${item.concepto || item.roomType || 'Servicio'} `;
+                if(item.regimen) text += `(${item.regimen}) `;
+                text += `-> ${sub}€`;
+                return text;
+            }).join("\\n            ");
+
+            const cliente = document.getElementById('solicitante-nombre-1')?.innerText || document.getElementById('solicitante-org-1')?.innerText || "Estimado Cliente";
+            const grupoName = document.getElementById('programa-1')?.innerText || "su grupo";
+            const entrada = document.getElementById('reserva-entrada-1')?.innerText || "--/--/----";
             const hotelName = HOTELS[currentHotel]?.name + " " + HOTELS[currentHotel]?.subname;
 
             let context = `documento de confirmación`;
             if (currentTemplate === 'proforma') context = `factura proforma`;
             if (currentTemplate === 'propuesta') context = `propuesta formal de servicios`;
 
-            const prompt = `Redacta un correo electrónico de acompañamiento para enviar una ${context} a un cliente. 
-            Detalles:
+            const prompt = `Redacta el cuerpo y asunto de un correo electrónico para enviar la ${context} adjunta al cliente.
+            
+            DETALLES DE LA RESERVA:
             - Cliente: ${cliente}
-            - Grupo: ${grupoName}
+            - Grupo / Referencia: ${grupoName}
             - Hotel: ${hotelName}
             - Fecha de entrada: ${entrada}
-            - Total: ${formatNum(total)} €
             
-            El tono debe ser amable, profesional y comercial si es una propuesta, o administrativo y claro si es una proforma/confirmación.
-            Asegúrate de invitar al cliente a revisar el ${context} adjunto y quedar a su disposición para cualquier duda.`;
+            SERVICIOS INCLUIDOS EN EL PRESUPUESTO:
+            ${resumenServicios}
+            
+            - Total Presupuesto: ${formatNum(grandTotal)} €
+            
+            INSTRUCCIONES ESTRICTAS:
+            1. El tono debe ser muy profesional, formal y elegante (administrativo claro si es proforma/confirmación, o persuasivo y cortés si es propuesta).
+            2. Analiza el presupuesto y menciona en el correo de forma resumida los puntos clave acordados (número de habitaciones principales, régimen, total a pagar). No enlistes todo como un robot, hazlo natural.
+            3. Invita cortésmente al cliente a revisar el ${context} en formato PDF adjunto.
+            4. DEVUELVE ÚNICAMENTE el Asunto en la primera línea (ej: **Asunto:** ...) y el cuerpo del correo. NO INCLUYAS frases introductorias tuyas como "Claro, aquí tienes una propuesta...". Empieza directamente con el Asunto.`;
 
-            const result = await callGemini(prompt);
+            const result = await callGeminiHotel(prompt);
             document.getElementById('ai-content').innerText = result;
         }
 
@@ -1072,6 +1103,8 @@
                 if (elUniversal) elUniversal.innerText = '';
             });
             document.querySelectorAll('[id^="fecha-proforma-"]').forEach(el => el.innerText = today);
+            const fechaUniv = document.getElementById('fecha-universal');
+            if (fechaUniv) fechaUniv.innerText = today;
 
             if (!saved) {
                 console.warn("⚠️ No se encontraron datos en 'selectedGroup'");
@@ -1641,9 +1674,9 @@
                 const totalPending = totalNetoPagar - totalPaid;
 
                 footer.innerHTML = `
-                    <div class="mt-10 font-pro" style="page-break-inside: avoid;">
+                    <div class="mt-4 font-pro" style="page-break-inside: avoid;">
                         <!-- Divider decorativo -->
-                        <div class="flex items-center gap-4 mb-8">
+                        <div class="flex items-center gap-4 mb-4">
                             <div class="flex-1 h-px" style="background: linear-gradient(to right, transparent, #cbd5e1 40%, #cbd5e1 60%, transparent); -webkit-print-color-adjust: exact; print-color-adjust: exact;"></div>
                             <div class="flex items-center gap-2">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" class="text-slate-300" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg>
@@ -1654,9 +1687,9 @@
                         </div>
 
                         <!-- TOTALES - Premium Block -->
-                        <div class="mb-6 rounded-2xl bg-white shadow-sm border border-slate-200 overflow-hidden flex relative" style="-webkit-print-color-adjust: exact; print-color-adjust: exact;">
+                        <div class="mb-4 rounded-2xl bg-white shadow-sm border border-slate-200 overflow-hidden flex relative" style="-webkit-print-color-adjust: exact; print-color-adjust: exact;">
                             <div class="w-1.5" style="background: linear-gradient(to bottom, ${currentHotel === 'cumbria' ? '#0f172a, #334155' : '#16a34a, #14532d'}); -webkit-print-color-adjust: exact; print-color-adjust: exact;"></div>
-                            <div class="flex-1 px-8 py-6 flex justify-between items-center bg-gradient-to-r from-slate-50/40 to-white">
+                            <div class="flex-1 px-8 py-4 flex justify-between items-center bg-gradient-to-r from-slate-50/40 to-white">
                                 <div>
                                     <span class="text-[8px] font-black uppercase tracking-[0.25em] text-slate-400 block mb-1">Total Presupuestado</span>
                                     <div class="flex items-baseline gap-1">
@@ -1685,6 +1718,7 @@
                         </div>
 
                         <div class="space-y-4">
+                            ${!(groupData["Enlace_TPV"] || h.paymentGateway) ? `
                             <!-- BLOQUE BANCO / TITULAR -->
                             <div class="bg-gradient-to-br from-slate-50 to-white pt-2 pb-4 px-5 rounded-2xl border border-slate-200/80 shadow-sm relative overflow-hidden" style="-webkit-print-color-adjust: exact; print-color-adjust: exact;">
                                  <!-- Decorative corner -->
@@ -1719,6 +1753,7 @@
                                      </div>
                                  </div>
                             </div>
+                            ` : ''}
 
                             <!-- PLAN DE PAGOS -->
                             <div>
@@ -1749,21 +1784,13 @@
                                                     </div>
                                                     <div class="flex justify-between items-end mt-1">
                                                         <div>
-                                                            <p class="text-[8.5px] ${isPaid ? 'text-emerald-500' : 'text-slate-500'} font-black uppercase tracking-wider mb-1">${isPaid ? 'Cobrado' : 'Vence'}</p>
-                                                            <p class="text-[10px] text-slate-600">${formatDateSafe(depDate)}</p>
+                                                            <p class="text-[9px] ${isPaid ? 'text-emerald-500' : 'text-rose-600'} font-black uppercase tracking-wider mb-1">${isPaid ? 'Cobrado' : 'Fecha Límite'}</p>
+                                                            <p class="text-[12px] font-bold ${isPaid ? 'text-slate-600' : 'text-slate-800'}">${formatDateSafe(depDate)}</p>
                                                         </div>
                                                         <div class="text-right">
-                                                            <p class="tabular-nums leading-none flex items-baseline gap-0.5" style="font-size: 11px; font-weight: 900; ${isPaid ? 'color: #047857;' : 'color: #1e293b;'} -webkit-print-color-adjust: exact; print-color-adjust: exact;">${formatNum(dep.amount)}<span style="font-size: 7.5px; opacity: 0.6;">€</span></p>
+                                                            <p class="tabular-nums leading-none flex items-baseline gap-0.5" style="font-size: 13px; font-weight: 900; ${isPaid ? 'color: #047857;' : 'color: #1e293b;'} -webkit-print-color-adjust: exact; print-color-adjust: exact;">${formatNum(dep.amount)}<span style="font-size: 8px; opacity: 0.6;">€</span></p>
                                                         </div>
                                                     </div>
-                                                    ${(!isPaid && dep.Enlace_TPV) ? `
-                                                    <div class="mt-2 pt-2 border-t border-slate-100/50 flex justify-center">
-                                                        <a href="${dep.Enlace_TPV}" target="_blank" class="text-[7.5px] font-black text-white px-4 py-2 rounded-full w-full text-center transition-all uppercase tracking-[0.1em] flex items-center justify-center shadow-md border hover:brightness-110" style="background: linear-gradient(135deg, #059669, #14b8a6); border-color: rgba(16,185,129,0.3); box-shadow: 0 4px 6px -1px rgba(16, 185, 129, 0.2), 0 2px 4px -1px rgba(16, 185, 129, 0.1); -webkit-print-color-adjust: exact; print-color-adjust: exact; text-decoration: none;">
-                                                            <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 5px; opacity: 0.9; -webkit-print-color-adjust: exact; print-color-adjust: exact;"><rect width="20" height="14" x="2" y="5" rx="2"></rect><line x1="2" x2="22" y1="10" y2="10"></line></svg>
-                                                            <span>PINCHA AQUÍ PARA PAGAR ONLINE</span>
-                                                        </a>
-                                                    </div>
-                                                    ` : ''}
                                                 </div>
                                             </div>
                                          `;
@@ -1776,6 +1803,18 @@
                                         <span class="text-slate-500 font-medium tracking-wide whitespace-nowrap"><span class="font-bold text-slate-600">TÉRMINOS DE PAGO:</span> Todos los pagos anticipados a cuenta son <strong class="font-bold text-slate-700">No Reembolsables</strong>.</span>
                                     </div>
                                 </div>
+                                
+                                ${(groupData["Enlace_TPV"] || h.paymentGateway) && groupPlan.some(p => p.status !== "Cobrado") ? `
+                                <!-- GLOBAL PAYMENT LINK BUTTON -->
+                                <div class="mt-2 mb-2 w-full flex justify-center">
+                                    <a href="${(()=>{ const l = groupData['Enlace_TPV'] || h.paymentGateway || ''; return (l && !l.startsWith('http')) ? 'https://'+l : l; })()}" target="_blank" class="px-6 py-3 rounded-full shadow-lg transition-all flex items-center justify-center gap-2 border" style="background: linear-gradient(135deg, ${currentHotel === 'cumbria' ? '#0f172a, #334155' : '#059669, #14b8a6'}); border-color: rgba(255,255,255,0.2); text-decoration: none; -webkit-print-color-adjust: exact; print-color-adjust: exact; transform: scale(1.02);">
+                                        <div style="background: rgba(255,255,255,0.2); padding: 4px; border-radius: 50%; display: flex;">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="-webkit-print-color-adjust: exact; print-color-adjust: exact;"><rect width="20" height="14" x="2" y="5" rx="2"></rect><line x1="2" x2="22" y1="10" y2="10"></line></svg>
+                                        </div>
+                                        <span style="color: white; font-size: 11px; font-weight: 900; letter-spacing: 0.1em; text-transform: uppercase;">Abonar Pago de la Reserva Online (TPV Segura)</span>
+                                    </a>
+                                </div>
+                                ` : ''}
                             </div>
                         </div>
                     </div>`;
@@ -1855,29 +1894,29 @@
                             </div>
                             
                             <div id="bank-details-wrapper" style="margin-top: 10px; text-align: right; border-top: 1px solid #eee; pt-4; position: relative;" class="group">
-                                ${showBankDetails ? `
-                                    <button class="no-print absolute top-0 -left-6 text-red-300 hover:text-red-500 text-xs" 
-                                            onclick="showBankDetails=false;renderItems();;" title="Eliminar datos bancarios">✕</button>
-                                    <p style="font-size: 9px; color: #64748b; font-weight: 700; text-transform: uppercase; margin-bottom: 3px; letter-spacing: 0.5px;">
-                                        Cuenta de Abono Corriente
+                                 ${(showBankDetails && !(groupData["Enlace_TPV"] || h.paymentGateway)) ? `
+                                     <button class="no-print absolute top-0 -left-6 text-red-300 hover:text-red-500 text-xs" 
+                                             onclick="showBankDetails=false;renderItems();;" title="Eliminar datos bancarios">✕</button>
+                                     <p style="font-size: 9px; color: #64748b; font-weight: 700; text-transform: uppercase; margin-bottom: 3px; letter-spacing: 0.5px;">
+                                         Cuenta de Abono Corriente
+                                     </p>
+                                      <p style="font-size: 9px; color: #111827; font-weight: 800; text-transform: uppercase; margin-bottom: 1px; font-family: 'Montserrat', sans-serif;">
+                                          Titular: ${h.company}
+                                      </p>
+                                      <p style="font-size: 9px; color: #111827; font-weight: 800; text-transform: uppercase; margin-bottom: 6px; font-family: 'Montserrat', sans-serif;">
+                                           ${h.bank} : <span style="letter-spacing: -0.2px;">${h.iban}</span>
+                                      </p>
+                                 ` : ''}
+                                 ${(groupData["Enlace_TPV"] || h.paymentGateway) ? `
+                                    <p style="font-size: 8px; color: #059669; font-weight: 800; text-transform: uppercase; margin-top: 4px; display: flex; align-items: center; justify-content: flex-end; gap: 4px;">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="5" rx="2"></rect><line x1="2" x2="22" y1="10" y2="10"></line></svg>
+                                        <a href="${(()=>{ const l = groupData['Enlace_TPV'] || h.paymentGateway || ''; return (l && !l.startsWith('http')) ? 'https://'+l : l; })()}" target="_blank" style="color: #059669; text-decoration: none; border-bottom: 1px solid #d1fae5;">Pago Online con Tarjeta</a>
                                     </p>
-                                     <p style="font-size: 9px; color: #111827; font-weight: 800; text-transform: uppercase; margin-bottom: 1px; font-family: 'Montserrat', sans-serif;">
-                                         Titular: ${h.company}
-                                     </p>
-                                     <p style="font-size: 9px; color: #111827; font-weight: 800; text-transform: uppercase; margin-bottom: 6px; font-family: 'Montserrat', sans-serif;">
-                                          ${h.bank} : <span style="letter-spacing: -0.2px;">${h.iban}</span>
-                                     </p>
-                                     ${(groupData["Enlace_TPV"] || h.paymentGateway) ? `
-                                        <p style="font-size: 8px; color: #059669; font-weight: 800; text-transform: uppercase; margin-top: 4px; display: flex; align-items: center; justify-content: flex-end; gap: 4px;">
-                                            <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="5" rx="2"></rect><line x1="2" x2="22" y1="10" y2="10"></line></svg>
-                                            <a href="${groupData["Enlace_TPV"] || h.paymentGateway}" target="_blank" style="color: #059669; text-decoration: none; border-bottom: 1px solid #d1fae5;">Pago Online con Tarjeta</a>
-                                        </p>
-                                     ` : ''}
-                                ` : `
+                                 ` : (!showBankDetails ? `
                                     <button class="no-print text-gray-200 hover:text-gray-400 font-medium uppercase tracking-tighter" 
                                             style="font-size: 5px; background: none; border: none; padding: 0; margin-bottom: 2px;"
                                             onclick="showBankDetails=true;renderItems();">+ restaurar datos bancarios</button>
-                                `}
+                                 ` : '')}
                                 <div id="legal-notice-wrapper" style="position: relative; border-top: 0.5px solid #f3f4f6; pt-2">
                                     ${showLegalNotice ? `
                                         <button class="no-print absolute top-2 -left-6 text-red-100 hover:text-red-300 text-[10px]" 
@@ -2117,6 +2156,20 @@
             doRedirect();
         }
 
+        // Print handlers to hide placeholder/empty notes
+        window.onbeforeprint = () => {
+            const notas = document.getElementById('propuesta-notas');
+            const placeholder = "Escriba aquí cualquier observación adicional";
+            if (notas && (notas.innerText.includes(placeholder) || !notas.innerText.trim())) {
+                notas.closest('.mt-8.pt-8').classList.add('no-print');
+            }
+        };
+        window.onafterprint = () => {
+            const notas = document.getElementById('propuesta-notas');
+            if (notas) {
+                notas.closest('.mt-8.pt-8').classList.remove('no-print');
+            }
+        };
     </script>
 </body>
 

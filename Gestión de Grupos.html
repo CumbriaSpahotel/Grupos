@@ -7065,7 +7065,7 @@
 
                                 <div className="w-12">
                                   <label className="block text-[9px] font-black text-slate-400 uppercase mb-1 ml-1 text-center">
-                                    Hab.
+                                    UND.
                                   </label>
                                   <input
                                     type="number"
@@ -7759,7 +7759,7 @@
                                           </div>
 
                                           <div className="space-y-1.5">
-                                            <div className="grid grid-cols-[25px_50px_90px_60px_70px_1fr_60px_25px] gap-1 px-1 mb-1 text-[8px] font-black text-slate-400 uppercase tracking-tighter">
+                                            <div className="grid grid-cols-[25px_50px_1fr_60px_70px_60px_25px] gap-1 px-1 mb-1 text-[8px] font-black text-slate-400 uppercase tracking-tighter">
                                               <div></div>
                                               <div className="text-center">
                                                 %
@@ -7772,9 +7772,6 @@
                                               </div>
                                               <div className="text-center">
                                                 Fecha
-                                              </div>
-                                              <div className="text-center">
-                                                Enlace de Pago TPV
                                               </div>
                                               <div className="text-center">
                                                 Estado
@@ -7817,7 +7814,7 @@
                                                 return (
                                                   <div
                                                     key={dep.id}
-                                                    className={`grid grid-cols-[25px_50px_90px_60px_70px_1fr_60px_25px] items-center gap-1 p-1 rounded border ${isPaid ? "bg-emerald-50/40 border-emerald-100/50" : isWarning ? "bg-rose-50 border-rose-200 animate-pulse" : "bg-white border-slate-100"} hover:border-slate-300 transition-all group shadow-sm pl-1`}
+                                                    className={`grid grid-cols-[25px_50px_1fr_60px_70px_60px_25px] items-center gap-1 p-1 rounded border ${isPaid ? "bg-emerald-50/40 border-emerald-100/50" : isWarning ? "bg-rose-50 border-rose-200 animate-pulse" : "bg-white border-slate-100"} hover:border-slate-300 transition-all group shadow-sm pl-1`}
                                                   >
                                                     <div className="flex justify-center">
                                                       {isWarning ? (
@@ -7835,8 +7832,8 @@
                                                       <input
                                                         type="number"
                                                         className="bg-transparent border-none text-[10px] font-black text-slate-600 w-8 text-right outline-none"
-                                                        value={dep.percent}
-                                                        onChange={(e) =>
+                                                        defaultValue={dep.percent}
+                                                        onBlur={(e) =>
                                                           handlePlanChange(
                                                             idx,
                                                             "percent",
@@ -7868,10 +7865,10 @@
                                                         <input
                                                           type="number"
                                                           className="bg-transparent border-none text-[11px] font-black text-blue-700 w-8 text-center outline-none"
-                                                          value={
+                                                          defaultValue={
                                                             dep.releaseDays
                                                           }
-                                                          onChange={(e) =>
+                                                          onBlur={(e) =>
                                                             handlePlanChange(
                                                               idx,
                                                               "releaseDays",
@@ -7893,23 +7890,7 @@
                                                     >
                                                       {formatDate(dep.date)}
                                                     </div>
-                                                    <div className="px-1 w-full">
-                                                      <input
-                                                        type="text"
-                                                        className="w-full bg-slate-50 border border-slate-200 rounded px-1.5 py-1 text-[9px] focus:outline-none focus:ring-1 focus:ring-emerald-500 placeholder:text-slate-300"
-                                                        placeholder="Añadir enlace TPV..."
-                                                        value={
-                                                          dep.Enlace_TPV || ""
-                                                        }
-                                                        onChange={(e) =>
-                                                          handlePlanChange(
-                                                            idx,
-                                                            "Enlace_TPV",
-                                                            e.target.value,
-                                                          )
-                                                        }
-                                                      />
-                                                    </div>
+
                                                     <button
                                                       onClick={() =>
                                                         handlePlanChange(
@@ -7975,24 +7956,32 @@
                                   Notas de Control
                                 </h4>
                                 {(() => {
-                                  const specificLink =
-                                    selectedGroupFicha.records[0]?.[
-                                    "Enlace_TPV"
-                                    ];
-                                  return specificLink ? (
-                                    <a
-                                      href={specificLink}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="ml-auto flex items-center gap-1.5 px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-full text-[9px] font-black uppercase tracking-wider transition-all shadow-sm shadow-emerald-200"
-                                    >
-                                      <IconCreditCard size={12} stroke={3} />
-                                      Pasarela Activa
-                                    </a>
-                                  ) : (
-                                    <div className="ml-auto flex items-center gap-1.5 px-3 py-1 bg-slate-100 text-slate-400 rounded-full text-[9px] font-black uppercase tracking-wider opacity-50">
-                                      <IconCreditCard size={12} stroke={3} />
-                                      Sin Enlace TPV
+                                  const specificLink = selectedGroupFicha.records[0]?.["Enlace_TPV"];
+                                  return (
+                                    <div className="ml-auto flex items-center gap-2">
+                                      <input
+                                        type="text"
+                                        placeholder="Pegue aquí el enlace de pasarela..."
+                                        className="bg-slate-50 border border-slate-200 rounded px-2 py-1 text-[9px] w-64 focus:outline-none focus:ring-1 focus:ring-emerald-500 text-slate-600 transition-colors"
+                                        defaultValue={specificLink || ""}
+                                        onBlur={(e) => updateGroupMetadata(selectedGroupFicha.id, "Enlace_TPV", e.target.value)}
+                                      />
+                                      {specificLink ? (
+                                        <a
+                                          href={specificLink}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="flex items-center gap-1.5 px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-full text-[9px] font-black uppercase tracking-wider transition-all shadow-sm shadow-emerald-200"
+                                        >
+                                          <IconCreditCard size={12} stroke={3} />
+                                          Pasarela
+                                        </a>
+                                      ) : (
+                                        <div className="flex items-center gap-1.5 px-3 py-1 bg-slate-100 text-slate-400 rounded-full text-[9px] font-black uppercase tracking-wider opacity-50">
+                                          <IconCreditCard size={12} stroke={3} />
+                                          Sin Enlace TPV
+                                        </div>
+                                      )}
                                     </div>
                                   );
                                 })()}
@@ -8002,12 +7991,10 @@
                                 <textarea
                                   className="w-full h-full bg-amber-50/50 border border-amber-100 rounded-lg p-2 text-[10px] font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-amber-200 resize-none leading-relaxed placeholder-amber-300"
                                   placeholder="Escribe aquí notas operativas, recordatorios o detalles importantes del grupo..."
-                                  value={
-                                    selectedGroupFicha.records[0]?.[
-                                    "Com_Notas"
-                                    ] || ""
+                                  defaultValue={
+                                    selectedGroupFicha.records[0]?.["Com_Notas"] || ""
                                   }
-                                  onChange={(e) =>
+                                  onBlur={(e) =>
                                     updateGroupMetadata(
                                       selectedGroupFicha.id,
                                       "Com_Notas",
