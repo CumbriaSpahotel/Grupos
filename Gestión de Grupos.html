@@ -1419,11 +1419,22 @@
         const segments = {};
 
         processedData.forEach((row) => {
+          // Filtrar grupos cancelados o pasados de la estadística de rentabilidad
+          const stateProps = getStatusProps(
+            row["Com_Estado_Interno"] || row["Segment."],
+            row["Entrada"],
+            row["Estado"]
+          );
+          if (stateProps.label === "DESESTIMADO" || stateProps.label === "PASADO") {
+            return;
+          }
+
           let segName = (row["Segment."] || "Sin Segmento")
             .toString()
             .trim()
             .toUpperCase();
           if (segName === "GRTANTEO") segName = "GRUPO TANTEO";
+          if (segName === "GRUPOS") segName = "GRUPO";
           const groupName = row["Nombre del Grupo"] || "Sin Nombre";
 
           if (!segments[segName]) {
@@ -3884,22 +3895,16 @@
           currentList = [];
         }
 
-        let nights = 1;
+        let nights = parseInt(roomManagerForm.nights) || 1;
         let dIn = new Date();
-        let dOut = new Date();
-        if (
-          !roomManagerForm.isService &&
-          roomManagerForm.dateIn &&
-          roomManagerForm.dateOut
-        ) {
+        if (roomManagerForm.dateIn) {
           dIn = new Date(toInputDate(roomManagerForm.dateIn));
-          dOut = new Date(toInputDate(roomManagerForm.dateOut));
-          if (!isNaN(dIn) && !isNaN(dOut)) {
-            const diff = dOut - dIn;
-            nights = Math.ceil(diff / (1000 * 60 * 60 * 24));
-          }
-          if (nights < 1) nights = 1;
         }
+        if (nights < 1) nights = 1;
+
+        // Calcular dateOut para propósitos informativos si es necesario (1 noche por defecto en dOut si no se especifica)
+        let dOut = new Date(dIn);
+        dOut.setDate(dIn.getDate() + nights);
 
         // --- Generación de Items (Desglosados o Únicos) ---
         let itemsToAdd = [];
