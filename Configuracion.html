@@ -97,6 +97,9 @@
                         { title: "Confirmación y Depósito", body: "Bloqueo confirmado al recibir el 30% del total ({DEP_30}). El 70% restante deberá liquidarse 7 días antes de la entrada." },
                         { title: "Política de Cancelación", body: "Al ser un evento de carácter exclusivo con bloqueo de inventario, todos los depósitos entregados tienen carácter de NO REEMBOLSABLES." },
                         { title: "Rooming List", body: "La relación detallada de ocupantes deberá entregarse 5 días hábiles antes de la llegada del primer pasajero." }
+                    ],
+                    confirmationClauses: [
+                        { title: "Firma y Aceptación", body: "La firma de este documento implica la aceptación total de los servicios indicados y condiciones pactadas." }
                     ]
                 },
                 cumbria: {
@@ -120,6 +123,9 @@
                         { title: "Confirmación y Depósito", body: "Bloqueo confirmado al recibir el 30% del total ({DEP_30}). El 70% restante deberá liquidarse 7 días antes de la entrada." },
                         { title: "Política de Cancelación", body: "Al ser un evento de carácter exclusivo con bloqueo de inventario, todos los depósitos entregados tienen carácter de NO REEMBOLSABLES." },
                         { title: "Rooming List", body: "La relación detallada de ocupantes deberá entregarse 5 días hábiles antes de la llegada del primer pasajero." }
+                    ],
+                    confirmationClauses: [
+                        { title: "Firma y Aceptación", body: "La firma de este documento implica la aceptación total de los servicios indicados y condiciones pactadas." }
                     ]
                 },
                 system: {
@@ -617,6 +623,72 @@
                                                     >
                                                         <LucideIcon name="plus" className="w-4 h-4" />
                                                         Añadir Nueva Cláusula
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* CLÁUSULAS DE CONFIRMACIÓN */}
+                                        <div className="mt-8 pt-8 border-t border-slate-100">
+                                            <div className="flex items-center gap-3 mb-6">
+                                                <div className="p-2 bg-emerald-50 rounded-lg">
+                                                    <LucideIcon name="check-square" className="w-5 h-5 text-emerald-600" />
+                                                </div>
+                                                <div>
+                                                    <h4 className="text-lg font-bold text-slate-800 tracking-tight">Cláusulas de Confirmación</h4>
+                                                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Textos legales para la carta de confirmación</p>
+                                                </div>
+                                            </div>
+                                            <div className="bg-slate-50 border border-slate-200 rounded-3xl p-6 md:p-8">
+                                                <div className="space-y-6">
+                                                    {(config[activeHotel].confirmationClauses || []).map((clause, idx) => (
+                                                        <div key={idx} className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm relative group">
+                                                            <button
+                                                                onClick={() => {
+                                                                    const nc = [...(config[activeHotel].confirmationClauses || [])];
+                                                                    nc.splice(idx, 1);
+                                                                    handleChange(activeHotel, 'confirmationClauses', nc);
+                                                                }}
+                                                                className="absolute top-4 right-4 text-slate-300 hover:text-red-500 transition-colors bg-white p-1 rounded opacity-0 group-hover:opacity-100"
+                                                                title="Eliminar cláusula">
+                                                                <LucideIcon name="trash-2" size={16} />
+                                                            </button>
+                                                            <div className="flex items-center gap-4 mb-4 pr-8">
+                                                                <span className="w-6 h-6 shrink-0 bg-emerald-50 border border-emerald-200 rounded-full flex items-center justify-center font-black text-emerald-700 text-xs">{idx + 1}</span>
+                                                                <input
+                                                                    type="text"
+                                                                    value={clause.title}
+                                                                    placeholder="Título (ej. Firma y Aceptación)"
+                                                                    onChange={(e) => {
+                                                                        const nc = [...(config[activeHotel].confirmationClauses || [])];
+                                                                        nc[idx].title = e.target.value;
+                                                                        handleChange(activeHotel, 'confirmationClauses', nc);
+                                                                    }}
+                                                                    className="flex-1 bg-transparent border-b border-slate-200 py-1 text-sm font-bold text-slate-800 outline-none focus:border-emerald-500 transition-colors"
+                                                                />
+                                                            </div>
+                                                            <textarea
+                                                                rows="2"
+                                                                value={clause.body}
+                                                                placeholder="Contenido de la cláusula..."
+                                                                onChange={(e) => {
+                                                                    const nc = [...(config[activeHotel].confirmationClauses || [])];
+                                                                    nc[idx].body = e.target.value;
+                                                                    handleChange(activeHotel, 'confirmationClauses', nc);
+                                                                }}
+                                                                className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-slate-600 text-sm outline-none focus:border-emerald-400 transition-all resize-y ml-10 w-[calc(100%-2.5rem)]"
+                                                            />
+                                                        </div>
+                                                    ))}
+                                                    <button
+                                                        onClick={() => {
+                                                            const current = config[activeHotel].confirmationClauses || [];
+                                                            handleChange(activeHotel, 'confirmationClauses', [...current, { title: "Nueva Cláusula", body: "" }]);
+                                                        }}
+                                                        className="w-full flex items-center justify-center gap-2 py-4 border-2 border-dashed border-emerald-200 rounded-2xl text-emerald-500 font-bold hover:border-emerald-500 hover:bg-emerald-50/50 transition-all text-sm"
+                                                    >
+                                                        <LucideIcon name="plus" className="w-4 h-4" />
+                                                        Añadir Cláusula de Confirmación
                                                     </button>
                                                 </div>
                                             </div>

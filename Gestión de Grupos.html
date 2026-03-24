@@ -306,6 +306,7 @@
   <script src="js/gemini.js"></script>
   <script src="js/icons.js"></script>
   <script src="js/firebase-init.js"></script>
+  <script src="js/services/excelService.js"></script>
 
   <script type="text/babel">
     // Aseguramos que las librerías estén disponibles
@@ -1683,11 +1684,22 @@
         if (!aiReviewData) return;
         try {
           const resID = aiReviewData.Reserva;
+          const entrada = aiReviewData.Entrada || "";
+          const releaseDate = entrada ? (() => {
+            const d = new Date(entrada);
+            if (!isNaN(d.getTime())) {
+              d.setDate(d.getDate() - 15);
+              return d.toISOString().split("T")[0];
+            }
+            return "";
+          })() : "";
+
           // Aseguramos que los campos requeridos estén presentes
           const finalData = {
             ...aiReviewData,
-            "Segment.": aiReviewData["Nombre del Grupo"],
+            "Segment.": aiReviewData["Nombre del Grupo"] || "GRUPOS",
             "Importe(*)": aiReviewData["Importe(*)"] || "0",
+            "Com_Vencimiento_Rel": aiReviewData["Com_Vencimiento_Rel"] || releaseDate,
             updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
           };
 
@@ -2332,805 +2344,34 @@
         setIsHotelModalOpen(false);
         setPendingFile(null);
 
-        const reader = new FileReader();
-
-        const processMatrixData = (rows, defaultStatus) => {
-          let headerRowIndex = -1;
-          const validData = [];
-          const errors = [];
-          let currentStatus = defaultStatus;
-          let headers = [];
-
-          // Barrido completo para detectar bloques
-          for (let i = 0; i < rows.length; i++) {
-            const row = rows[i];
-            if (!row || row.length === 0) continue;
-            const rowStr = row.join(" ").toLowerCase();
-
-            // Detectar cambios de sección internos (prioridad: más específico primero)
-            if (
-              rowStr.includes("reservas de grupos anuladas") ||
-              rowStr.includes("anuladas") ||
-              rowStr.includes("canceladas")
-            ) {
-              currentStatus = "Anulada";
-              // log
-            } else if (
-              rowStr.includes("tentativa") ||
-              rowStr.includes("bloqueada") ||
-              rowStr.includes("en opcion") ||
-              rowStr.includes("en opción")
-            ) {
-              currentStatus = "Tentativa";
-              // log
-            } else if (
-              rowStr.includes("reservas de grupos confirmadas") ||
-              rowStr.includes("confirmadas")
-            ) {
-              currentStatus = "Confirmada";
-              // log
-            }
-
-            // Detectar cabecera (Flexible: Si encontramos "Reserva" y algo que suene a "Grupo" o "Nombre")
-            // Ampliamos variantes: id, ref, loc, localizador
-            const rowStrLower = rowStr.toLowerCase();
-            const hasReserva =
-              rowStrLower.includes("reserva") ||
-              rowStrLower.includes(" ref") ||
-              rowStrLower.includes(" id ") ||
-              rowStrLower.includes("localiz") ||
-              rowStrLower.includes("cod.");
-            const hasGrupo =
-              rowStrLower.includes("grupo") ||
-              rowStrLower.includes("nombre del g") ||
-              rowStrLower.includes("titular") ||
-              rowStrLower.includes("cliente");
-
-            if (hasReserva && hasGrupo) {
-              headerRowIndex = i;
-              headers = row.map((h) => {
-                const val = (h || "").toString().trim();
-                const lower = val.toLowerCase();
-
-                // NORMALIZACIÓN SEGÚN PLAN DE IMPORTACIÓN (10 COLUMNAS) - PRIORIDAD EXACTA
-                if (
-                  lower === "reserva" ||
-                  lower === "ref" ||
-                  lower === "localizador" ||
-                  lower === "referencia" ||
-                  lower === "id" ||
-                  lower === "cod."
-                )
-                  return "Reserva";
-                if (
-                  lower === "nombre del grupo" ||
-                  lower === "grupo" ||
-                  lower === "titular" ||
-                  lower === "nombre"
-                )
-                  return "Nombre del Grupo";
-                if (
-                  lower === "entrada" ||
-                  lower === "check-in" ||
-                  lower === "llegada" ||
-                  lower === "lleg."
-                )
-                  return "Entrada";
-                if (
-                  lower === "salida" ||
-                  lower === "check-out" ||
-                  lower === "sal." ||
-                  lower === "partida"
-                )
-                  return "Salida";
-                if (
-                  lower === "noches" ||
-                  lower === "nights" ||
-                  lower === "noct." ||
-                  lower === "nº noches"
-                )
-                  return "Noches";
-                if (
-                  lower === "pernoct." ||
-                  lower === "pernoctaciones" ||
-                  lower === "pernoct" ||
-                  lower === "pernoctaciones."
-                )
-                  return "Pernoct.";
-                if (
-                  lower === "pax" ||
-                  lower === "pax." ||
-                  lower === "personas" ||
-                  lower === "pers."
-                )
-                  return "Pax.";
-                if (
-                  lower === "empresa/agencia" ||
-                  lower === "empresa" ||
-                  lower === "agencia" ||
-                  lower === "cliente" ||
-                  lower === "empresa/age"
-                )
-                  return "Empresa/Agencia";
-                if (
-                  lower === "segment." ||
-                  lower === "segmento" ||
-                  lower === "segment"
-                )
-                  return "Segment.";
-                if (
-                  lower === "régimen" ||
-                  lower === "regimen" ||
-                  lower === "meal plan" ||
-                  lower === "reg."
-                )
-                  return "Régimen";
-                if (
-                  lower === "importe(*)" ||
-                  lower === "importe" ||
-                  lower === "revenue" ||
-                  lower === "total" ||
-                  lower.includes("(*)")
-                )
-                  return "Importe(*)";
-
-                // NORMALIZACIÓN POR PATRÓN (SI NO HUBO MATCH EXACTO)
-                if (
-                  lower.includes("reserva") ||
-                  lower.includes("localiz") ||
-                  lower.includes("ref.")
-                )
-                  return "Reserva";
-                if (lower.includes("nombre del g") || lower.includes("titul"))
-                  return "Nombre del Grupo";
-                if (
-                  lower.includes("entrada") ||
-                  lower.includes("check-in") ||
-                  lower.includes("checkin")
-                )
-                  return "Entrada";
-                if (
-                  lower.includes("salida") ||
-                  lower.includes("check-out") ||
-                  lower.includes("checkout")
-                )
-                  return "Salida";
-                if (lower.includes("pernoct")) return "Pernoct.";
-                if (lower.includes("noche") || lower.includes("night"))
-                  return "Noches";
-                if (lower.includes("pax") || lower.includes("persona"))
-                  return "Pax.";
-                if (
-                  lower.includes("empresa") ||
-                  lower.includes("agencia") ||
-                  lower.includes("client")
-                )
-                  return "Empresa/Agencia";
-                if (lower.includes("segm") || lower.includes("mercado"))
-                  return "Segment.";
-                if (
-                  lower.includes("regi") ||
-                  lower.includes("meal") ||
-                  lower.includes("régimen")
-                )
-                  return "Régimen";
-                if (
-                  lower.includes("importe") ||
-                  lower.includes("revenue") ||
-                  lower.includes("total") ||
-                  lower.includes("val.")
-                )
-                  return "Importe(*)";
-
-                // Campos Auxiliares y Otros
-                if (lower.includes("estado") || lower.includes("status"))
-                  return "Estado";
-                if (
-                  lower.includes("habitac") ||
-                  lower.includes("rooms") ||
-                  lower.includes("hab.")
-                )
-                  return "Cant. Habitaciones";
-                if (
-                  lower.includes("precio u") ||
-                  lower.includes("unit price") ||
-                  lower.includes("tarifa neta")
-                )
-                  return "Precio Unitario";
-                if (
-                  lower.includes("cant") ||
-                  lower.includes("qty") ||
-                  lower.includes("unidades")
-                )
-                  return "Cantidad";
-
-                return val;
-              });
-              // log
-              continue;
-            }
-
-            // Si tenemos headers, procesamos la fila
-            if (headerRowIndex !== -1 && headers.length > 0) {
-              // Ignorar filas vacías o repetidas cabeceras
-              if (row.length === 0) continue;
-
-              const obj = {};
-              let hasData = false;
-
-              headers.forEach((header, idx) => {
-                if (header) {
-                  obj[header] =
-                    row[idx] !== undefined && row[idx] !== null
-                      ? row[idx]
-                      : "";
-                  if (obj[header] !== "") hasData = true;
-                }
-              });
-
-              if (hasData) {
-                const reservaVal = (obj["Reserva"] || "")
-                  .toString()
-                  .toLowerCase()
-                  .trim();
-                // Ignorar si parece otra cabecera o fila de totales
-                if (
-                  reservaVal.includes("reserva") ||
-                  reservaVal.includes("total")
-                )
-                  continue;
-
-                // Inyectar Estado detectado si no viene en el excel
-                if (!obj["Estado"] || String(obj["Estado"]).trim() === "")
-                  obj["Estado"] = currentStatus;
-                obj["Hotel_Asignado"] = hotelName;
-
-                if (
-                  reservaVal.length > 0 ||
-                  (obj["Nombre del Grupo"] &&
-                    obj["Nombre del Grupo"].toString().trim().length > 0)
-                ) {
-                  validData.push(obj);
-                } else {
-                  // Solo reportar error si la fila parece contener datos de una reserva (fechas, pax o importe)
-                  // Esto evita avisos molestos en filas de totales, pies de página o filas semivacías al final del Excel
-                  const hasSignificantData =
-                    (obj["Entrada"] &&
-                      obj["Entrada"].toString().trim() !== "") ||
-                    (obj["Salida"] &&
-                      obj["Salida"].toString().trim() !== "") ||
-                    (obj["Pax."] &&
-                      obj["Pax."].toString().trim() !== "" &&
-                      obj["Pax."].toString().trim() !== "0") ||
-                    (obj["Importe(*)"] &&
-                      obj["Importe(*)"].toString().trim() !== "" &&
-                      obj["Importe(*)"].toString().trim() !== "0");
-
-                  if (hasSignificantData) {
-                    errors.push(
-                      `Fila ${i + 1}: Ignorada por no tener Reserva o Nombre de Grupo válido.`,
-                    );
-                  }
-                }
-              }
-            }
-          }
-
-          // log
-          return { validData, errors };
-        };
-
-        if (file.name.endsWith(".csv")) {
-          reader.onload = (e) => {
-            Papa.parse(e.target.result, {
-              header: false,
-              skipEmptyLines: false,
-              complete: (res) => {
-                const csvData = processMatrixData(res.data, "Confirmada");
-                if (csvData.validData.length > 0) {
-                  sanitizeAndSetData(
-                    csvData.validData,
-                    csvData.errors || [],
-                    hotelName,
-                  );
-                } else {
-                  alert("No se encontraron datos válidos en el CSV.");
-                }
-              },
-            });
-          };
-          reader.readAsText(file);
-        } else if (
-          file.name.endsWith(".xlsx") ||
-          file.name.endsWith(".xls")
-        ) {
-          reader.onload = (e) => {
-            const data = new Uint8Array(e.target.result);
-            const workbook = XLSX.read(data, { type: "array" });
-            let allDetectedData = [];
-
-            workbook.SheetNames.forEach((sheetName) => {
-              const worksheet = workbook.Sheets[sheetName];
-              const matrix = XLSX.utils.sheet_to_json(worksheet, {
-                header: 1,
-                defval: "",
-              });
-
-              // Determinamos estado por nombre de hoja
-              let defaultStatus = "Confirmada";
-              if (sheetName.toLowerCase().includes("anula"))
-                defaultStatus = "Anulada";
-
-              const sheetData = processMatrixData(matrix, defaultStatus);
-              allDetectedData = [...allDetectedData, ...sheetData.validData];
-              if (sheetData.errors) {
-                allDetectedData.errors = [
-                  ...(allDetectedData.errors || []),
-                  ...sheetData.errors,
-                ];
-              }
-            });
-
-            if (allDetectedData.length > 0) {
-              sanitizeAndSetData(
-                allDetectedData,
-                allDetectedData.errors || [],
-                hotelName,
-              );
-            } else {
-              alert("No se encontraron datos en el Excel.");
-            }
-          };
-          reader.readAsArrayBuffer(file);
-        } else {
-          alert("Formato no soportado.");
+        if (!file) {
+          alert("Primero selecciona un archivo Excel/CSV.");
+          return;
         }
-      };
 
-      const sanitizeAndSetData = (rawData, importErrors = [], hotelName) => {
-        // Helper to normalize Excel Dates to YYYY-MM-DD
-        const normalizeDate = (val) => {
-          if (!val) return "";
-          let d, m, y;
-
-          // Handle Excel Serial Date
-          if (
-            typeof val === "number" ||
-            (!isNaN(parseFloat(val)) && /^\d{5}$/.test(val))
-          ) {
-            const serial = parseFloat(val);
-            const date = new Date(
-              Math.round((serial - 25569) * 86400 * 1000),
-            );
-            d = date.getUTCDate();
-            m = date.getUTCMonth() + 1;
-            y = date.getUTCFullYear();
-          } else {
-            const str = String(val).trim();
-            // Handle DD/MM/YYYY, DD-MM-YYYY or DD.MM.YY/YYYY
-            if (/^\d{1,2}[\/-]\d{1,2}[\/-]\d{2,4}$/.test(str)) {
-              const parts = str.split(/[\/-]/);
-              [d, m, y] = parts.map(Number);
-              if (y < 100) y += 2000;
-            }
-            // Handle YYYY-MM-DD
-            else if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
-              const [year, month, day] = str.split("-").map(Number);
-              [d, m, y] = [day, month, year];
-            }
-          }
-
-          if (d && m && y) {
-            return `${d.toString().padStart(2, "0")}/${m.toString().padStart(2, "0")}/${y}`;
-          }
-          return String(val).trim();
-        };
-
-        const simpleRows = rawData.map((row) => {
-          const cleanRow = {};
-          Object.keys(row).forEach((k) => {
-            if (k && k.trim() !== "") {
-              let val = row[k];
-              // Normalize dates for 'Entrada' and 'Salida'
-              if (k === "Entrada" || k === "Salida" || k.includes("Date")) {
-                val = normalizeDate(val);
-              }
-              let cleanKey = k.trim();
-              let cleanVal = val;
-
-              // Normalización de Segmentos
-              if (cleanKey === "Segment.") {
-                let seg = (val || "").toString().trim().toUpperCase();
-                if (seg === "GRTANTEO") cleanVal = "GRUPO TANTEO";
-              }
-
-              cleanRow[cleanKey] = cleanVal;
-            }
-          });
-          return cleanRow;
-        });
-
-        // --- GROUPING LOGIC: Aggregating split reservations (same ID) ---
-        const groupedMap = new Map();
-
-        // Helper to get Date object from string
-        const parseToDateObj = (str) => {
-          if (!str) return null;
-          const parts = String(str).split(/[\/-]/);
-          if (parts.length !== 3) return new Date(str);
-          if (parts[0].length === 4) return new Date(str); // YYYY-MM-DD
-          return new Date(`${parts[2]}-${parts[1]}-${parts[0]}`); // DD/MM/YYYY
-        };
-
-        simpleRows.forEach((row) => {
-          const id = normalizeId(row["Reserva"]);
-          if (!id || id === "-") {
-            // For rows without ID, treat as unique by using a random key
-            groupedMap.set(`TEMP-${Math.random()}`, row);
-            return;
-          }
-
-          const getStatusPriority = (s) => {
-            const low = (s || "").toLowerCase();
-            if (low.includes("conf") || low.includes("ok")) return 3;
-            if (low.includes("tent") || low.includes("pros")) return 2;
-            if (low.includes("anul") || low.includes("can")) return 1;
-            return 0;
-          };
-
-          if (!groupedMap.has(id)) {
-            groupedMap.set(id, { ...row });
-          } else {
-            const existing = groupedMap.get(id);
-            const existingPriority = getStatusPriority(existing["Estado"]);
-            const newPriority = getStatusPriority(row["Estado"]);
-
-            // 1. Sum Pax
-            const oldPax = parseNum(existing["Pax."]);
-            const newPax = parseNum(row["Pax."]);
-            existing["Pax."] = (oldPax + newPax).toString();
-
-            // 1.5 Sum Pernoct.
-            const oldPernoct = parseNum(existing["Pernoct."]);
-            const newPernoct = parseNum(row["Pernoct."]);
-            if (oldPernoct > 0 || newPernoct > 0)
-              existing["Pernoct."] = (oldPernoct + newPernoct).toString();
-
-            // 2. Sum Importe
-            const oldImp = parseNum(existing["Importe(*)"]);
-            const newImp = parseNum(row["Importe(*)"]);
-            existing["Importe(*)"] = (oldImp + newImp).toFixed(2);
-
-            // 3. Dates & Hotel Priority
-            if (newPriority > existingPriority) {
-              // New row is more "active", adopt its dates/hotel/status as base
-              existing["Entrada"] = row["Entrada"];
-              existing["Salida"] = row["Salida"];
-              existing["Estado"] = row["Estado"];
-              existing["Hotel_Asignado"] = row["Hotel_Asignado"];
-              existing["Nombre del Grupo"] =
-                row["Nombre del Grupo"] || existing["Nombre del Grupo"];
-              existing["Segment."] = row["Segment."] || existing["Segment."];
-            } else if (newPriority === existingPriority) {
-              // Expand dates only if same priority levels
-              const eIn = parseToDateObj(existing["Entrada"]);
-              const rIn = parseToDateObj(row["Entrada"]);
-              if (rIn && eIn && rIn < eIn)
-                existing["Entrada"] = row["Entrada"];
-
-              const eOut = parseToDateObj(existing["Salida"]);
-              const rOut = parseToDateObj(row["Salida"]);
-              if (rOut && eOut && rOut > eOut)
-                existing["Salida"] = row["Salida"];
-            }
-            // If newPriority < existingPriority, we just added its pax/rev but keep the active dates.
-
-            // 4. Join regime
-            if (row["Régimen"] && existing["Régimen"] !== row["Régimen"]) {
-              if (!existing["Régimen"].includes(row["Régimen"])) {
-                existing["Régimen"] =
-                  `${existing["Régimen"]}, ${row["Régimen"]}`;
-              }
-            }
-          }
-        });
-
-        const incomingRows = Array.from(groupedMap.values());
-
-        // Auto-calculate Noches if missing but Entrada/Salida exist
-        incomingRows.forEach((row) => {
-          if (
-            (!row["Noches"] ||
-              row["Noches"] === "" ||
-              row["Noches"] === "0") &&
-            row["Entrada"] &&
-            row["Salida"]
-          ) {
-            const eIn = parseToDateObj(row["Entrada"]);
-            const eOut = parseToDateObj(row["Salida"]);
-            if (
-              eIn &&
-              eOut &&
-              !isNaN(eIn.getTime()) &&
-              !isNaN(eOut.getTime())
-            ) {
-              const diffDays = Math.round(
-                (eOut - eIn) / (1000 * 60 * 60 * 24),
-              );
-              if (diffDays > 0) row["Noches"] = diffDays.toString();
-            }
-          }
-        });
-
-        // Log import summary
-        const totalPaxFound = incomingRows.reduce(
-          (a, b) => a + parseNum(b["Pax."]),
-          0,
-        );
-        const totalImpFound = incomingRows.reduce(
-          (a, b) => a + parseNum(b["Importe(*)"]),
-          0,
-        );
-        const mergedCount = simpleRows.length - incomingRows.length;
-        // log
-
-        // Copia profunda de los datos actuales para el merge
-        const mergedData = [...data];
-        // log
-
-        // 1. Procesar registros entrantes
-        const APP_ONLY_FIELDS = new Set([
-          "Estado",
-          "Com_Comercial",
-          "Com_Estado_Interno",
-          "Com_Notas",
-          "Com_Seguimiento",
-          "Com_Vencimiento_Rel",
-          "Com_Precio",
-          "Dep1_Label",
-          "Dep1_Percent",
-          "Dep1_Importe",
-          "Dep1_Fecha",
-          "Dep2_Label",
-          "Dep2_Percent",
-          "Dep2_Importe",
-          "Dep2_Fecha",
-          "Dep3_Label",
-          "Dep3_Percent",
-          "Dep3_Importe",
-          "Dep3_Fecha",
-          "PaymentPlan_JSON",
-          "RoomingList_JSON",
-          "Fiscal_RazonSocial",
-          "Fiscal_CIF",
-          "Fiscal_Direccion",
-          "Fiscal_CP",
-          "Fiscal_Poblacion",
-          "Fiscal_Provincia",
-          "Fiscal_Pais",
-          "Email",
-          "Telefono",
-          "Persona_Contacto",
-          "Proforma_NetRate",
-          "Proforma_Rooms",
-          "Proforma_RoomList",
-          "Com_Pagado",
-          "Hotel_Asignado",
-          "updatedAt",
-        ]);
-
-        incomingRows.forEach((newRow, idx) => {
-          // Generate a temp ID if Reserva is missing to avoid overwriting all empty reserva rows
-          if (!newRow["Reserva"]) {
-            newRow["Reserva"] = `TEMP-${Date.now()}-${idx}`;
-          }
-          const resID = normalizeId(newRow["Reserva"]);
-          const existingIdx = mergedData.findIndex((r) => {
-            const existingId = normalizeId(r["Reserva"]);
-            return (
-              existingId === resID ||
-              existingId.startsWith(resID + "_") ||
-              resID.startsWith(existingId + "_")
-            );
-          });
-
-          if (existingIdx === -1) {
-            mergedData.push({ ...newRow, _diff: "new" });
-          } else {
-            const existingRow = mergedData[existingIdx];
-            let diffType = null;
-            let changes = {};
-
-            const toNum = (v) => parseNum(v);
-            const toIsoDate = (v) => {
-              if (v === null || v === undefined || v === "" || v === "---")
-                return "";
-              let s = String(v).trim();
-              const numericVal = parseFloat(s);
-              if (
-                !isNaN(numericVal) &&
-                numericVal > 40000 &&
-                numericVal < 60000 &&
-                !s.includes("/") &&
-                !s.includes("-")
-              ) {
-                try {
-                  const date = new Date(
-                    Math.round((numericVal - 25569) * 86400 * 1000),
-                  );
-                  if (!isNaN(date.getTime()))
-                    return date.toISOString().split("T")[0];
-                } catch (e) { }
-              }
-              if (/^\d{4}[-\/]\d{2}[-\/]\d{2}/.test(s))
-                return s.substring(0, 10).replace(/\//g, "-");
-              let d, m, y;
-              const parts = s.split(/[-\/.]/);
-              if (parts.length === 3) {
-                if (parts[0].length <= 2) [d, m, y] = parts;
-                else if (parts[0].length === 4) [y, m, d] = parts;
-              }
-              if (d && m && y) {
-                let year = parseInt(y);
-                if (year < 100) year += 2000;
-                return `${String(year).padStart(4, "0")}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-              }
-              return "";
-            };
-
-            const NUMERIC_KEYS = new Set([
-              "Importe(*)",
-              "Pax.",
-              "Noches",
-              "Pernoct.",
-              "Cant. Habitaciones",
-            ]);
-            const DATE_KEYS = new Set(["Entrada", "Salida"]);
-            const relevantKeys = [
-              "Entrada",
-              "Salida",
-              "Pax.",
-              "Importe(*)",
-              "Régimen",
-              "Segment.",
-              "Nombre del Grupo",
-              "Noches",
-              "Pernoct.",
-              "Empresa/Agencia",
-              "Cant. Habitaciones",
-            ];
-
-            relevantKeys.forEach((key) => {
-              const rawOld = existingRow[key];
-              const rawNew = newRow[key];
-              if (rawNew === undefined) return;
-              const isEmptyOld =
-                rawOld === null ||
-                rawOld === undefined ||
-                String(rawOld).trim() === "" ||
-                String(rawOld).trim() === "---";
-              const isEmptyNew =
-                rawNew === null ||
-                rawNew === undefined ||
-                String(rawNew).trim() === "" ||
-                String(rawNew).trim() === "---";
-
-              // NO detectar cambios si el nuevo valor está vacío pero el antiguo tenía algo (evitar sobreescrituras accidentales de campos críticos)
-              if (!isEmptyOld && isEmptyNew) return;
-
-              if (isEmptyOld && isEmptyNew) return;
-              let isDifferent = false;
-              if (NUMERIC_KEYS.has(key)) {
-                const numOld = toNum(rawOld);
-                const numNew = toNum(rawNew);
-                if (isNaN(numOld) && isNaN(numNew)) return;
-                if (isNaN(numOld) !== isNaN(numNew))
-                  isDifferent =
-                    Math.abs(isNaN(numOld) ? numNew : numOld) > 0.01;
-                else isDifferent = Math.abs(numOld - numNew) >= 0.5; // Ignore sub-decimal fluctuations in imports
-              } else if (DATE_KEYS.has(key)) {
-                const dateOld = toIsoDate(rawOld);
-                const dateNew = toIsoDate(rawNew);
-                if (dateOld === "" && dateNew === "") return;
-                isDifferent = dateOld !== dateNew;
-              } else {
-                const cleanStr = (v) =>
-                  String(v)
-                    .replace(/\.0$/, "")
-                    .trim()
-                    .toUpperCase()
-                    .replace(/\s+/g, " ");
-                isDifferent =
-                  (isEmptyOld ? "" : cleanStr(rawOld)) !==
-                  (isEmptyNew ? "" : cleanStr(rawNew));
-              }
-              if (isDifferent) {
-                if (NUMERIC_KEYS.has(key)) {
-                  // Parse value explicitly, round to 2 decimals, then toString() to strip floating noise
-                  const cleanVal = (v) =>
-                    isNaN(toNum(v))
-                      ? String(v).trim()
-                      : Number(
-                        Math.round(toNum(v) + "e2") + "e-2",
-                      ).toString();
-                  changes[key] = {
-                    old: isEmptyOld ? "---" : cleanVal(rawOld),
-                    new: isEmptyNew ? "---" : cleanVal(rawNew),
-                  };
-                } else {
-                  changes[key] = {
-                    old: isEmptyOld ? "---" : rawOld,
-                    new: isEmptyNew ? "---" : rawNew,
-                  };
+        setLoading(true);
+        if (window.ExcelService && window.ExcelService.parseAndMergeFile) {
+            window.ExcelService.parseAndMergeFile(file, data, hotelName, (err, result) => {
+                setLoading(false);
+                if (err) {
+                    alert(err.message || "Error al procesar el archivo");
+                    return;
                 }
-              }
+                
+                setData(result.sortedData);
+                setColumns(result.columns);
+                setImportSummaryData(result.summaryData);
+                setShowImportSummary(true);
+                
+                if (result.summaryData.newGroupsCount > 0 || result.summaryData.modifiedGroupsCount > 0) {
+                    setActiveTab("table");
+                }
             });
-
-            const oldStatus = (existingRow["Estado"] || "").toLowerCase();
-            const newStatus = (newRow["Estado"] || "").toLowerCase();
-            if (newStatus.includes("anul") && !oldStatus.includes("anul"))
-              diffType = "cancelled";
-            else if (Object.keys(changes).length > 0) diffType = "modified";
-
-            const mergedRow = { ...existingRow };
-            Object.keys(newRow).forEach((key) => {
-              if (APP_ONLY_FIELDS.has(key)) return;
-              const valNew = newRow[key];
-              if (valNew === undefined || valNew === null || valNew === "")
-                return;
-              if (NUMERIC_KEYS.has(key))
-                mergedRow[key] = toNum(valNew).toString();
-              else if (DATE_KEYS.has(key)) mergedRow[key] = toIsoDate(valNew);
-              else mergedRow[key] = valNew;
-            });
-
-            if (Object.keys(changes).length === 0) {
-              mergedRow["_diff"] = null;
-              mergedRow["_changes"] = null;
-            } else {
-              mergedRow["_diff"] =
-                diffType || (existingRow._diff ? existingRow._diff : null);
-              mergedRow["_changes"] = changes;
-            }
-            mergedData[existingIdx] = mergedRow;
-          }
-        });
-
-        const allKeys = new Set();
-        mergedData.forEach((r) =>
-          Object.keys(r).forEach((k) => allKeys.add(k)),
-        );
-
-        const sortedData = [...mergedData].sort((a, b) => {
-          const valA = toInputDate(a["Entrada"]) || "9999";
-          const valB = toInputDate(b["Entrada"]) || "9999";
-          return valA.localeCompare(valB);
-        });
-
-        setData(sortedData);
-        setColumns(
-          Array.from(allKeys).filter(
-            (k) => !k.startsWith("_") && k !== "Hotel_Asignado",
-          ),
-        );
-
-        const newsCount = sortedData.filter((r) => r._diff === "new").length;
-        const modsCount = sortedData.filter(
-          (r) => r._diff === "modified" || r._diff === "cancelled",
-        ).length;
-
-        setImportSummaryData({
-          totalRowsProcessed: simpleRows.length,
-          uniqueGroups: incomingRows.length,
-          totalPax: totalPaxFound,
-          totalRevenue: totalImpFound,
-          newGroupsCount: newsCount,
-          modifiedGroupsCount: modsCount,
-          errors: importErrors,
-          detectedHotel: hotelName,
-        });
-        setShowImportSummary(true);
-        if (newsCount > 0 || modsCount > 0) setActiveTab("table");
+        } else {
+            setLoading(false);
+            console.error("ExcelService no está disponible en window.");
+            alert("Error crítico: El módulo ExcelService no está cargado.");
+        }
       };
 
       const acceptChanges = () => {
@@ -3505,132 +2746,203 @@
           if (currentList.length === 0) {
             const newAutoList = [];
 
-            // Iterate through all records (multi-hotel)
-            // Group records by unique combination of Hotel + Dates to avoid duplicates from raw data line splits
-            const uniqueSegments = new Map();
-
-            group.records.forEach((r) => {
-              // Filtro de validez: No generar bloques para registros anulados si hay más activos
-              const rowStatus = (r["Estado"] || "").toLowerCase();
-              if (rowStatus.includes("anul") || rowStatus.includes("can"))
-                return;
-
-              const h = r["Hotel_Asignado"] || r["Hotel"] || "H. Pendiente";
-              const dIn = r["Entrada"];
-              const dOut = r["Salida"];
-              const key = `${h}|${dIn}|${dOut}`;
-
-              // Numerical fixes for massive sums: detect if Importe is likely total and not additive
-              const imp = parseNum(r["Importe(*)"]);
-              const pax = parseInt(r["Pax."] || "0");
-
-              if (!uniqueSegments.has(key)) {
-                uniqueSegments.set(key, {
-                  hotel: h,
-                  dateIn: dIn,
-                  dateOut: dOut,
-                  pax: pax,
-                  price: imp,
-                  regime: r["Régimen"] || "AD",
+            if (group.dailyConfig && Object.keys(group.dailyConfig).length > 0) {
+              const dates = Object.keys(group.dailyConfig).sort();
+              const hotelName = group.records[0]?.["Hotel_Asignado"] || group.records[0]?.["Hotel"] || "H. Pendiente";
+              
+              dates.forEach(date => {
+                const config = group.dailyConfig[date];
+                const normalizedRooms = {};
+                Object.entries(group.roomCounts || {}).forEach(([type, count]) => {
+                  if(count > 0) normalizedRooms[type.toLowerCase()] = { type, count: Number(count) };
                 });
-              } else {
-                const existing = uniqueSegments.get(key);
-                existing.pax += pax;
-                existing.price += imp;
-                // Use the first non-empty regime found
-                if (!existing.regime || existing.regime === "AD") {
-                  existing.regime = r["Régimen"] || existing.regime;
-                }
+                
+                Object.values(normalizedRooms).forEach(v => {
+                  let count = v.count;
+                  if (config.counts) {
+                     const overrideKey = Object.keys(config.counts).find(k => k.toLowerCase() === v.type.toLowerCase());
+                     if (overrideKey && config.counts[overrideKey] !== '' && config.counts[overrideKey] !== undefined) {
+                        count = Number(config.counts[overrideKey]);
+                     }
+                  }
+                  if (count > 0) {
+                     let price = 0;
+                     let regime = config.board || group["Régimen"] || "AD";
+                     let gratuities = 0;
+                     if (config.prices) {
+                        const pk = Object.keys(config.prices).find(k => k.toLowerCase() === v.type.toLowerCase());
+                        price = pk ? parseFloat(config.prices[pk] || 0) : 0;
+                        const gk = config.gratuities ? Object.keys(config.gratuities).find(k => k.toLowerCase() === v.type.toLowerCase()) : null;
+                        gratuities = gk ? parseInt(config.gratuities[gk] || 0) : 0;
+                     } else {
+                        const tk = Object.keys(config).find(k => k.toLowerCase() === v.type.toLowerCase());
+                        if (tk && config[tk]) {
+                          price = parseFloat(config[tk].price || 0);
+                          regime = config[tk].board || regime;
+                          gratuities = parseInt(config[tk].gratuities || 0);
+                        }
+                     }
+                     
+                     // Fallback to approximate logic since getPaxByRoomType might be out of scope or we pass string directly
+                     const paxPerRoom = typeof getPaxByRoomType === 'function' ? getPaxByRoomType(v.type) : (v.type.toLowerCase().includes('ind') || v.type.toLowerCase().includes('dui') ? 1 : (v.type.toLowerCase().includes('tri') ? 3 : 2));
+                     
+                     const payingRooms = Math.max(0, count - gratuities);
+                     if (payingRooms > 0) {
+                       newAutoList.push({
+                          id: Date.now() + Math.random(),
+                          hotel: hotelName,
+                          type: v.type.toUpperCase(),
+                          dateIn: date,
+                          dateOut: date,
+                          qty: payingRooms,
+                          regime: regime,
+                          price: price,
+                          pax: paxPerRoom,
+                          nights: 1,
+                          total: (payingRooms * price).toFixed(2),
+                          isService: false
+                       });
+                     }
+                     if (gratuities > 0) {
+                       newAutoList.push({
+                          id: Date.now() + Math.random(),
+                          hotel: hotelName,
+                          type: v.type.toUpperCase() + " (GRATUIDAD)",
+                          dateIn: date,
+                          dateOut: date,
+                          qty: gratuities,
+                          regime: regime,
+                          price: 0,
+                          pax: paxPerRoom,
+                          nights: 1,
+                          total: "0.00",
+                          isService: false
+                       });
+                     }
+                  }
+                });
+              });
+
+              if (group.extraCharges && group.extraCharges.length > 0) {
+                const hotelName = group.records[0]?.["Hotel_Asignado"] || group.records[0]?.["Hotel"] || "H. Pendiente";
+                group.extraCharges.forEach(ext => {
+                   const isGlobal = !ext.date || ext.date === 'Todas';
+                   const d = isGlobal ? (dates[0] || "") : ext.date;
+                   const u = ext.units !== undefined ? ext.units : 1;
+                   const up = ext.unitPrice !== undefined ? ext.unitPrice : parseFloat(ext.price || 0);
+                   let qty = u;
+                   let nights = isGlobal ? Math.max(1, dates.length) : 1;
+                   
+                   newAutoList.push({
+                     id: Date.now() + Math.random(),
+                     hotel: hotelName,
+                     type: (ext.concept || "Cargo Extra").toUpperCase(),
+                     dateIn: d,
+                     dateOut: d,
+                     qty: qty,
+                     regime: "-",
+                     price: up,
+                     pax: 0, // for extra, pax isn't strictly meaningful in the table usually
+                     nights: nights,
+                     total: (qty * up * nights).toFixed(2),
+                     isService: true
+                   });
+                });
               }
-            });
+            } else {
+              // Iterate through all records (multi-hotel) - Fallback
+              const uniqueSegments = new Map();
 
-            uniqueSegments.forEach((seg) => {
-              if (seg.dateIn && seg.dateOut) {
-                // Robust Date Parsing
-                const parseDate = (dStr) => {
-                  if (!dStr) return null;
-                  const s = dStr.toString();
+              group.records.forEach((r) => {
+                const rowStatus = (r["Estado"] || "").toLowerCase();
+                if (rowStatus.includes("anul") || rowStatus.includes("can"))
+                  return;
 
-                  // Handle Excel Serial Date (e.g. 46088 -> 2026-03-07)
-                  // 5 digits, typically > 40000 for current years
-                  if (/^\d{5}$/.test(s)) {
-                    const serial = parseInt(s, 10);
-                    // Check if it's a reasonable serial number for a date (e.g. > 20000 which is year 1954)
-                    if (serial > 25569) {
-                      return new Date(
-                        Math.round((serial - 25569) * 86400 * 1000),
-                      );
+                const h = r["Hotel_Asignado"] || r["Hotel"] || "H. Pendiente";
+                const dIn = r["Entrada"];
+                const dOut = r["Salida"];
+                const key = `${h}|${dIn}|${dOut}`;
+
+                const imp = parseNum(r["Importe(*)"]);
+                const pax = parseInt(r["Pax."] || "0");
+
+                if (!uniqueSegments.has(key)) {
+                  uniqueSegments.set(key, {
+                    hotel: h,
+                    dateIn: dIn,
+                    dateOut: dOut,
+                    pax: pax,
+                    price: imp,
+                    regime: r["Régimen"] || "AD",
+                  });
+                } else {
+                  const existing = uniqueSegments.get(key);
+                  existing.pax += pax;
+                  existing.price += imp;
+                  if (!existing.regime || existing.regime === "AD") {
+                    existing.regime = r["Régimen"] || existing.regime;
+                  }
+                }
+              });
+
+              uniqueSegments.forEach((seg) => {
+                if (seg.dateIn && seg.dateOut) {
+                  const parseDate = (dStr) => {
+                    if (!dStr) return null;
+                    const s = dStr.toString();
+                    if (/^\d{5}$/.test(s)) {
+                      const serial = parseInt(s, 10);
+                      if (serial > 25569) {
+                        return new Date(Math.round((serial - 25569) * 86400 * 1000));
+                      }
+                    }
+                    if (s.includes("-") && s.split("-")[0].length <= 2) {
+                      const [d, m, y] = s.split("-");
+                      return new Date(`${y}-${m}-${d}T12:00:00Z`);
+                    }
+                    if (s.includes("/") && s.split("/")[0].length <= 2) {
+                      const [d, m, y] = s.split("/");
+                      return new Date(`${y}-${m}-${d}T12:00:00Z`);
+                    }
+                    if (s.includes("-") && s.split("-")[0].length === 4) {
+                      return new Date(`${s}T12:00:00Z`);
+                    }
+                    return new Date(s);
+                  };
+
+                  let start = parseDate(seg.dateIn);
+                  let end = parseDate(seg.dateOut);
+
+                  if (!isNaN(start.getTime()) && !isNaN(end.getTime()) && end > start) {
+                    for (let d = new Date(start); d < end; d.setDate(d.getDate() + 1)) {
+                      const nextDay = new Date(d);
+                      nextDay.setDate(d.getDate() + 1);
+
+                      const totalDays = Math.ceil((end - start) / (1000 * 60 * 60 * 24));
+                      const dailyPrice = totalDays > 0 ? seg.price / totalDays : 0;
+
+                      newAutoList.push({
+                        id: Date.now() + Math.random(),
+                        hotel: seg.hotel,
+                        type: "Habitación (Auto)",
+                        dateIn: d.toISOString().split("T")[0],
+                        dateOut: nextDay.toISOString().split("T")[0],
+                        qty: Math.ceil(seg.pax / 2) || 1,
+                        regime: seg.regime || "AD",
+                        price: (dailyPrice / (Math.ceil(seg.pax / 2) || 1)).toFixed(2),
+                        nights: 1,
+                        total: dailyPrice.toFixed(2),
+                        isService: false
+                      });
                     }
                   }
-
-                  // Handle DD-MM-YYYY or DD/MM/YYYY
-                  if (s.includes("-") && s.split("-")[0].length <= 2) {
-                    const [d, m, y] = s.split("-");
-                    return new Date(`${y}-${m}-${d}T12:00:00Z`);
-                  }
-                  if (s.includes("/") && s.split("/")[0].length <= 2) {
-                    const [d, m, y] = s.split("/");
-                    return new Date(`${y}-${m}-${d}T12:00:00Z`);
-                  }
-                  if (s.includes("-") && s.split("-")[0].length === 4) {
-                    return new Date(`${s}T12:00:00Z`);
-                  }
-                  return new Date(s);
-                };
-
-                let start = parseDate(seg.dateIn);
-                let end = parseDate(seg.dateOut);
-
-                if (
-                  !isNaN(start.getTime()) &&
-                  !isNaN(end.getTime()) &&
-                  end > start
-                ) {
-                  // Loop through days
-                  for (
-                    let d = new Date(start);
-                    d < end;
-                    d.setDate(d.getDate() + 1)
-                  ) {
-                    const nextDay = new Date(d);
-                    nextDay.setDate(d.getDate() + 1);
-
-                    // Calculations for daily price (avg)
-                    const totalDays = Math.ceil(
-                      (end - start) / (1000 * 60 * 60 * 24),
-                    );
-                    const dailyPrice =
-                      totalDays > 0 ? seg.price / totalDays : 0;
-
-                    newAutoList.push({
-                      id: Date.now() + Math.random(),
-                      hotel: seg.hotel,
-                      type: "Habitación (Auto)",
-                      dateIn: d.toISOString().split("T")[0],
-                      dateOut: nextDay.toISOString().split("T")[0],
-                      qty: Math.ceil(seg.pax / 2) || 1, // Assume DBL
-                      regime: seg.regime || "AD",
-                      price: (
-                        dailyPrice / (Math.ceil(seg.pax / 2) || 1)
-                      ).toFixed(2), // Unit price approx
-                      nights: 1,
-                      total: dailyPrice.toFixed(2),
-                    });
-                  }
                 }
-              }
-            });
+              });
+            }
 
-            // Update the group object locally with the new list
             if (newAutoList.length > 0) {
-              // We need to update the record's RoomingList_JSON
-              // Since we can't easily deep update state here without triggering re-renders or complexity,
-              // we'll update the 'group' object clone and let the state settle.
-              // BUT, to persist, we should probably call updateGroupMetadata later or just let user save.
-              // For now, we put it in the object passed to state.
               if (group.records && group.records[0]) {
-                group.records[0]["RoomingList_JSON"] =
-                  JSON.stringify(newAutoList);
+                group.records[0]["RoomingList_JSON"] = JSON.stringify(newAutoList);
               }
             }
           }
@@ -8063,17 +7375,19 @@
                               <div className="absolute top-0 right-0 p-2 opacity-5">
                                 <IconFile size={60} />
                               </div>
-                              <div className="flex items-center gap-2 mb-2 z-10">
-                                <div className="bg-amber-100 p-1 rounded text-amber-600">
-                                  <IconEdit size={14} />
-                                </div>
-                                <h4 className="text-[10px] font-black text-slate-700 uppercase tracking-widest">
-                                  Notas de Control
-                                </h4>
-                                {(() => {
-                                  const specificLink = selectedGroupFicha.records[0]?.["Enlace_TPV"];
-                                  return (
-                                    <div className="ml-auto flex items-center gap-2">
+                              <div className="flex flex-col gap-3 mb-2 z-10 w-full">
+                                <div className="flex items-center gap-2 w-full">
+                                  <div className="bg-amber-100 p-1 rounded text-amber-600">
+                                    <IconEdit size={14} />
+                                  </div>
+                                  <h4 className="text-[10px] font-black text-slate-700 uppercase tracking-widest">
+                                    Notas de Control
+                                  </h4>
+                                  {(() => {
+                                    const specificLink = selectedGroupFicha.records[0]?.["Enlace_TPV"];
+                                    return (
+                                      <div className="ml-auto flex items-center gap-2">
+
                                       <input
                                         type="text"
                                         placeholder="Pegue aquí el enlace de pasarela..."
@@ -8102,21 +7416,104 @@
                                 })()}
                               </div>
 
+                              {/* Checklist Logística Interactivo */}
+                              {(() => {
+                                const record = selectedGroupFicha.records[0] || {};
+                                const status = (record["Estado"] || "").toUpperCase();
+                                const isInactive = ["ANULADA", "CANCELADA", "GASTOS DE ANULACION", "BAJA"].includes(status);
+                                
+                                if (isInactive) return null;
+
+                                const hasRooming = record["Logistica_Rooming"] === true;
+                                const hasMP = record["Logistica_MenuMP"] === true;
+                                const hasPC = record["Logistica_MenuPC"] === true;
+
+                                const regimen = (record["Régimen"] || "").toUpperCase();
+                                const needsMP = regimen.includes("MP");
+                                const needsPC = regimen.includes("PC");
+
+                                let daysToArrival = 999;
+                                if (record["Entrada"]) {
+                                  // Asumiendo formato YYYY-MM-DD
+                                  const arrDateStr = String(record["Entrada"]);
+                                  const arrDate = new Date(arrDateStr.includes('T') ? arrDateStr : arrDateStr + 'T12:00:00');
+                                  if (!isNaN(arrDate)) {
+                                    daysToArrival = Math.ceil((arrDate - new Date()) / (1000 * 60 * 60 * 24));
+                                  }
+                                }
+
+                                const isClose = daysToArrival <= 15 && daysToArrival >= 0;
+                                // Para MP y PC, si no dice explícitamente que NO lo necesita y no está checkeado, es falta (solo si el régimen lo pide o si falta rooming que es obligatorio siempre)
+                                const missingCritical = !hasRooming || (needsMP && !hasMP) || (needsPC && !hasPC);
+                                const showWarning = isClose && missingCritical;
+
+                                const missingList = [
+                                  !hasRooming && "Rooming List",
+                                  needsMP && !hasMP && "Menú MP",
+                                  needsPC && !hasPC && "Menú PC"
+                                ].filter(Boolean).join(", ");
+
+                                return (
+                                  <div className="flex flex-col gap-2 w-full">
+                                    {showWarning && (
+                                      <div className="bg-rose-50 border border-rose-200 text-rose-700 px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-2 shadow-sm animate-pulse-slow">
+                                        <IconAlertTriangle size={14} className="text-rose-500 shrink-0" stroke={3} />
+                                        <span>ALERTA LOGÍSTICA: Llegada en {daysToArrival} días. Faltan datos operativos ({missingList}).</span>
+                                      </div>
+                                    )}
+
+                                    <div className="flex flex-wrap items-center gap-2 bg-slate-50/50 p-2 rounded-lg border border-slate-100">
+                                      <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mr-1">Comprobación:</span>
+                                      
+                                      <button
+                                        onClick={() => updateGroupMetadata(selectedGroupFicha.id, "Logistica_Rooming", !hasRooming)}
+                                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[9px] font-black uppercase tracking-wider transition-all border ${hasRooming ? 'bg-emerald-50 border-emerald-200 text-emerald-700 shadow-sm' : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-100'}`}
+                                      >
+                                        {hasRooming ? <IconCheckCircle size={12} stroke={3} /> : <IconCircle size={12} stroke={2} />}
+                                        Rooming List
+                                      </button>
+
+                                      {needsMP && (
+                                        <button
+                                          onClick={() => updateGroupMetadata(selectedGroupFicha.id, "Logistica_MenuMP", !hasMP)}
+                                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[9px] font-black uppercase tracking-wider transition-all border ${hasMP ? 'bg-emerald-50 border-emerald-200 text-emerald-700 shadow-sm' : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-100'}`}
+                                        >
+                                          {hasMP ? <IconCheckCircle size={12} stroke={3} /> : <IconCircle size={12} stroke={2} />}
+                                          Menú MP
+                                        </button>
+                                      )}
+
+                                      {needsPC && (
+                                        <button
+                                          onClick={() => updateGroupMetadata(selectedGroupFicha.id, "Logistica_MenuPC", !hasPC)}
+                                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[9px] font-black uppercase tracking-wider transition-all border ${hasPC ? 'bg-emerald-50 border-emerald-200 text-emerald-700 shadow-sm' : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-100'}`}
+                                        >
+                                          {hasPC ? <IconCheckCircle size={12} stroke={3} /> : <IconCircle size={12} stroke={2} />}
+                                          Menú PC
+                                        </button>
+                                      )}
+                                    </div>
+                                  </div>
+                                );
+                              })()}
+                            </div>
+
                               <div className="flex-1 z-10">
-                                <textarea
-                                  className="w-full h-full bg-amber-50/50 border border-amber-100 rounded-lg p-2 text-[10px] font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-amber-200 resize-none leading-relaxed placeholder-amber-300"
-                                  placeholder="Escribe aquí notas operativas, recordatorios o detalles importantes del grupo..."
-                                  defaultValue={
-                                    selectedGroupFicha.records[0]?.["Com_Notas"] || ""
-                                  }
-                                  onBlur={(e) =>
-                                    updateGroupMetadata(
-                                      selectedGroupFicha.id,
-                                      "Com_Notas",
-                                      e.target.value,
-                                    )
-                                  }
-                                ></textarea>
+                                  <textarea
+                                    id="notas-control-textarea"
+                                    className="w-full h-full bg-amber-50/50 border border-amber-100 rounded-lg p-2 text-[10px] font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-amber-200 resize-none leading-relaxed placeholder-amber-300"
+                                    placeholder="Escribe aquí notas operativas, recordatorios o detalles importantes del grupo..."
+                                    defaultValue={
+                                      selectedGroupFicha.records[0]?.["Com_Notas"] || ""
+                                    }
+                                    onBlur={(e) =>
+                                      updateGroupMetadata(
+                                        selectedGroupFicha.id,
+                                        "Com_Notas",
+                                        e.target.value,
+                                      )
+                                    }
+                                  ></textarea>
                               </div>
                             </div>
                           </div>

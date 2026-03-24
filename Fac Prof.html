@@ -27,7 +27,7 @@
                 margin: 0;
                 border: none;
                 width: 100%;
-                min-height: auto;
+                min-height: 297mm; /* Keep A4 height so flex mt-auto works */
             }
 
             .editable:hover {
@@ -68,8 +68,7 @@
             background-color: #f3f4f6;
             border-radius: 2px;
         }
-
-        .editable:focus {
+        .editable:focus {
             outline: 2px solid #2d5a43;
             background: white;
         }
@@ -321,10 +320,7 @@
                     <button onclick="switchTemplate('proforma')" id="btn-proforma"
                         class="pb-2 px-2 text-gray-400 hover:text-gray-600 transition-all uppercase text-xs tracking-widest whitespace-nowrap">Modelo
                         Factura Proforma</button>
-                    <button onclick="switchTemplate('propuesta')" id="btn-propuesta"
-                        class="pb-2 px-2 text-gray-400 hover:text-gray-600 transition-all uppercase text-xs tracking-widest whitespace-nowrap">Propuesta
-                        Formal</button>
-                </div>
+                </div></div>
             </div>
         </div>
 
@@ -424,7 +420,7 @@
                                 id="solicitante-tel-1" contenteditable="true">-</span></p>
                     </div>
                     <div class="mt-2 pt-2 border-t border-slate-100 flex items-center gap-2">
-                        <strong class="text-[9px] font-bold text-slate-400 uppercase">Nombre del Grupo:</strong>
+                        <strong class="text-[9px] font-bold text-slate-400 uppercase">Referencia del Evento:</strong>
                         <span class="editable font-black text-slate-800 text-xs flex-1" id="programa-1"
                             contenteditable="true">---</span>
                     </div>
@@ -505,8 +501,7 @@
 
             <!-- Campo Programa -->
             <div class="mb-4 bg-slate-100/50 p-2 border-l-4 border-slate-800 flex items-center gap-4">
-                <span class="text-[9px] font-black uppercase text-slate-500 tracking-widest shrink-0">Nombre del
-                    Grupo</span>
+                <span class="text-[9px] font-black uppercase text-slate-500 tracking-widest shrink-0">Referencia del Evento</span>
                 <span class="editable font-black text-slate-800 text-sm flex-1" id="programa-2"
                     contenteditable="true">---</span>
             </div>
@@ -603,7 +598,7 @@
             <div class="mb-8 text-center">
                 <h1
                     class="text-4xl font-black uppercase tracking-[0.2em] text-slate-800 border-b-4 border-slate-800 inline-block px-8 pb-2">
-                    Propuesta Formal</h1>
+                    Referencia del Evento</h1>
                 <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mt-4 italic">Documento de
                     Presentación de Servicios y Tarifas</p>
             </div>
@@ -1307,12 +1302,10 @@
             currentTemplate = tpl;
             document.getElementById('tpl-confirmacion').classList.toggle('hidden', tpl !== 'confirmacion');
             document.getElementById('tpl-proforma').classList.toggle('hidden', tpl !== 'proforma');
-            document.getElementById('tpl-propuesta').classList.toggle('hidden', tpl !== 'propuesta');
 
             document.getElementById('tpl-policies').classList.toggle('hidden', tpl !== 'confirmacion');
             document.getElementById('btn-confirmacion').className = tpl === 'confirmacion' ? 'pb-2 px-2 tab-active transition-all uppercase text-xs tracking-widest' : 'pb-2 px-2 text-gray-400 transition-all uppercase text-xs tracking-widest';
             document.getElementById('btn-proforma').className = tpl === 'proforma' ? 'pb-2 px-2 tab-active transition-all uppercase text-xs tracking-widest' : 'pb-2 px-2 text-gray-400 transition-all uppercase text-xs tracking-widest';
-            document.getElementById('btn-propuesta').className = tpl === 'propuesta' ? 'pb-2 px-2 tab-active transition-all uppercase text-xs tracking-widest' : 'pb-2 px-2 text-gray-400 transition-all uppercase text-xs tracking-widest';
 
             const docTitle = document.getElementById('doc-type-title');
             const docLabel = document.getElementById('doc-type-label');
@@ -1322,13 +1315,13 @@
             const titleContainer = document.querySelector('.header-title-container');
             const infoContainer = document.querySelector('.header-info-container');
 
-            if (tpl === 'proforma' || tpl === 'propuesta') {
-                if (titleContainer) titleContainer.style.display = 'none';
+            if (tpl === 'proforma') {
+                if (titleContainer) titleContainer.style.display = 'block'; // Keep visible for 3-column layout
                 if (infoContainer) {
-                    infoContainer.style.textAlign = 'left';
-                    infoContainer.style.flex = 'none';
-                    infoContainer.style.paddingLeft = '40px';
-                    infoContainer.style.marginTop = '10px';
+                    infoContainer.style.textAlign = 'center';
+                    infoContainer.style.flex = '1';
+                    infoContainer.style.paddingLeft = '0';
+                    infoContainer.style.marginTop = '0';
                 }
             } else {
                 if (titleContainer) titleContainer.style.display = 'block';
@@ -1344,8 +1337,11 @@
         function formatNum(num) {
             let n = parseFloat(num);
             if (isNaN(n)) return "0,00";
-            // Usa toLocaleString para forzar formato español: 1.234,56
-            return n.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            return new Intl.NumberFormat('es-ES', { 
+                minimumFractionDigits: 2, 
+                maximumFractionDigits: 2,
+                useGrouping: true 
+            }).format(n);
         }
 
         function updateHotel(hotelKey) {
@@ -1652,8 +1648,32 @@
                 });
             }
 
-            // Footer Logic (Confirmacion) - Full payment details
-            if (currentTemplate === 'confirmacion') {
+            // --- Footer Logic per Template ---
+            if (currentTemplate === 'propuesta') {
+                // Cálculo de total para Propuesta (Alojamientos + Extras)
+                let grandTotalPropuesta = 0;
+                const dailyC = groupData.dailyConfig || {};
+                Object.values(dailyC).forEach(rooms => {
+                    Object.entries(rooms).forEach(([type, cfg]) => {
+                        const count = (groupData.roomCounts || {})[type] || 0;
+                        grandTotalPropuesta += count * (parseFloat(cfg.price) || 0);
+                    });
+                });
+                items.forEach(item => {
+                    grandTotalPropuesta += (parseFloat(item.precio) || 0) * (parseFloat(item.hab) || 1) * (parseFloat(item.cant) || 1) * (parseFloat(item.dias) || 1);
+                });
+
+                footer.innerHTML = `
+                    <div class="mt-6">
+                        <div class="rounded-2xl bg-slate-900 px-10 py-6 text-white flex justify-between items-center shadow-xl overflow-hidden relative">
+                            <!-- Background accent -->
+                            <div class="absolute inset-0 opacity-10 pointer-events-none" style="background: radial-gradient(circle at right, #4f46e5, transparent);"></div>
+                            <span class="text-xs font-black uppercase tracking-[0.3em] opacity-80 relative z-10">Total General Propuesta (Neto):</span>
+                            <span class="text-4xl font-black tabular-nums transition-all relative z-10" id="propuesta-total-final">${formatNum(grandTotalPropuesta)} €</span>
+                        </div>
+                    </div>
+                `;
+            } else if (currentTemplate === 'confirmacion') {
                 const h = HOTELS[currentHotel];
 
                 // --- PAGO PLAN LOGIC ---
@@ -1843,17 +1863,47 @@
                             </div>
                         </div>
                     </div>`;
+            } else if (currentTemplate === 'proforma') {
+                const netTotal = total - totalComision;
+                footer.innerHTML = `
+                    <div class="mt-4 flex flex-col items-end w-full">
+                        <div class="proforma-total-box w-[300px] shadow-lg">
+                            <span class="text-[10px] font-bold uppercase tracking-widest mr-4">Total a Pagar:</span>
+                            <span class="text-xl tabular-nums font-black">${formatNum(netTotal)} €</span>
+                        </div>
+                        <div class="mt-4 w-full h-px bg-slate-200"></div>
+                    </div>
+                `;
+            }
 
-            // Update static QR payment block
-            const payUrl = (()=>{ const l = groupData['Enlace_TPV'] || h.paymentGateway || ''; return (l && !l.startsWith('http')) ? 'https://'+l : l; })();
+            updatePaymentLink();
+        }
+
+        function updatePaymentLink() {
+            const groupData = JSON.parse(localStorage.getItem('selectedGroup') || '{}');
+            const h = HOTELS[currentHotel] || HOTELS['guadiana'];
+
+            // --- PAGO PLAN LOGIC ---
+            let groupPlan = [];
+            try {
+                groupPlan = JSON.parse(groupData.PaymentPlan_JSON || "[]");
+            } catch (e) { groupPlan = []; }
+
+            const payUrl = (()=>{ 
+                const l = groupData['Enlace_TPV'] || h.paymentGateway || ''; 
+                return (l && !l.startsWith('http')) ? 'https://'+l : l; 
+            })();
+            
             const qrBlock = document.getElementById('payment-qr-block');
             const qrLink = document.getElementById('payment-qr-link');
             const qrImg = document.getElementById('payment-qr-img');
             const qrInner = document.getElementById('payment-qr-inner');
-            if (qrBlock && payUrl && groupPlan.some(p => p.status !== "Cobrado")) {
+            
+            if (qrBlock && payUrl && (groupPlan.length === 0 || groupPlan.some(p => p.status !== "Cobrado"))) {
                 qrBlock.style.display = 'block';
                 if (qrLink) qrLink.href = payUrl;
                 if (qrImg) qrImg.src = 'https://api.qrserver.com/v1/create-qr-code/?size=100x100&color=064e3b&bgcolor=ffffff&data=' + encodeURIComponent(payUrl);
+                
                 const qrUrlSpan = document.getElementById('payment-raw-url-link');
                 if (qrUrlSpan) {
                     qrUrlSpan.innerText = payUrl;
@@ -1866,369 +1916,19 @@
             } else if (qrBlock) {
                 qrBlock.style.display = 'none';
             }
-            } else {
-                const breakdownHtml = `
-                    <div style="background-color: ${currentHotel === 'cumbria' ? '#0f172a' : '#2d5a43'}; color: white; padding: 10px; border-radius: 4px; box-shadow: inset 0 0 10px rgba(0,0,0,0.1); -webkit-print-color-adjust: exact;">
-                        <table style="width: 100%; border-collapse: collapse; font-size: 8px; text-transform: uppercase;">
-                            <thead style="opacity: 0.7; border-bottom: 0.5px solid rgba(255,255,255,0.2);">
-                                <tr>
-                                    <th style="text-align: left; padding-bottom: 4px;">Tipo IVA</th>
-                                    <th style="text-align: right; padding-bottom: 4px;">Base</th>
-                                    <th style="text-align: right; padding-bottom: 4px;">Cuota</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                ${base10 > 0 ? `
-                                <tr>
-                                    <td style="padding-top: 4px;">REDUC. (10%)</td>
-                                    <td style="text-align: right; padding-top: 4px;">${formatNum(base10)} €</td>
-                                    <td style="text-align: right; padding-top: 4px;">${formatNum(iva10)} €</td>
-                                </tr>` : ''}
-                                ${base21 > 0 ? `
-                                <tr>
-                                    <td style="padding-top: 2px;">GRAL. (21%)</td>
-                                    <td style="text-align: right; padding-top: 2px;">${formatNum(base21)} €</td>
-                                    <td style="text-align: right; padding-top: 2px;">${formatNum(iva21)} €</td>
-                                </tr>` : ''}
-                                <tr style="border-top: 1px solid rgba(255,255,255,0.3); font-weight: bold;">
-                                    <td style="padding-top: 6px;">TOTAL NETO</td>
-                                    <td colspan="2" style="text-align: right; padding-top: 6px; font-size: 10px;">${formatNum(base10 + base21)} €</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>`;
-
-                // Inyectar en paneles de reserva
-                const summaryProforma = document.getElementById('iva-summary-proforma');
-                if (summaryProforma) summaryProforma.innerHTML = breakdownHtml;
-
-                // Footer Logic (Proforma) - Only the black box and small text
-                footer.innerHTML = `
-                    <div style="margin-top: 20px; width: 100%; display: flex; justify-content: flex-end;">
-                        <div style="width: 320px; font-family: 'Montserrat', sans-serif;">
-                            <!-- Total Section Premium Block -->
-                            <div class="rounded-xl bg-white shadow-sm border border-slate-200 overflow-hidden flex relative w-full mb-2" style="-webkit-print-color-adjust: exact; print-color-adjust: exact;">
-                                <div class="w-1.5" style="background: linear-gradient(to bottom, ${currentHotel === 'cumbria' ? '#0f172a, #334155' : '#16a34a, #14532d'}); -webkit-print-color-adjust: exact; print-color-adjust: exact;"></div>
-                                <div class="flex-1 px-4 py-3 flex justify-between items-center bg-gradient-to-r from-slate-50/50 to-white">
-                                    <span class="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400">Total IVA Incl.</span>
-                                    <div class="flex items-baseline gap-1">
-                                        <span class="tabular-nums tracking-tighter" style="font-size: 22px; font-weight: 900; color: #0f172a; -webkit-print-color-adjust: exact; print-color-adjust: exact; letter-spacing: -0.02em;">${formatNum(total - totalComision)}</span>
-                                        <span class="font-bold text-slate-400" style="font-size: 11px;">€</span>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <!-- Discrete IVA Breakdown Section -->
-                            <div style="margin-top: 10px; border-top: 1px solid #e2e8f0; padding: 6px 0;">
-                                <table style="width: 100%; border-collapse: collapse; font-size: 9px; color: #334155; font-family: 'Montserrat', sans-serif; text-transform: uppercase;">
-                                    <tr>
-                                        <th style="text-align: left; font-weight: 800; color: #64748b; padding-bottom: 4px;">Base Imponible</th>
-                                        <th style="text-align: center; font-weight: 800; color: #64748b; padding-bottom: 4px;">IVA</th>
-                                        <th style="text-align: right; font-weight: 800; color: #64748b; padding-bottom: 4px;">Cuota</th>
-                                    </tr>
-                                    ${base10 > 0 ? `
-                                    <tr>
-                                        <td style="padding: 3px 0; font-weight: 600;">${formatNum(base10)} €</td>
-                                        <td style="text-align: center; padding: 3px 0; font-weight: 600;">10%</td>
-                                        <td style="text-align: right; padding: 3px 0; font-weight: 600;">${formatNum(iva10)} €</td>
-                                    </tr>` : ''}
-                                    ${base21 > 0 ? `
-                                    <tr>
-                                        <td style="padding: 3px 0; font-weight: 600;">${formatNum(base21)} €</td>
-                                        <td style="text-align: center; padding: 3px 0; font-weight: 600;">21%</td>
-                                        <td style="text-align: right; padding: 3px 0; font-weight: 600;">${formatNum(iva21)} €</td>
-                                    </tr>` : ''}
-                                </table>
-                            </div>
-                            
-                            <div id="bank-details-wrapper" style="margin-top: 10px; text-align: right; border-top: 1px solid #eee; pt-4; position: relative;" class="group">
-                                 ${(showBankDetails && !(groupData["Enlace_TPV"] || h.paymentGateway)) ? `
-                                     <button class="no-print absolute top-0 -left-6 text-red-300 hover:text-red-500 text-xs" 
-                                             onclick="showBankDetails=false;renderItems();;" title="Eliminar datos bancarios">✕</button>
-                                     <p style="font-size: 9px; color: #64748b; font-weight: 700; text-transform: uppercase; margin-bottom: 3px; letter-spacing: 0.5px;">
-                                         Cuenta de Abono Corriente
-                                     </p>
-                                      <p style="font-size: 9px; color: #111827; font-weight: 800; text-transform: uppercase; margin-bottom: 1px; font-family: 'Montserrat', sans-serif;">
-                                          Titular: ${h.company}
-                                      </p>
-                                      <p style="font-size: 9px; color: #111827; font-weight: 800; text-transform: uppercase; margin-bottom: 6px; font-family: 'Montserrat', sans-serif;">
-                                           ${h.bank} : <span style="letter-spacing: -0.2px;">${h.iban}</span>
-                                      </p>
-                                 ` : ''}
-                                 ${(groupData["Enlace_TPV"] || h.paymentGateway) ? `
-                                    <p style="font-size: 8px; color: #059669; font-weight: 800; text-transform: uppercase; margin-top: 4px; display: flex; align-items: center; justify-content: flex-end; gap: 4px;">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="5" rx="2"></rect><line x1="2" x2="22" y1="10" y2="10"></line></svg>
-                                        <a href="${(()=>{ const l = groupData['Enlace_TPV'] || h.paymentGateway || ''; return (l && !l.startsWith('http')) ? 'https://'+l : l; })()}" target="_blank" style="color: #059669; text-decoration: none; border-bottom: 1px solid #d1fae5; position: relative; z-index: 50;">Pago Online con Tarjeta</a>
-                                    </p>
-                                 ` : (!showBankDetails ? `
-                                    <button class="no-print text-gray-200 hover:text-gray-400 font-medium uppercase tracking-tighter" 
-                                            style="font-size: 5px; background: none; border: none; padding: 0; margin-bottom: 2px;"
-                                            onclick="showBankDetails=true;renderItems();">+ restaurar datos bancarios</button>
-                                 ` : '')}
-                                <div id="legal-notice-wrapper" style="position: relative; border-top: 0.5px solid #f3f4f6; pt-2">
-                                    ${showLegalNotice ? `
-                                        <button class="no-print absolute top-2 -left-6 text-red-100 hover:text-red-300 text-[10px]" 
-                                                onclick="showLegalNotice=false;renderItems();" title="Eliminar aviso legal">✕</button>
-                                        <p style="font-size: 7px; color: #9ca3af; font-style: italic; font-weight: 400; line-height: 1.3;">
-                                            * Este documento es una liquidación provisional (Factura Proforma).<br>
-                                            No tiene validez como factura ordinaria hasta su emisión definitiva.
-                                        </p>
-                                    ` : `
-                                        <button class="no-print text-gray-200 hover:text-gray-400 font-medium uppercase tracking-tighter" 
-                                                style="font-size: 5px; background: none; border: none; padding: 0; margin-top: 1px;"
-                                                onclick="showLegalNotice=true;renderItems();">+ restaurar aviso legal</button>
-                                    `}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    </div>`;
-            }
-
-            syncWithFicha();
-        }
-
-        // --- Drag and Drop Helpers ---
-        function addOcupanteField() {
-            const container = document.querySelector('#ocupante-box .flex-1');
-            if (!container) return;
-
-            const footer = [...container.children].find(child => child.classList.contains('border-t') && child.classList.contains('no-print'));
-
-            const newRow = document.createElement('div');
-            newRow.className = 'ocupante-row flex items-center gap-1 mt-1';
-            newRow.innerHTML = `
-                <span class="w-24"><strong><span class="editable" contenteditable="true">Campo</span> :</strong></span>
-                <span class="editable flex-1" contenteditable="true" style="min-width: 100px;">Valor</span>
-                <button class="no-print text-red-200 hover:text-red-500 text-[10px] ml-auto" 
-                        onclick="this.parentElement.remove()" title="Eliminar">✕</button>
-            `;
-
-            if (footer) {
-                container.insertBefore(newRow, footer);
-            } else {
-                container.appendChild(newRow);
-            }
-        }
-
-        function dragStart(ev, index) {
-            ev.dataTransfer.setData("text/plain", index);
-            ev.dataTransfer.effectAllowed = "move";
-        }
-        function allowDrop(ev) {
-            ev.preventDefault();
-        }
-        function drop(ev, targetIndex) {
-            ev.preventDefault();
-            const sourceIndex = parseInt(ev.dataTransfer.getData("text/plain"));
-            if (sourceIndex === targetIndex) return;
-
-            const movedItem = items[sourceIndex];
-            items.splice(sourceIndex, 1);
-            items.splice(targetIndex, 0, movedItem);
-            renderItems();
-        }
-
-        // --- Update Item Logic ---
-        function updateItem(index, key, val) {
-            if (key === 'fecha') {
-                // Input date returns YYYY-MM-DD
-                // Store as is or format? Let's format to DD-MM-YYYY for consistency with legacy
-                items[index][key] = formatDate(val).replace(/\//g, '-');
-            } else if (['concepto', 'hab', 'cant', 'regimen', 'dias'].includes(key)) {
-                items[index][key] = val;
-            } else {
-                items[index][key] = parseMoney(val);
-            }
-            renderItems();
-        }
-
-        function addRow() {
-            items.push({
-                fecha: formatDate(new Date().toISOString().split('T')[0]).replace(/\//g, '-'),
-                hab: '',
-                cant: '1',
-                concepto: 'Nuevo Concepto',
-                precio: 0,
-                iva: 10,
-                regimen: ''
-            });
-            renderItems();
-        }
-        function removeItem(index) { items.splice(index, 1); renderItems(); }
-
-        async function syncWithFicha() {
-            const saved = localStorage.getItem('selectedGroup');
-            if (!saved) return;
-
-            let group = JSON.parse(saved);
-
-            // 1. Calcular Totales desde Items
-            const totalRevenue = items.reduce((acc, curr) => {
-                const p = parseFloat(curr.precio) || 0;
-                const h = parseFloat(curr.hab) || 1;
-                const c = parseFloat(curr.cant) || 1;
-                const d = parseFloat(curr.dias) || 1;
-                return acc + (p * h * c * d);
-            }, 0);
-
-            // 2. Fechas: siempre tomamos de group (formato ISO de Firestore)
-            // NO leer del DOM para evitar sobreescribir con fechas en formato de pantalla (DD-MM-YYYY)
-            const entrada = toInputDate(group["Entrada"]) || group["Entrada"];
-            const salida = toInputDate(group["Salida"]) || group["Salida"];
-
-            // 4. Actualizar Objeto Grupo
-            // IMPORTANTE: NO modificamos Hotel_Asignado - ese campo se gestiona solo desde la ficha.
-            // Si lo sobreescribimos aquí, grupos de Cumbria se guardarían como Guadiana al salir.
-            const customFields = {};
-            const editableIds = [
-                'solicitante-org', 'solicitante-nombre', 'solicitante-tel', 'solicitante-email',
-                'reserva-personas', 'reserva-entrada', 'reserva-salida', 'fecha-proforma',
-                'client-address', 'client-city', 'client-nif',
-                'f-pax-name', 'f-pax-count', 'f-date-in', 'f-date-out', 'f-room-summary'
-            ];
-
-            editableIds.forEach(id => {
-                let el = document.getElementById(id + '-1') || document.getElementById(id);
-                if (el) {
-                    customFields[id] = el.tagName === 'INPUT' ? el.value : el.innerText;
-                }
-            });
-
-            // Capture dynamic rows
-            const dynamicRows = Array.from(document.querySelectorAll('.ocupante-row')).map(row => {
-                const spans = row.querySelectorAll('.editable');
-                if (spans.length >= 2) {
-                    return { key: spans[0].innerText.trim(), value: spans[1].innerText.trim() };
-                }
-                return null;
-            }).filter(Boolean);
-            customFields['dynamicRows'] = dynamicRows;
-
-            const updatedData = {
-                // IMPORTANTE: NO sobreescribir Pax. e Importe(*) -- son datos del PMS/importación.
-                // Si los sobreescribimos con valores de la proforma, cada visita a la proforma
-                // genera cambios falsos en la validación de importación.
-                // Los guardamos como campos proforma-only para referencia interna:
-                "Com_ProformaTotal": totalRevenue,
-                "Com_ProformaPax": customFields['reserva-personas'] || group["Pax."],
-                "Entrada": entrada,
-                "Salida": salida,
-                // Hotel_Asignado se omite intencionalmente — no debe modificarse desde la proforma
-                "ProformaCustomFields": customFields,
-                "updatedAt": firebase.firestore.FieldValue.serverTimestamp()
-            };
-
-            if (items.length > 0) {
-                updatedData["ProformaItems"] = items;
-                updatedData["Dep1_Importe"] = parseFloat((totalRevenue * 0.3).toFixed(2));
-                updatedData["Dep2_Importe"] = parseFloat((totalRevenue * 0.7).toFixed(2));
-            }
-
-            // Sincronizar Release
-            if (entrada) {
-                const parts = entrada.includes('/') ? entrada.split('/') : entrada.split('-');
-                if (parts.length === 3) {
-                    let d, m, y;
-                    if (parts[0].length === 4) { [y, m, d] = parts; } else { [d, m, y] = parts; }
-                    const fechaEntrada = new Date(y, m - 1, d);
-                    const fechaRelease = new Date(fechaEntrada);
-                    const diasRelease = parseInt(group["Com_Relix"]) || 22;
-                    fechaRelease.setDate(fechaRelease.getDate() - diasRelease);
-                    updatedData["Com_Vencimiento_Rel"] = fechaRelease.toISOString().split('T')[0];
-                }
-            }
-
-            // Actualizar LocalStorage
-            const finalGroup = { ...group, ...updatedData };
-            localStorage.setItem('selectedGroup', JSON.stringify(finalGroup));
-
-            // PERSISTENCIA EN CLOUD (Firestore)
-            if (finalGroup.Reserva && typeof db !== 'undefined') {
-                try {
-                    // IMPORTANT: Same normalization as normalizeId() in Gestión de Grupos.html
-                    // to ensure Firestore doc ID is always consistent
-                    const finalGroupReservaId = String(finalGroup.Reserva || "").trim().replace(/\.0$/, "").replace(/[\/\\]/g, "-");
-                    await db.collection("groups").doc(finalGroupReservaId).set(updatedData, { merge: true });
-                    // log
-                } catch (e) {
-                    console.error("❌ Error persistiendo en Firestore:", e);
-                }
-            }
-        }
-
-        function handleLogoUpload(input) {
-            if (input.files && input.files[0]) {
-                const reader = new FileReader();
-                reader.onload = e => {
-                    document.querySelectorAll('.logo-placeholder').forEach(img => { img.src = e.target.result; img.classList.remove('hidden'); });
-                    document.querySelectorAll('.font-logo').forEach(t => t.classList.add('hidden'));
-                    const logoContainer = document.getElementById('default-logo-2');
-                    if (logoContainer) logoContainer.classList.add('hidden');
-                };
-                reader.readAsDataURL(input.files[0]);
-            }
-        }
-
-
-        async function saveAndExit() {
-            const targetFile = "Gestión de Grupos.html";
-            const saved = localStorage.getItem('selectedGroup');
-            let reservaId = "";
-            if (saved) {
-                try {
-                    const group = JSON.parse(saved);
-                    reservaId = group.Reserva || group["Reserva"] || "";
-                } catch (e) { }
-            }
-            if (reservaId) {
-                localStorage.setItem('nexus_return_reserva', reservaId);
-            }
-
-            const url = encodeURI(targetFile) + (reservaId ? '?reserva=' + encodeURIComponent(reservaId) : '');
-
-            // Función para redirigir
-            const doRedirect = () => {
-                // log
-                window.location.href = url;
-            };
-
-            // Intentar sincronizar pero con un timeout de seguridad
-            try {
-                const syncPromise = syncWithFicha();
-                const timeoutPromise = new Promise(resolve => setTimeout(resolve, 1500));
-                await Promise.race([syncPromise, timeoutPromise]);
-            } catch (e) {
-                console.error("Error sincronizando antes de salir:", e);
-            }
-            doRedirect();
-        }
-
-        // Helper: actualiza el enlace de pasarela con la URL real
-        function updatePaymentLink() {
-            const savedGroup = JSON.parse(localStorage.getItem('selectedGroup') || '{}');
-            const h = HOTELS[currentHotel] || {};
-            const l = savedGroup['Enlace_TPV'] || h.paymentGateway || '';
-            const url = (l && !l.startsWith('http')) ? 'https://' + l : l;
-            const link = document.getElementById('payment-qr-link');
-            const img = document.getElementById('payment-qr-img');
-            const rawUrl = document.getElementById('payment-raw-url');
-            if (link && url) {
-                link.href = url;
-                link.setAttribute('href', url);
-            }
-            if (rawUrl && url) {
-                rawUrl.innerText = url;
-            }
-            if (img && url) {
-                img.src = 'https://api.qrserver.com/v1/create-qr-code/?size=100x100&color=064e3b&bgcolor=ffffff&data=' + encodeURIComponent(url);
-            }
         }
 
         // Botón Imprimir: actualizar enlace ANTES de llamar a window.print()
         function printDoc() {
             updatePaymentLink();
-            setTimeout(() => window.print(), 150);
+            const groupData = JSON.parse(localStorage.getItem('selectedGroup') || '{}');
+            const ref = groupData["Nombre del Grupo"] || groupData["Reserva"] || 'Documento';
+            const oldTitle = document.title;
+            document.title = ref;
+            setTimeout(() => {
+                window.print();
+                document.title = oldTitle;
+            }, 150);
         }
 
         // Print handlers
@@ -2248,5 +1948,4 @@
         };
     </script>
 </body>
-
 </html>

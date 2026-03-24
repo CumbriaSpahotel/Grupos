@@ -316,9 +316,19 @@
                     const rawReservaId = extractedData.Reserva || `PRES-${Math.floor(100000 + Math.random() * 900000)}`;
                     const reservaId = String(rawReservaId).trim().replace(/\.0$/, "").replace(/[\/\\]/g, "-");
 
+                    const entrada = String(extractedData["Entrada"] || "");
+                    let releaseDate = extractedData.Com_Vencimiento_Rel || "";
+                    if (!releaseDate && entrada) {
+                        const d = new Date(entrada);
+                        if (!isNaN(d.getTime())) {
+                            d.setDate(d.getDate() - 15);
+                            releaseDate = d.toISOString().split("T")[0];
+                        }
+                    }
+
                     const groupToSave = {
                         "Nombre del Grupo": String(extractedData["Nombre del Grupo"] || "Sin Nombre").toUpperCase(),
-                        "Entrada": String(extractedData["Entrada"] || ""),
+                        "Entrada": entrada,
                         "Salida": String(extractedData["Salida"] || ""),
                         "Pax.": String(extractedData["Pax."] || "0"),
                         "Habitaciones": String(extractedData["Habitaciones"] || ""),
@@ -329,9 +339,10 @@
                         "Reserva": reservaId,
                         "Estado": "Presupuesto",
                         "Com_Estado_Interno": extractedData.Com_Estado_Interno || "PRESUPUESTO",
-                        "Segment.": "GRUPOS",
+                        "Segment.": extractedData["Segment."] || "GRUPOS",
                         "Hotel_Asignado": String(extractedData.Hotel || "Sercotel Guadiana"),
                         "Com_Notas": String(extractedData.Observaciones || ""),
+                        "Com_Vencimiento_Rel": releaseDate,
                         "Com_Nombre_Contacto": String(extractedData.Com_Nombre_Contacto || ""),
                         "Com_Email_Contacto": String(extractedData.Com_Email_Contacto || ""),
                         "Com_Telefono_Contacto": String(extractedData.Com_Telefono_Contacto || ""),
@@ -340,9 +351,9 @@
                         "Fiscal_Direccion": String(extractedData.Fiscal_Direccion || ""),
                         "Fiscal_CP": String(extractedData.Fiscal_CP || ""),
                         "Fiscal_Poblacion": String(extractedData.Fiscal_Poblacion || ""),
-                        "Com_Comercial": "",
+                        "Com_Comercial": extractedData.Com_Comercial || "",
                         "dailyConfig": extractedData.dailyConfig || {},
-                        "createdAt": firebase.firestore.FieldValue.serverTimestamp(),
+                        "createdAt": extractedData.createdAt || firebase.firestore.FieldValue.serverTimestamp(),
                         "updatedAt": firebase.firestore.FieldValue.serverTimestamp()
                     };
 
