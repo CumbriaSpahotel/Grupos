@@ -1,74 +1,43 @@
 <!DOCTYPE html>
 <html lang="es">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title id="page-title">Generador de Facturas</title>
-    <!-- Static Styles (Tailwind Compiled) -->
     <link rel="stylesheet" href="style.css">
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=Montserrat:wght@300;400;700&family=Courier+Prime:wght@400;700&display=swap');
 
+        @page { margin: 0; size: A4; }
         @media print {
-            .no-print {
-                display: none !important;
+            .no-print { display: none !important; }
+            body { background: white; padding: 0; margin: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            .page-container { 
+                box-shadow: none !important; 
+                margin: 0 !important; 
+                border: none !important; 
+                width: 210mm !important; 
+                height: 296.7mm !important; /* Ligeramente menor que 297 para evitar saltos fantasma */
+                padding: 12mm 15mm !important; 
+                display: flex !important; 
+                flex-direction: column !important;
+                overflow: hidden !important; /* Si cabe, cabe exacto. Si no, crece. */
             }
-
-            body {
-                background: white;
-                padding: 0;
-                -webkit-print-color-adjust: exact;
-                print-color-adjust: exact;
-            }
-
-            .page-container {
-                box-shadow: none;
-                margin: 0;
-                border: none;
-                width: 100%;
-                min-height: 297mm; /* Keep A4 height so flex mt-auto works */
-            }
-
-            .editable:hover {
-                background: transparent;
-            }
-
-            select {
-                appearance: none;
-                -webkit-appearance: none;
-                border: none;
-                background: transparent;
-                padding: 0;
-            }
-
-            /* Forzar impresión de sombras y fondos */
-            .shadow-lg,
-            .shadow-md,
-            .shadow-sm,
-            [style*="box-shadow"] {
-                -webkit-print-color-adjust: exact !important;
-                print-color-adjust: exact !important;
-            }
+            .mt-auto { margin-top: auto !important; }
+            
+            body.print-proforma #tpl-proforma .mb-6 { margin-bottom: 8px !important; }
+            body.print-proforma #tpl-proforma .mb-4 { margin-bottom: 6px !important; }
+            body.print-proforma #tpl-proforma .mb-4 { margin-bottom: 2px !important; }
+            body.print-proforma .mt-8 { margin-top: 4px !important; }
+            body.print-proforma .pt-8 { padding-top: 4px !important; }
+            body.print-proforma .mt-3 { margin-top: 4px !important; }
+            body.print-proforma #ocupante-box { padding: 4px 6px !important; }
+            body.print-proforma .mt-auto { margin-top: 10px !important; } 
         }
 
-        body {
-            font-family: 'Montserrat', sans-serif;
-            transition: all 0.3s;
-        }
-
-        .editable {
-            min-height: 1.2em;
-            min-width: 20px;
-            display: inline-block;
-            cursor: text;
-        }
-
-        .editable:hover {
-            background-color: #f3f4f6;
-            border-radius: 2px;
-        }
-        .editable:focus {
+        body { font-family: 'Montserrat', sans-serif; transition: all 0.3s; }
+        .editable { min-height: 1.2em; min-width: 20px; display: inline-block; cursor: text; }
+        .editable:focus {
             outline: 2px solid #2d5a43;
             background: white;
         }
@@ -299,67 +268,82 @@
 
 <body class="bg-gray-200 p-0 md:p-8">
 
-    <!-- Panel de Control Superior -->
-    <div
-        class="max-w-[210mm] mx-auto mb-6 no-print bg-white shadow-lg rounded-xl p-4 flex flex-wrap justify-between items-center gap-4">
-        <div class="flex gap-6 items-center">
-            <button onclick="saveAndExit()" class="p-2 hover:bg-slate-100 rounded-lg transition-colors text-[#2d5a43]"
-                title="Volver a la Ficha">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
-                    stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="m15 18-6-6 6-6" />
-                </svg>
-            </button>
-            <div class="flex flex-col">
-                <span class="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">Entorno de
-                    Trabajo</span>
-                <div class="flex gap-4">
+    <!-- Panel de Control Superior (no-print) -->
+    <div class="max-w-[210mm] mx-auto mb-5 no-print rounded-2xl overflow-hidden shadow-xl border border-slate-200/60" style="background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);">
+
+        <!-- Fila 1: Navegación y hotel -->
+        <div class="flex items-center justify-between px-5 py-3 border-b border-white/10">
+            <div class="flex items-center gap-4">
+                <!-- Botón volver -->
+                <button onclick="saveAndExit()" title="Guardar y volver"
+                    class="w-8 h-8 flex items-center justify-center rounded-lg bg-white/10 hover:bg-white/20 text-white/70 hover:text-white transition-all">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+                </button>
+
+                <!-- Separador -->
+                <div class="w-px h-6 bg-white/15"></div>
+
+                <!-- Label -->
+                <span class="text-[9px] font-bold text-white/40 uppercase tracking-[0.25em]">Entorno de Trabajo</span>
+
+                <!-- Tabs -->
+                <div class="flex gap-1">
                     <button onclick="switchTemplate('confirmacion')" id="btn-confirmacion"
-                        class="pb-2 px-2 tab-active transition-all uppercase text-xs tracking-widest whitespace-nowrap">Modelo
-                        Confirmación</button>
+                        class="px-4 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest bg-white text-slate-900 shadow-md transition-all whitespace-nowrap">
+                        Confirmación
+                    </button>
                     <button onclick="switchTemplate('proforma')" id="btn-proforma"
-                        class="pb-2 px-2 text-gray-400 hover:text-gray-600 transition-all uppercase text-xs tracking-widest whitespace-nowrap">Modelo
-                        Factura Proforma</button>
-                </div></div>
+                        class="px-4 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest text-white/50 hover:text-white/80 hover:bg-white/10 transition-all whitespace-nowrap">
+                        Factura Proforma
+                    </button>
+                </div>
+            </div>
+
+            <!-- Hotel selector -->
+            <div class="flex items-center gap-2">
+                <span class="text-[9px] font-bold text-white/40 uppercase tracking-widest">Hotel</span>
+                <select id="hotel-selector" onchange="updateHotel(this.value)"
+                    class="bg-white/10 border border-white/20 text-white text-[10px] font-bold rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-white/30 cursor-pointer">
+                    <option value="guadiana" class="text-slate-900 bg-white">Sercotel Guadiana</option>
+                    <option value="cumbria" class="text-slate-900 bg-white">Sercotel Cumbria</option>
+                </select>
             </div>
         </div>
 
-        <div class="flex flex-col">
-            <span class="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">Seleccionar Hotel</span>
-            <select id="hotel-selector" onchange="updateHotel(this.value)"
-                class="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#2d5a43]">
-                <option value="guadiana">Sercotel Guadiana</option>
-                <option value="cumbria">Sercotel Cumbria</option>
-            </select>
-        </div>
-
-        <div class="flex gap-2">
+        <!-- Fila 2: Acciones -->
+        <div class="flex items-center gap-2 px-5 py-2.5">
+            <!-- Guardar y Salir -->
             <button onclick="saveAndExit()"
-                class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg font-bold text-[10px] uppercase border border-blue-500 transition-all flex items-center gap-1 shadow-md">
-                💾 Guardar y Salir
+                class="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white border border-white/20 text-[10px] font-bold uppercase tracking-wider transition-all">
+                <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                Guardar y Salir
             </button>
+
+            <!-- Redactar Email -->
             <button onclick="generateAIEmail()"
-                class="bg-emerald-50 hover:bg-emerald-100 text-[#2d5a43] px-3 py-2 rounded-lg font-bold text-[10px] uppercase border border-emerald-200 transition-all flex items-center gap-1">
-                ✨ Redactar Email
+                class="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white/70 hover:text-white border border-white/15 text-[10px] font-bold uppercase tracking-wider transition-all">
+                <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2l-19 9 8 4 10-13z"/><path d="M12.5 15l1 6 4-8"/></svg>
+                Redactar Email
             </button>
+
+            <!-- Separador -->
+            <div class="flex-1"></div>
+
+            <!-- Imprimir PDF -->
             <button onclick="printDoc()"
-                class="bg-[#2d5a43] hover:bg-[#1e3a2c] text-white px-6 py-2 rounded-lg font-bold shadow-md transition-all uppercase text-[10px]">
+                class="flex items-center gap-2 px-5 py-2 rounded-xl bg-white text-slate-900 text-[10px] font-black uppercase tracking-wider shadow-lg hover:bg-slate-100 transition-all">
+                <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
                 Imprimir / PDF
             </button>
-            <button onclick="desestimarGrupo()"
-                class="p-2 hover:bg-red-50 text-red-300 hover:text-red-500 rounded-lg transition-colors border border-transparent hover:border-red-100"
-                title="Desestimar / Borrar">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
-                    stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M3 6h18" />
-                    <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
-                    <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
-                    <line x1="10" x2="10" y1="11" y2="17" />
-                    <line x1="14" x2="14" y1="11" y2="17" />
-                </svg>
+
+            <!-- Desestimar -->
+            <button onclick="desestimarGrupo()" title="Desestimar / Borrar"
+                class="w-9 h-9 flex items-center justify-center rounded-xl bg-red-500/10 hover:bg-red-500/25 text-red-300 hover:text-red-200 border border-red-500/20 transition-all">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>
             </button>
         </div>
     </div>
+
 
     <!-- CONTENEDOR DE LA PÁGINA -->
     <div id="capture-area" class="page-container shadow-2xl border border-gray-300">
@@ -385,18 +369,24 @@
             </div>
 
             <div class="header-title-container">
-                <div id="doc-type-title"
-                    class="text-lg font-black uppercase tracking-tighter text-gray-800 border-b-2 border-gray-800 inline-block px-1">
+                <!-- Badge tipo documento -->
+                <div id="doc-type-title" style="display:inline-block; background:#1e293b; color:white; font-size:8px; font-weight:900; letter-spacing:0.2em; text-transform:uppercase; padding:3px 10px; border-radius:4px; margin-bottom:6px; -webkit-print-color-adjust:exact; print-color-adjust:exact;">
                     Confirmación
                 </div>
-                <div class="mt-2 text-[11px] font-bold text-gray-500">
-                    <span id="doc-type-label">Reserva:</span> <span id="reserva-id-universal"
-                        class="editable font-black text-slate-800" contenteditable="true">---</span>
+                <!-- Nº Reserva — visible solo en confirmacion, oculto en proforma -->
+                <div id="header-reserva-block" style="display:flex; flex-direction:column; gap:1px; margin-bottom:4px;">
+                    <span id="doc-type-label" style="font-size:7px; font-weight:900; letter-spacing:0.15em; text-transform:uppercase; color:#94a3b8;">Nº Reserva</span>
+                    <span id="reserva-id-universal" class="editable" contenteditable="true"
+                        style="font-size:13px; font-weight:900; color:#0f172a; letter-spacing:0.03em; font-family:'Courier Prime', monospace;">---</span>
                 </div>
-                <div class="text-[10px] text-gray-400 mt-0.5">
-                    Fecha: <span id="fecha-universal" class="editable" contenteditable="true">--/--/----</span>
+                <!-- Fecha — visible solo en confirmacion -->
+                <div id="header-fecha-block" style="display:flex; flex-direction:column; gap:1px;">
+                    <span style="font-size:7px; font-weight:900; letter-spacing:0.15em; text-transform:uppercase; color:#94a3b8;">Fecha</span>
+                    <span id="fecha-universal" class="editable" contenteditable="true"
+                        style="font-size:10px; font-weight:700; color:#475569;">--/--/----</span>
                 </div>
             </div>
+
         </div>
 
         <!-- MODELO 1: CONFIRMACIÓN (Estilo Moderno) -->
@@ -419,11 +409,7 @@
                         <p><strong class="font-bold text-slate-500">Teléfono:</strong> <span class="editable"
                                 id="solicitante-tel-1" contenteditable="true">-</span></p>
                     </div>
-                    <div class="mt-2 pt-2 border-t border-slate-100 flex items-center gap-2">
-                        <strong class="text-[9px] font-bold text-slate-400 uppercase">Referencia del Evento:</strong>
-                        <span class="editable font-black text-slate-800 text-xs flex-1" id="programa-1"
-                            contenteditable="true">---</span>
-                    </div>
+
                 </div>
                 <div class="border-l-4 border-[#eab308] pl-4">
                     <h4 class="text-[10px] font-bold text-gray-400 uppercase mb-1">Reserva</h4>
@@ -436,6 +422,12 @@
                             id="reserva-salida-1" contenteditable="true">---</span>
                     </div>
                 </div>
+            </div>
+
+            <!-- Referencia del Evento: bloque independiente con raya amarilla -->
+            <div class="border-l-4 border-[#eab308] pl-4 mb-6">
+                <p class="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Referencia del Evento:</p>
+                <span class="editable font-black text-slate-800 text-sm" id="programa-1" contenteditable="true">---</span>
             </div>
 
             <table class="w-full text-[10px] mb-6 border-collapse">
@@ -461,27 +453,28 @@
         </div>
 
         <div id="tpl-proforma" class="template-content hidden font-pro text-black">
-            <div class="mb-6 flex justify-between items-end pb-2">
-                <h1 class="text-3xl font-black uppercase tracking-widest text-slate-800">Factura Proforma</h1>
-            </div>
             <table class="w-full mb-6">
                 <tr>
-                    <td width="55%" class="align-top">
-
-                        <!-- Caja Datos Factura -->
-                        <div class="proforma-box w-[250px] border-black">
-                            <div class="proforma-box-header bg-gray-100 border-b border-black text-center">
-                                <div class="border-r border-black" id="proforma-header-label">Nº Factura</div>
-                                <div class="border-r border-black">Fecha</div>
-                                <div>Pag.</div>
-                            </div>
-                            <div class="proforma-box-row text-center">
-                                <div class="border-r border-black font-bold text-[10px] leading-tight flex flex-col items-center justify-center py-0.5">Prof: <span class="editable inline-block" id="reserva-id-2" contenteditable="true">---</span></div>
-                                <div class="border-r border-black text-xs flex items-center justify-center"><span class="editable" id="fecha-proforma-2" contenteditable="true">12-02-2026</span></div>
-                                <div class="text-xs flex items-center justify-center editable" contenteditable="true">1</div>
-                            </div>
-                        </div>
+                    <td width="55%" class="align-middle">
+                        <!-- Tabla clásica de referencia centrada -->
+                        <table style="border-collapse:collapse; border:1px solid #000; width:280px; margin:0 auto; font-size:10px;" id="proforma-ref-table">
+                            <thead>
+                                <tr style="background:#f1f5f9;">
+                                    <th style="border:1px solid #000; padding:3px 8px; text-align:center; font-weight:900; width:40%;" id="proforma-header-label">Nº Factura</th>
+                                    <th style="border:1px solid #000; padding:3px 8px; text-align:center; font-weight:900; width:40%;">Fecha</th>
+                                    <th style="border:1px solid #000; padding:3px 8px; text-align:center; font-weight:900; width:20%;">Pág.</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td style="border:1px solid #000; padding:4px 8px; text-align:center;"><span class="editable" id="reserva-id-2" contenteditable="true">Prof. ---</span></td>
+                                    <td style="border:1px solid #000; padding:4px 8px; text-align:center;"><span class="editable" id="fecha-proforma-2" contenteditable="true">--/--/----</span></td>
+                                    <td style="border:1px solid #000; padding:4px 8px; text-align:center;" contenteditable="true">1</td>
+                                </tr>
+                            </tbody>
+                        </table>
                     </td>
+
                     <td width="45%" class="align-top pt-2">
                         <div class="bg-slate-50 p-4 rounded-lg shadow-sm text-xs font-mono text-gray-600">
                             <div class="font-bold text-black uppercase text-sm editable" id="solicitante-org-2"
@@ -592,6 +585,24 @@
             <div class="text-[8px] font-bold text-slate-500 tracking-wider text-right uppercase mb-4" style="-webkit-print-color-adjust: exact; print-color-adjust: exact;">
                 * Todos los importes llevan incluido el impuesto correspondiente
             </div>
+
+            <!-- Notas y Comentarios Especiales (oculto por defecto) -->
+            <button id="btn-proforma-notas" class="no-print mt-4 text-[9px] font-bold text-slate-400 uppercase tracking-widest hover:text-slate-600 transition flex items-center gap-1"
+                onclick="document.getElementById('proforma-notas-block').style.display='block'; this.style.display='none';">
+                ＋ Añadir Notas / Comentarios
+            </button>
+            <div id="proforma-notas-block" class="mt-4 pt-4 border-t border-slate-100 mb-4" style="display:none;">
+                <div class="flex items-center justify-between mb-2">
+                    <h4 class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Notas y Comentarios Especiales</h4>
+                    <button class="no-print text-[9px] text-red-300 hover:text-red-500 font-bold"
+                        onclick="document.getElementById('proforma-notas-block').style.display='none'; document.getElementById('btn-proforma-notas').style.display='flex';">✕ Quitar</button>
+                </div>
+                <div class="p-4 rounded-xl bg-slate-50 border border-slate-100 italic text-[10px] text-slate-600 leading-relaxed min-h-[50px] editable"
+                    contenteditable="true" id="proforma-notas">
+                </div>
+            </div>
+
+
         </div>
 
         <div id="tpl-propuesta" class="template-content hidden font-pro text-black">
@@ -688,31 +699,24 @@
             </div>
         </div>
 
-        <div class="mt-8 pt-8 border-t border-slate-100">
-            <h4 class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Notas y Comentarios
-                Especiales</h4>
-            <div class="p-8 rounded-[2.5rem] bg-slate-50 border border-slate-100 italic text-xs text-slate-600 leading-relaxed min-h-[100px] editable"
-                contenteditable="true" id="propuesta-notas">
-                Escriba aquí cualquier observación adicional, términos de cancelación específicos o detalles de
-                servicios personalizados para este grupo...
-            </div>
-        </div>
-    </div>
-    </div>
+        <div class="flex-1"></div>
 
-    <div class="no-print flex justify-center mb-4 mt-2">
-        <button onclick="addRow()"
-            class="bg-gray-100 hover:bg-gray-200 text-gray-600 px-4 py-1 rounded-full text-[9px] uppercase font-bold tracking-widest transition border border-gray-300">
-            + Añadir Concepto
-        </button>
-    </div>
-
-    <!-- TOTALES Y FOOTER -->
-    <div class="mt-auto">
-        <!-- Totales Dinámicos -->
+        <!-- TOTALES Y FOOTER -->
+        <div class="mt-auto">
+        <!-- Totales Dinámicos (Confirmación / Propuesta) -->
         <div id="footer-totals" class="w-full"></div>
+        
+        <!-- Bloque Resumen Proforma (Total + IVA) -->
+        <div id="proforma-summary" class="w-full flex flex-col items-end gap-1 mt-2"></div>
+        
+        <!-- Bloque Datos Bancarios Proforma -->
+        <div id="proforma-bank-container" class="w-full"></div>
+
         <!-- BLOQUE DE PAGO QR ESTATICO - el <a> es DOM real, Chrome lo convierte en annotacion PDF clicable -->
-        <div id="payment-qr-block" style="display:none; margin-top:10px; margin-bottom:4px; -webkit-print-color-adjust:exact; print-color-adjust:exact;">
+        <div id="payment-qr-block" style="display:none; margin-top:10px; margin-bottom:4px; -webkit-print-color-adjust:exact; print-color-adjust:exact; position:relative;">
+            <!-- Botón cerrar (no imprime) -->
+            <button class="no-print" onclick="document.getElementById('payment-qr-block').style.display='none'; sessionStorage.setItem('proforma_qr_hidden','1'); document.getElementById('qr-show-btn').style.display='flex';" style="position:absolute; top:8px; right:8px; background:rgba(255,255,255,0.15); border:1px solid rgba(255,255,255,0.3); border-radius:4px; padding:2px 6px; font-size:10px; cursor:pointer; color:white; line-height:1; z-index:20;" title="Ocultar pasarela de pago">✕</button>
+
             <div style="display:flex; align-items:stretch; background:linear-gradient(135deg,#064e3b,#065f46); border-radius:14px; -webkit-print-color-adjust:exact; print-color-adjust:exact;">
                 <div style="padding:12px 10px 12px 14px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:5px; flex-shrink:0;">
                     <div style="background:white; border-radius:8px; padding:5px; display:inline-flex; box-shadow:0 2px 8px rgba(0,0,0,0.3); -webkit-print-color-adjust:exact; print-color-adjust:exact;">
@@ -744,6 +748,9 @@
                 </div>
             </div>
         </div>
+        <!-- Botón para mostrar qr de nuevo (no imprime) -->
+        <button id="qr-show-btn" class="no-print" onclick="document.getElementById('payment-qr-block').style.display='block'; sessionStorage.setItem('proforma_qr_hidden','0'); this.style.display='none';" style="display:none; margin-top:6px; align-items:center; gap:4px; background:#f1f5f9; border:1px solid #e2e8f0; border-radius:6px; padding:3px 10px; font-size:8px; cursor:pointer; color:#475569; font-weight:700; letter-spacing:0.05em;">＋ Incluir pasarela de pago (QR)</button>
+
         <!-- FIN BLOQUE PAGO QR -->
 
 
@@ -898,7 +905,7 @@
                 }
             });
             // Auto-guardado local
-            syncWithFicha();
+            // syncWithFicha(); // Removed call to undefined function
         }
         setInterval(syncFields, 3000);
 
@@ -919,17 +926,7 @@
             const url = encodeURI(targetFile) + (reservaId ? '?reserva=' + encodeURIComponent(reservaId) : '');
 
             // Función para redirigir
-            const doRedirect = () => {
-                // log
-                window.location.href = url;
-            };
-
-            // Intentar sincronizar pero con un timeout de seguridad para no bloquear al usuario
-            const syncPromise = syncWithFicha().catch(e => console.error("Error sincronizando:", e));
-            const timeoutPromise = new Promise(resolve => setTimeout(resolve, 1500));
-
-            await Promise.race([syncPromise, timeoutPromise]);
-            doRedirect();
+            window.location.href = url;
         }
 
         // callGemini base cargado desde js/gemini.js
@@ -1231,7 +1228,7 @@
                     if (id === 'reserva-id') {
                         ['reserva-id-2', 'reserva-id-universal'].forEach(rid => {
                             const e = document.getElementById(rid);
-                            if (e) e.innerText = finalVal;
+                            if (e) e.innerText = rid === 'reserva-id-2' ? ('Prof. ' + finalVal) : finalVal;
                         });
                     }
                 });
@@ -1304,13 +1301,45 @@
             document.getElementById('tpl-proforma').classList.toggle('hidden', tpl !== 'proforma');
 
             document.getElementById('tpl-policies').classList.toggle('hidden', tpl !== 'confirmacion');
-            document.getElementById('btn-confirmacion').className = tpl === 'confirmacion' ? 'pb-2 px-2 tab-active transition-all uppercase text-xs tracking-widest' : 'pb-2 px-2 text-gray-400 transition-all uppercase text-xs tracking-widest';
-            document.getElementById('btn-proforma').className = tpl === 'proforma' ? 'pb-2 px-2 tab-active transition-all uppercase text-xs tracking-widest' : 'pb-2 px-2 text-gray-400 transition-all uppercase text-xs tracking-widest';
+            document.getElementById('btn-confirmacion').className = tpl === 'confirmacion'
+                ? 'px-4 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest bg-white text-slate-900 shadow-md transition-all whitespace-nowrap'
+                : 'px-4 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest text-white/50 hover:text-white/80 hover:bg-white/10 transition-all whitespace-nowrap';
+            document.getElementById('btn-proforma').className = tpl === 'proforma'
+                ? 'px-4 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest bg-white text-slate-900 shadow-md transition-all whitespace-nowrap'
+                : 'px-4 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest text-white/50 hover:text-white/80 hover:bg-white/10 transition-all whitespace-nowrap';
 
             const docTitle = document.getElementById('doc-type-title');
             const docLabel = document.getElementById('doc-type-label');
-            if (docTitle) docTitle.innerText = tpl === 'confirmacion' ? 'Confirmación' : 'Proforma';
-            if (docLabel) docLabel.innerText = tpl === 'confirmacion' ? 'Reserva:' : 'Nº Factura:';
+            const hReserva = document.getElementById('header-reserva-block');
+            const hFecha   = document.getElementById('header-fecha-block');
+
+            if (tpl === 'proforma') {
+                // Proforma: ocultar badge, mostrar solo Nº Factura en el header
+                if (docTitle) docTitle.style.display = 'none';
+                if (docLabel) docLabel.innerText = 'Nº Reserva';
+                if (hReserva) hReserva.style.display = 'flex';
+                if (hFecha)   hFecha.style.display   = 'none';
+            } else {
+                // Confirmación: mostrar badge + Nº Reserva + Fecha
+                if (docTitle) { docTitle.style.display = 'inline-block'; docTitle.innerText = 'Confirmación'; }
+                if (docLabel) docLabel.innerText = 'Nº Reserva';
+                if (hReserva) hReserva.style.display = 'flex';
+                if (hFecha)   hFecha.style.display   = 'flex';
+            }
+            // Mostrar/ocultar bloque de notas compartido
+            const sharedNotas = document.getElementById('shared-notas-block');
+            if (sharedNotas) sharedNotas.style.display = tpl === 'proforma' ? 'none' : 'block';
+
+            // Mostrar/ocultar bloques de pie de página específicos de cada plantilla
+            const footerTotals = document.getElementById('footer-totals');
+            const pSummary = document.getElementById('proforma-summary');
+            const pBank = document.getElementById('proforma-bank-container');
+
+            if (footerTotals) footerTotals.style.display = tpl === 'proforma' ? 'none' : 'block';
+            if (pSummary) pSummary.style.display = tpl === 'proforma' ? 'flex' : 'none';
+            if (pBank)    pBank.style.display    = tpl === 'proforma' ? 'block' : 'none';
+
+            document.body.classList.toggle('print-proforma', tpl === 'proforma');
 
             const titleContainer = document.querySelector('.header-title-container');
             const infoContainer = document.querySelector('.header-info-container');
@@ -1332,6 +1361,14 @@
                 }
             }
             renderItems();
+        }
+
+        function cleanConcept(text) {
+            // Elimina códigos internos entre paréntesis y normaliza nombres
+            let t = (text || '').replace(/\s*\((DBL|TPL|DUI|SGL|SA|TRP|JR|SU|STD|PC|AD|MP|BB|HB|FB|RO|CUA|QUA)\)/gi, '').trim();
+            // Normalizar: "Doble Uso Individual" → "Uso Individual"
+            t = t.replace(/Doble\s+Uso\s+Individual/gi, 'Uso Individual');
+            return t;
         }
 
         function formatNum(num) {
@@ -1435,6 +1472,11 @@
             let base10 = 0, iva10 = 0, base21 = 0, iva21 = 0;
 
             containers.forEach(c => c.innerHTML = '');
+            if (footer) footer.innerHTML = '';
+            const pSummary = document.getElementById('proforma-summary');
+            const pBank = document.getElementById('proforma-bank-container');
+            if (pSummary) pSummary.innerHTML = '';
+            if (pBank) pBank.innerHTML = '';
 
             items.forEach((item, index) => {
                 const precioUnitario = parseFloat(item.precio) || 0;
@@ -1479,7 +1521,7 @@
                             </td>
                             <td class="p-1 text-center font-bold text-gray-400 text-[10px]"><span class="editable" contenteditable="true" onblur="updateItem(${index}, 'cant', this.innerText)">${item.cant || '1'}</span></td>
                             <td class="p-1 text-[11px] font-black text-gray-800">
-                                <span class="editable" contenteditable="true" onblur="updateItem(${index}, 'concepto', this.innerText)">${item.concepto}</span>
+                            <span class="editable" contenteditable="true" onblur="updateItem(${index}, 'concepto', this.innerText)">${cleanConcept(item.concepto)}</span>
                             </td>
                             <td class="p-1 text-center text-gray-400">
                                 <span class="editable text-[9px]" contenteditable="true" onblur="updateItem(${index}, 'regimen', this.innerText)" placeholder="-">${item.regimen || '-'}</span>
@@ -1505,7 +1547,7 @@
                             </td>
                             <td class="align-middle text-center font-bold text-gray-400 text-[10px]"><span class="editable" contenteditable="true" onblur="updateItem(${index}, 'cant', this.innerText)">${item.cant || '1'}</span></td>
                             <td class="align-middle font-black text-gray-800 text-[11px] uppercase py-1">
-                                <span class="editable" contenteditable="true" onblur="updateItem(${index}, 'concepto', this.innerText)">${item.concepto}</span>
+                                <span class="editable" contenteditable="true" onblur="updateItem(${index}, 'concepto', this.innerText)">${cleanConcept(item.concepto)}</span>
                             </td>
                             <td class="align-middle text-center text-gray-400">
                                 <span class="editable text-[9px]" contenteditable="true" onblur="updateItem(${index}, 'regimen', this.innerText)" placeholder="-">${item.regimen || '-'}</span>
@@ -1749,8 +1791,8 @@
                                 <div>
                                     <span class="text-[8px] font-black uppercase tracking-[0.25em] text-slate-400 block mb-1">Total Presupuestado</span>
                                     <div class="flex items-baseline gap-1">
-                                        <span class="tabular-nums tracking-tighter" style="font-size: 34px; font-weight: 900; color: #0f172a; -webkit-print-color-adjust: exact; print-color-adjust: exact; letter-spacing: -0.02em;">${formatNum(totalNetoPagar)}</span>
-                                        <span class="font-bold text-slate-400" style="font-size: 14px;">€</span>
+                                        <span class="tabular-nums tracking-tight" style="font-size: 20px; font-weight: 900; color: #0f172a; -webkit-print-color-adjust: exact; print-color-adjust: exact;">${formatNum(totalNetoPagar)}</span>
+                                        <span class="font-bold text-slate-400" style="font-size: 11px;">€</span>
                                     </div>
                                 </div>
                                 ${totalPaid >= Math.abs(totalNetoPagar) ? `
@@ -1765,8 +1807,8 @@
                                 <div class="text-right border-l border-slate-200/60 pl-8 flex flex-col justify-center">
                                     <span class="text-[7.5px] font-black uppercase tracking-[0.25em] block mb-1" style="color: ${currentHotel === 'cumbria' ? '#475569' : '#15803d'};">Pendiente a Pagar</span>
                                     <div class="flex items-baseline justify-end gap-1">
-                                        <span class="tabular-nums tracking-tighter" style="font-size: 26px; font-weight: 900; color: ${currentHotel === 'cumbria' ? '#0f172a' : '#14532d'}; -webkit-print-color-adjust: exact; print-color-adjust: exact; letter-spacing: -0.02em;">${formatNum(totalPending)}</span>
-                                        <span class="font-bold" style="font-size: 13px; color: ${currentHotel === 'cumbria' ? '#64748b' : '#22c55e'};">€</span>
+                                        <span class="tabular-nums tracking-tighter" style="font-size: 20px; font-weight: 900; color: ${currentHotel === 'cumbria' ? '#0f172a' : '#14532d'}; -webkit-print-color-adjust: exact; print-color-adjust: exact; letter-spacing: -0.02em;">${formatNum(totalPending)}</span>
+                                        <span class="font-bold" style="font-size: 11px; color: ${currentHotel === 'cumbria' ? '#64748b' : '#22c55e'};">€</span>
                                     </div>
                                 </div>
                                 `}
@@ -1792,17 +1834,17 @@
                                  <div class="relative z-10 flex border-t border-slate-100 pt-3">
                                      <!-- Beneficiario -->
                                      <div class="flex-1">
-                                         <p class="text-[6.5px] font-bold text-slate-400 uppercase tracking-[0.15em] mb-1">Beneficiario</p>
-                                         <p class="font-black text-slate-800 uppercase" style="font-size: 9.5px; letter-spacing: -0.01em;">${h.company}</p>
-                                         <p class="font-bold text-slate-400 mt-0.5" style="font-size: 7.5px;">NIF: <span class="font-black text-slate-600">${h.nif}</span></p>
+                                         <p class="text-[5px] font-bold text-slate-300 uppercase tracking-[0.1em] mb-0.5">Beneficiario</p>
+                                         <p class="font-black text-slate-800 uppercase" style="font-size: 8.5px; letter-spacing: -0.01em;">${h.company}</p>
+                                         <p class="font-bold text-slate-500 mt-0.5" style="font-size: 7px;">NIF: <span class="font-black text-slate-700">${h.nif}</span></p>
                                      </div>
                                      
                                      <!-- Cuenta IBAN -->
                                      <div class="flex-1 flex justify-end">
                                          <div class="bg-white p-2.5 rounded-xl border border-slate-100 shadow-sm flex flex-col justify-center min-w-[280px]" style="-webkit-print-color-adjust: exact; print-color-adjust: exact;">
-                                            <div class="flex items-center justify-between mb-1.5">
-                                                <p class="text-[7.5px] font-black text-slate-400 tracking-wider leading-none uppercase">${h.bank}</p>
-                                                <span class="text-[6.5px] font-black px-1.5 py-0.5 rounded-sm uppercase tracking-[0.15em] leading-none" style="background: linear-gradient(135deg, ${currentHotel === 'cumbria' ? '#0f172a' : '#214732'}, ${currentHotel === 'cumbria' ? '#334155' : '#2d5a43'}); color: rgba(255,255,255,0.9); -webkit-print-color-adjust: exact; print-color-adjust: exact;">IBAN</span>
+                                            <div class="flex items-center justify-between mb-0.5">
+                                                <p class="text-[5.5px] font-bold text-slate-300 tracking-tight leading-none uppercase">${h.bank}</p>
+                                                <span class="text-[4.5px] font-black px-1 py-0.5 rounded-[2px] uppercase tracking-[0.1em] leading-none" style="background: #e2e8f0; color: #64748b; -webkit-print-color-adjust: exact; print-color-adjust: exact;">IBAN</span>
                                             </div>
                                             <p class="font-black text-slate-700 tabular-nums" style="font-size: 11px; letter-spacing: 0.1em; line-height: 1;">${h.iban}</p>
                                          </div>
@@ -1840,11 +1882,11 @@
                                                     </div>
                                                     <div class="flex justify-between items-end mt-1">
                                                         <div>
-                                                            <p class="text-[9px] ${isPaid ? 'text-emerald-500' : 'text-rose-600'} font-black uppercase tracking-wider mb-1">${isPaid ? 'Cobrado' : 'Fecha Límite'}</p>
-                                                            <p class="text-[12px] font-bold ${isPaid ? 'text-slate-600' : 'text-slate-800'}">${formatDateSafe(depDate)}</p>
+                                                            <p class="text-[8px] ${isPaid ? 'text-emerald-500' : 'text-rose-600'} font-black uppercase tracking-wider mb-0.5">${isPaid ? 'Cobrado' : 'Fecha Límite'}</p>
+                                                            <p class="text-[11px] font-bold ${isPaid ? 'text-slate-600' : 'text-slate-800'}">${formatDateSafe(depDate)}</p>
                                                         </div>
                                                         <div class="text-right">
-                                                            <p class="tabular-nums leading-none flex items-baseline gap-0.5" style="font-size: 13px; font-weight: 900; ${isPaid ? 'color: #047857;' : 'color: #1e293b;'} -webkit-print-color-adjust: exact; print-color-adjust: exact;">${formatNum(dep.amount)}<span style="font-size: 8px; opacity: 0.6;">€</span></p>
+                                                            <p class="tabular-nums leading-none flex items-baseline gap-0.5" style="font-size: 11px; font-weight: 900; ${isPaid ? 'color: #047857;' : 'color: #1e293b;'} -webkit-print-color-adjust: exact; print-color-adjust: exact;">${formatNum(dep.amount)}<span style="font-size: 8px; opacity: 0.6;">€</span></p>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -1865,15 +1907,69 @@
                     </div>`;
             } else if (currentTemplate === 'proforma') {
                 const netTotal = total - totalComision;
-                footer.innerHTML = `
-                    <div class="mt-4 flex flex-col items-end w-full">
-                        <div class="proforma-total-box w-[300px] shadow-lg">
-                            <span class="text-[10px] font-bold uppercase tracking-widest mr-4">Total a Pagar:</span>
-                            <span class="text-xl tabular-nums font-black">${formatNum(netTotal)} €</span>
+
+                // Construir filas de desglose IVA
+                let ivaRows = '';
+                if (base10 > 0) {
+                    ivaRows += `
+                        <tr><td class="text-left py-0.5 text-slate-500">Base Imponible (10%)</td><td class="text-right py-0.5 tabular-nums">${formatNum(base10)} €</td></tr>
+                        <tr class="border-b border-gray-200"><td class="text-left py-0.5 text-slate-500">IVA (10%)</td><td class="text-right py-0.5 tabular-nums font-bold">${formatNum(iva10)} €</td></tr>`;
+                }
+                if (base21 > 0) {
+                    ivaRows += `
+                        <tr><td class="text-left py-0.5 text-slate-500">Base Imponible (21%)</td><td class="text-right py-0.5 tabular-nums">${formatNum(base21)} €</td></tr>
+                        <tr class="border-b border-gray-200"><td class="text-left py-0.5 text-slate-500">IVA (21%)</td><td class="text-right py-0.5 tabular-nums font-bold">${formatNum(iva21)} €</td></tr>`;
+                }
+
+                const h = HOTELS[currentHotel];
+                const summaryHtml = `
+                    <div class="flex flex-col items-end gap-3 w-full">
+                        <!-- TOTAL -->
+                        <div class="proforma-total-box w-[240px] shadow-lg" style="-webkit-print-color-adjust:exact; print-color-adjust:exact;">
+                            <span class="text-[9px] font-bold uppercase tracking-widest mr-4">Total:</span>
+                            <span class="text-lg tabular-nums font-black">${formatNum(netTotal)} €</span>
                         </div>
-                        <div class="mt-4 w-full h-px bg-slate-200"></div>
-                    </div>
-                `;
+                        <!-- Desglose IVA -->
+                        ${ivaRows ? `
+                        <table class="text-[9px] w-[300px] border-collapse border border-gray-200 rounded-lg overflow-hidden" style="-webkit-print-color-adjust:exact; print-color-adjust:exact;">
+                            <thead><tr class="bg-gray-50"><td colspan="2" class="text-[8px] font-black text-slate-400 uppercase tracking-widest px-3 py-2">Desglose Fiscal</td></tr></thead>
+                            <tbody class="font-mono text-[9px]">${ivaRows.replace(/py-0\.5/g,'py-1.5 px-3')}</tbody>
+                        </table>` : ''}
+                    </div>`;
+
+                // Renderizar dentro de la proforma (para que quede en la misma hoja)
+                const proformaSummary = document.getElementById('proforma-summary');
+                if (proformaSummary) proformaSummary.innerHTML = summaryHtml;
+
+                // Datos bancarios en el PIE de página del documento proforma
+                const proformaBankContainer = document.getElementById('proforma-bank-container');
+                const bankHidden = sessionStorage.getItem('proforma_bank_hidden') === '1';
+                if (proformaBankContainer) {
+                    proformaBankContainer.innerHTML = `
+                        <div class="mt-3 w-full h-px bg-slate-200" style="-webkit-print-color-adjust:exact;"></div>
+                        ${h?.iban ? `
+                        <div id="bank-data-block" style="margin-top:8px; display:${bankHidden ? 'none' : 'flex'}; align-items:stretch; border:1px solid #e2e8f0; border-radius:8px; overflow:hidden; -webkit-print-color-adjust:exact; print-color-adjust:exact; background:white; position:relative;">
+                            <!-- Franja lateral acento -->
+                            <div style="width:4px; background:#1e293b; flex-shrink:0;"></div>
+                            <!-- Contenido -->
+                            <div style="padding:8px 14px; display:flex; flex-direction:column; gap:2px; flex:1;">
+                                <div style="font-size:5px; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; color:#cbd5e1;">Transferencia Bancaria · Datos de Pago</div>
+                                <div style="font-size:14px; font-weight:900; letter-spacing:0.08em; color:#0f172a; font-family:'Courier Prime', monospace; margin-top:2px;">${h.iban}</div>
+                                <div style="font-size:6px; color:#94a3b8; margin-top:1px; text-transform:uppercase;">${h.bank} &nbsp;<span style="color:#e2e8f0;">·</span>&nbsp; Beneficiario: <strong style="color:#475569;">${h.company}</strong> (NIF: ${h.nif})</div>
+                            </div>
+                            <!-- Badge entidad -->
+                            <div style="display:flex; align-items:center; padding:0 12px; background:#f8fafc; border-left:1px solid #e2e8f0;">
+                                <span style="font-size:5px; font-weight:900; color:#94a3b8; letter-spacing:0.05em; white-space:nowrap;">IBAN</span>
+                            </div>
+                            <!-- Botón cerrar (no imprime) -->
+                            <button class="no-print" onclick="document.getElementById('bank-data-block').style.display='none'; sessionStorage.setItem('proforma_bank_hidden','1'); document.getElementById('bank-show-btn').style.display='flex';" style="position:absolute; top:4px; right:4px; background:#f1f5f9; border:1px solid #e2e8f0; border-radius:4px; padding:1px 5px; font-size:9px; cursor:pointer; color:#64748b; line-height:1.4;" title="Ocultar datos bancarios">✕</button>
+                        </div>
+                        <!-- Botón para mostrar de nuevo (no imprime) -->
+                        <button id="bank-show-btn" class="no-print" onclick="document.getElementById('bank-data-block').style.display='flex'; sessionStorage.setItem('proforma_bank_hidden','0'); this.style.display='none';" style="display:${bankHidden ? 'flex' : 'none'}; margin-top:6px; align-items:center; gap:4px; background:#f1f5f9; border:1px solid #e2e8f0; border-radius:6px; padding:3px 10px; font-size:8px; cursor:pointer; color:#475569; font-weight:700; letter-spacing:0.05em;">＋ Incluir datos bancarios</button>
+                        ` : ''}`;
+                }
+
+
             }
 
             updatePaymentLink();
@@ -1899,8 +1995,13 @@
             const qrImg = document.getElementById('payment-qr-img');
             const qrInner = document.getElementById('payment-qr-inner');
             
+            const isQrHidden = sessionStorage.getItem('proforma_qr_hidden') === '1';
+            const qrShowBtn = document.getElementById('qr-show-btn');
+
             if (qrBlock && payUrl && (groupPlan.length === 0 || groupPlan.some(p => p.status !== "Cobrado"))) {
-                qrBlock.style.display = 'block';
+                qrBlock.style.display = isQrHidden ? 'none' : 'block';
+                if (qrShowBtn) qrShowBtn.style.display = isQrHidden ? 'flex' : 'none';
+
                 if (qrLink) qrLink.href = payUrl;
                 if (qrImg) qrImg.src = 'https://api.qrserver.com/v1/create-qr-code/?size=100x100&color=064e3b&bgcolor=ffffff&data=' + encodeURIComponent(payUrl);
                 
@@ -1918,32 +2019,62 @@
             }
         }
 
-        // Botón Imprimir: actualizar enlace ANTES de llamar a window.print()
+        // Botón Imprimir: ocultar controles, imprimir y restaurar
         function printDoc() {
             updatePaymentLink();
+
+            // 1. Ocultar TODOS los elementos no-print antes de imprimir
+            const noPrints = Array.from(document.querySelectorAll('.no-print'));
+            noPrints.forEach(el => {
+                el._savedDisplay = el.style.display;
+                el.style.setProperty('display', 'none', 'important');
+            });
+
+            // 2. Ajustar título (nombre del PDF)
             const groupData = JSON.parse(localStorage.getItem('selectedGroup') || '{}');
-            const ref = groupData["Nombre del Grupo"] || groupData["Reserva"] || 'Documento';
+            const reserva = groupData["Reserva"] || groupData["id"] || '';
+            const grupo   = groupData["Nombre del Grupo"] || '';
+            const ref = (reserva && grupo) ? `${reserva} - ${grupo}` : (grupo || reserva || 'Documento');
             const oldTitle = document.title;
             document.title = ref;
+
+            // 3. Pequeño delay para que el DOM se pinte sin esos elementos
             setTimeout(() => {
                 window.print();
                 document.title = oldTitle;
-            }, 150);
+                // 4. Restaurar después de imprimir
+                noPrints.forEach(el => {
+                    el.style.display = el._savedDisplay || '';
+                    delete el._savedDisplay;
+                });
+            }, 80);
         }
 
         // Print handlers
         window.onbeforeprint = () => {
             updatePaymentLink();
+            // Ocultar todos los elementos no-print por JS (refuerza el CSS @media print)
+            document.querySelectorAll('.no-print').forEach(el => {
+                el.dataset._prevDisplay = el.style.display;
+                el.style.display = 'none';
+            });
             const notas = document.getElementById('propuesta-notas');
             const placeholder = "Escriba aquí cualquier observación adicional";
             if (notas && (notas.innerText.includes(placeholder) || !notas.innerText.trim())) {
-                notas.closest('.mt-8.pt-8').classList.add('no-print');
+                const section = notas.closest('.mt-8');
+                if (section) section.style.display = 'none';
             }
         };
         window.onafterprint = () => {
+            // Restaurar todos los elementos no-print
+            document.querySelectorAll('.no-print').forEach(el => {
+                el.style.display = el.dataset._prevDisplay || '';
+                delete el.dataset._prevDisplay;
+            });
             const notas = document.getElementById('propuesta-notas');
             if (notas) {
-                notas.closest('.mt-8.pt-8').classList.remove('no-print');
+                const section = notas.closest('.mt-8');
+                if (section) section.style.display = '';
             }
         };
     </script>

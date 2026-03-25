@@ -1176,47 +1176,61 @@
                           </div>
                           {/* Uds */}
                           <div className="w-14 relative">
-                            <input 
-                              type="number" 
-                              min="0"
-                              value={extra.units !== undefined ? extra.units : 1}
-                              onChange={(e) => {
-                                 const newExtras = [...formData.extraCharges];
-                                 const u = Number(e.target.value);
-                                 const pax = newExtras[index].pax !== undefined ? newExtras[index].pax : 1;
-                                 newExtras[index].units = u;
-                                 const up = newExtras[index].unitPrice !== undefined ? newExtras[index].unitPrice : 0;
-                                 newExtras[index].price = u * pax * up;
-                                 setFormData({ ...formData, extraCharges: newExtras });
-                              }}
-                              placeholder="1"
-                              title="Unidades (salas, sesiones...)"
-                              className="w-full px-2 py-2 bg-slate-50 border border-slate-100 rounded-lg text-[11px] font-black outline-none focus:ring-2 focus:ring-teal-500/10 focus:border-teal-500 transition-all text-slate-700 text-center"
-                            />
-                            <span className="absolute -top-3.5 left-0 text-[8px] font-bold text-indigo-400 uppercase">Uds</span>
+                            {(extra.pax || 0) > 0 ? (
+                              <div className="w-full px-2 py-2 bg-slate-50 border border-slate-100 rounded-lg text-[11px] font-black text-slate-300 text-center select-none">–</div>
+                            ) : (
+                              <input
+                                type="number"
+                                min="0"
+                                value={extra.units !== undefined && extra.units > 0 ? extra.units : ''}
+                                onChange={(e) => {
+                                   const newExtras = [...formData.extraCharges];
+                                   const u = Number(e.target.value) || 0;
+                                   newExtras[index].units = u;
+                                   newExtras[index].pax = 0;
+                                   const up = newExtras[index].unitPrice !== undefined ? newExtras[index].unitPrice : 0;
+                                   newExtras[index].price = u * up;
+                                   setFormData({ ...formData, extraCharges: newExtras });
+                                }}
+                                placeholder="-"
+                                title="Unidades (salas, sesiones...)"
+                                className={`w-full px-2 py-2 border rounded-lg text-[11px] font-black outline-none transition-all text-center ${
+                                  (extra.units || 0) > 0 ? 'bg-teal-50 border-teal-300 text-teal-700' : 'bg-slate-50 border-slate-100 text-slate-400'
+                                }`}
+                              />
+                            )}
+                            <span className={`absolute -top-3.5 left-0 text-[8px] font-black uppercase ${
+                              (extra.pax || 0) > 0 ? 'text-slate-300' : (extra.units || 0) > 0 ? 'text-teal-500' : 'text-slate-400'
+                            }`}>Uds</span>
                           </div>
                           {/* Pax */}
                           <div className="w-14 relative">
-                            <input 
-                              type="number" 
-                              min="0"
-                              value={extra.pax || ''}
-                              onChange={(e) => {
-                                 const newExtras = [...formData.extraCharges];
-                                 const pax = Number(e.target.value) || 0;
-                                 newExtras[index].pax = pax;
-                                 newExtras[index].units = 0;
-                                 const unitPrice = newExtras[index].unitPrice || 0;
-                                 newExtras[index].price = pax * unitPrice;
-                                 setFormData({ ...formData, extraCharges: newExtras });
-                              }}
-                              placeholder="-"
-                              title="Personas. Deja vacío si cobras por unidades."
-                              className={`w-full px-2 py-2 border rounded-lg text-[11px] font-black outline-none transition-all text-center ${
-                                (extra.pax || 0) > 0 ? 'bg-teal-50 border-teal-300 text-teal-700' : 'bg-slate-50 border-slate-100 text-slate-400'
-                              }`}
-                            />
-                            <span className={`absolute -top-3.5 left-0 text-[8px] font-black uppercase ${(extra.pax || 0) > 0 ? 'text-teal-500' : 'text-slate-400'}`}>Pax</span>
+                            {(extra.units || 0) > 0 ? (
+                              <div className="w-full px-2 py-2 bg-slate-50 border border-slate-100 rounded-lg text-[11px] font-black text-slate-300 text-center select-none">–</div>
+                            ) : (
+                              <input
+                                type="number"
+                                min="0"
+                                value={extra.pax || ''}
+                                onChange={(e) => {
+                                   const newExtras = [...formData.extraCharges];
+                                   const pax = Number(e.target.value) || 0;
+                                   newExtras[index].pax = pax;
+                                   newExtras[index].units = 0;
+                                   const unitPrice = newExtras[index].unitPrice || 0;
+                                   newExtras[index].price = pax * unitPrice;
+                                   setFormData({ ...formData, extraCharges: newExtras });
+                                }}
+                                placeholder="-"
+                                title="Personas. Deja vacío si cobras por unidades."
+                                className={`w-full px-2 py-2 border rounded-lg text-[11px] font-black outline-none transition-all text-center ${
+                                  (extra.pax || 0) > 0 ? 'bg-teal-50 border-teal-300 text-teal-700' : 'bg-slate-50 border-slate-100 text-slate-400'
+                                }`}
+                              />
+                            )}
+                            <span className={`absolute -top-3.5 left-0 text-[8px] font-black uppercase ${
+                              (extra.units || 0) > 0 ? 'text-slate-300' : (extra.pax || 0) > 0 ? 'text-teal-500' : 'text-slate-400'
+                            }`}>Pax</span>
                           </div>
                           <div className="w-20 md:w-24 relative">
                             <input 
@@ -1297,10 +1311,29 @@
         );
       };
 
+      const HOTEL_DEFAULTS = {
+        guadiana: {
+          address: 'C/ Guadiana, 36',
+          city: '13002 - Ciudad Real (España)',
+          phone: '926 22 33 13',
+          email: 'info@hotelguadiana.es',
+          web: 'www.hotelguadiana.es'
+        },
+        cumbria: {
+          address: 'Ctra. Toledo, 26',
+          city: '13005 - Ciudad Real (España)',
+          phone: '(+34) 926 25 04 04',
+          email: 'recepcion@hotelcumbria.es',
+          web: 'www.hotelcumbria.es'
+        }
+      };
+
       const renderDetail = () => {
         if (!selectedGroup) return null;
         const g = normalizeGroupData(selectedGroup);
-        const calculatedTotal = calculateTotal(g);
+        // Mezclar: usar selectedGroup para habitaciones/fechas, pero formData.extraCharges para extras vivos
+        const mergedForTotal = { ...selectedGroup, extraCharges: formData.extraCharges ?? selectedGroup?.extraCharges };
+        const calculatedTotal = calculateTotal(mergedForTotal);
         const hotelName = g.Hotel_Asignado || g.Hotel || "N/A";
         const isCumbria = hotelName.toLowerCase().includes("cumbria");
         const activeRoomsMap = Object.entries(g.roomCounts || {}).reduce((acc, [type, count]) => {
@@ -1467,21 +1500,32 @@
               {/* DOCUMENTO DE PROPUESTA */}
               <div className="lg:col-span-8 print:col-span-12">
                 <div className="bg-white rounded-3xl shadow-xl border border-slate-200 print-shadow-none print:border-none overflow-hidden print:overflow-visible text-slate-800 print:text-black print:m-0 print:p-0">
-                  <div className="p-12 md:p-16 print:p-8" id="quote-document">
-                    <div className={`flex items-center justify-between gap-6 border-b-2 pb-5 mb-10 print:mb-4 print:pb-3 ${isCumbria ? 'border-blue-900' : 'border-orange-600'}`}>
-                      {/* Logo — max-height prevents clipping, auto width keeps proportions */}
+                  <div className="p-8 md:p-10 print:p-8" id="quote-document">
+                    <div className={`flex items-center justify-between gap-6 border-b-2 pb-4 mb-8 print:mb-4 print:pb-3 ${isCumbria ? 'border-blue-900' : 'border-orange-600'}`}>
+                      {/* Logo */}
                       <img
                         src={isCumbria ? "Logos/Cumbria Spa&Hotel.jpg" : "Logos/Sercotel Guadiana.jpg"}
                         alt={hotelName}
                         className="max-h-20 print:max-h-14 w-auto object-contain flex-shrink-0"
                       />
-                      {/* Contact details — centre column */}
-                      <div className="flex-1 flex flex-col items-center text-center gap-0.5">
-                        {globalConfig?.hotelAddress && <p className="text-[9px] print:text-[7.5px] text-slate-500 font-semibold">{globalConfig.hotelAddress}</p>}
-                        {globalConfig?.hotelPhone && <p className="text-[9px] print:text-[7.5px] text-slate-500">Tel: {globalConfig.hotelPhone}</p>}
-                        {globalConfig?.hotelEmail && <p className="text-[9px] print:text-[7.5px] text-slate-500">{globalConfig.hotelEmail}</p>}
-                        {globalConfig?.hotelWeb && <p className="text-[9px] print:text-[7.5px] text-slate-400 italic">{globalConfig.hotelWeb}</p>}
-                      </div>
+                      {/* Contact details — centre column (always visible with fallback) */}
+                      {(() => {
+                        const defaults = isCumbria ? HOTEL_DEFAULTS.cumbria : HOTEL_DEFAULTS.guadiana;
+                        const addr    = globalConfig?.hotelAddress || defaults.address;
+                        const city    = globalConfig?.hotelCity    || defaults.city;
+                        const phone   = globalConfig?.hotelPhone   || defaults.phone;
+                        const email   = globalConfig?.hotelEmail   || defaults.email;
+                        const web     = globalConfig?.hotelWeb     || defaults.web;
+                        return (
+                          <div className="flex-1 flex flex-col items-center text-center gap-0.5">
+                            <p className="text-[9px] print:text-[7.5px] text-slate-600 font-bold">{addr}</p>
+                            {city  && <p className="text-[9px] print:text-[7.5px] text-slate-500">{city}</p>}
+                            <p className="text-[9px] print:text-[7.5px] text-slate-500">Telf.: {phone}</p>
+                            {email && <p className="text-[9px] print:text-[7.5px] text-slate-400">{email}</p>}
+                            {web   && <p className="text-[9px] print:text-[7.5px] text-slate-400 italic">{web}</p>}
+                          </div>
+                        );
+                      })()}
                       {/* Title — right column */}
                       <div className={`flex items-center gap-4`}>
                         <div className={`w-px h-10 print:h-7 ${isCumbria ? 'bg-blue-200' : 'bg-orange-200'}`}></div>
@@ -1492,25 +1536,25 @@
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 print:grid-cols-2 gap-y-6 print:gap-y-2 gap-x-12 mb-12 print:mb-4 text-sm print:text-xs border-b border-slate-100 pb-10 print:pb-4">
-                      <div className="space-y-1 print:space-y-0 text-left">
-                        <span className="text-[10px] print:text-[8px] font-black text-slate-400 uppercase tracking-widest">A la atención de</span>
-                        <p className="text-lg print:text-sm font-black text-slate-800 print:text-black">{g.Com_Nombre_Contacto}</p>
-                        {g.Com_Email_Contacto && <p className="text-slate-500 print:text-black">{g.Com_Email_Contacto}</p>}
+                    <div className="grid grid-cols-1 md:grid-cols-2 print:grid-cols-2 gap-y-3 print:gap-y-1.5 gap-x-8 mb-6 print:mb-3 text-xs print:text-[10px] border-b border-slate-100 pb-5 print:pb-3">
+                      <div className="space-y-0.5 text-left">
+                        <span className="text-[9px] print:text-[7px] font-black text-slate-400 uppercase tracking-widest">A la atención de</span>
+                        <p className="text-sm print:text-[11px] font-black text-slate-800 print:text-black">{g.Com_Nombre_Contacto}</p>
+                        {g.Com_Email_Contacto && <p className="text-[10px] text-slate-500 print:text-black">{g.Com_Email_Contacto}</p>}
                       </div>
-                      <div className="space-y-1 print:space-y-0 text-left">
-                        <span className="text-[10px] print:text-[8px] font-black text-slate-400 uppercase tracking-widest">Referencia del Evento</span>
-                        <p className="text-lg print:text-sm font-black text-slate-800">{g["Nombre del Grupo"]}</p>
-                        <p className="text-slate-500">{g.Reserva}</p>
+                      <div className="space-y-0.5 text-left">
+                        <span className="text-[9px] print:text-[7px] font-black text-slate-400 uppercase tracking-widest">Referencia del Evento</span>
+                        <p className="text-sm print:text-[11px] font-black text-slate-800">{g["Nombre del Grupo"]}</p>
+                        <p className="text-[10px] text-slate-500">{g.Reserva}</p>
                       </div>
-                      <div className="space-y-1 print:space-y-0 text-left">
-                        <span className="text-[10px] print:text-[8px] font-black text-slate-400 uppercase tracking-widest">Período de Estancia</span>
-                        <p className="text-base print:text-sm font-bold text-slate-800">{formatDate(g.Entrada)} al {formatDate(g.Salida)}</p>
-                        <p className="text-slate-500 italic print:text-[10px]">{dates.length} noches estimadas</p>
+                      <div className="space-y-0.5 text-left">
+                        <span className="text-[9px] print:text-[7px] font-black text-slate-400 uppercase tracking-widest">Período de Estancia</span>
+                        <p className="text-xs print:text-[10px] font-bold text-slate-800">{formatDate(g.Entrada)} al {formatDate(g.Salida)}</p>
+                        <p className="text-[10px] text-slate-500 italic print:text-[9px]">{dates.length} noches estimadas</p>
                       </div>
-                      <div className="space-y-1 print:space-y-0 text-left">
-                        <span className="text-[10px] print:text-[8px] font-black text-slate-400 uppercase tracking-widest">Pax Estimados</span>
-                        <p className="text-base print:text-sm font-bold text-slate-800">{totalPax} personas</p>
+                      <div className="space-y-0.5 text-left">
+                        <span className="text-[9px] print:text-[7px] font-black text-slate-400 uppercase tracking-widest">Pax Estimados</span>
+                        <p className="text-xs print:text-[10px] font-bold text-slate-800">{totalPax} personas</p>
                       </div>
                     </div>
 
@@ -1710,15 +1754,15 @@
                                       <td className="px-6 py-3 print:py-1.5 print:px-3 text-right tabular-nums whitespace-nowrap">-{formatNum(parseFloat(g.Descuentos))} €</td>
                                     </tr>
                                   )}
-                                  <tr>
-                                    <td colSpan="3" className="p-6 print:py-2 print:px-3 text-right uppercase tracking-widest text-xs print:text-[10px] text-white">Total General Propuesta (Neto):</td>
-                                    <td className="p-6 print:py-2 print:px-3 text-right text-xl print:text-lg tabular-nums text-white whitespace-nowrap">{formatNum(calculatedTotal)} €</td>
+                                  <tr style={{backgroundColor:'#0f172a', color:'white', WebkitPrintColorAdjust:'exact', printColorAdjust:'exact'}}>
+                                    <td colSpan="3" className="p-6 print:py-2 print:px-3 text-right uppercase tracking-widest text-xs print:text-[10px]" style={{color:'white'}}>Total General Propuesta (Neto):</td>
+                                    <td className="p-6 print:py-2 print:px-3 text-right text-xl print:text-lg tabular-nums whitespace-nowrap" style={{color:'white', fontWeight:900}}>{formatNum(calculatedTotal)} €</td>
                                   </tr>
                                 </>
                               ) : (
-                                <tr>
-                                  <td colSpan="3" className="p-6 print:py-2 print:px-3 text-right uppercase tracking-widest text-xs print:text-[10px]">Total General Propuesta (Neto):</td>
-                                  <td className="p-6 print:py-2 print:px-3 text-right text-xl print:text-lg tabular-nums whitespace-nowrap">{formatNum(calculatedTotal)} €</td>
+                                <tr style={{backgroundColor:'#0f172a', color:'white', WebkitPrintColorAdjust:'exact', printColorAdjust:'exact'}}>
+                                  <td colSpan="3" className="p-6 print:py-2 print:px-3 text-right uppercase tracking-widest text-xs print:text-[10px]" style={{color:'white'}}>Total General Propuesta (Neto):</td>
+                                  <td className="p-6 print:py-2 print:px-3 text-right text-xl print:text-lg tabular-nums whitespace-nowrap" style={{color:'white', fontWeight:900}}>{formatNum(calculatedTotal)} €</td>
                                 </tr>
                               )}
                             </tfoot>
@@ -1794,10 +1838,9 @@
                   <button 
                     onClick={() => {
                       const originalTitle = document.title;
-                      const savedGroup = JSON.parse(localStorage.getItem('selectedPresupuesto') || '{}');
-                      const num = (savedGroup.id || '---').split('_')[0];
-                      const cliente = savedGroup["Nombre del Grupo"] || savedGroup.Com_Nombre_Contacto || '---';
-                      document.title = `${num} - ${cliente}`;
+                      const reserva  = formData.Reserva || selectedGroup?.Reserva || g.Reserva || '';
+                      const grupo    = formData['Nombre del Grupo'] || g['Nombre del Grupo'] || formData.Com_Nombre_Contacto || '';
+                      document.title = (reserva && grupo) ? `${reserva} - ${grupo}` : (grupo || reserva || 'Propuesta');
                       window.print();
                       setTimeout(() => { document.title = originalTitle; }, 500);
                     }} 
