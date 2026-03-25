@@ -178,10 +178,14 @@
         }
         });
 
-        if (!foundSegment) {
+        if (!cleanRow["Segment."] || cleanRow["Segment."] === "") {
             const resName = cleanRow["Nombre del Grupo"] || cleanRow["Reserva"] || "Fila desconocida";
             importErrors.push(`⚠️ El grupo "${resName}" no tiene información de Segmentación.`);
             cleanRow._hasWarning = true;
+        }
+
+        if (!cleanRow["Hotel_Asignado"] && hotelName && hotelName !== "" && hotelName !== "Hotel Multi-Hoja") {
+            cleanRow["Hotel_Asignado"] = hotelName;
         }
         return cleanRow;
     });

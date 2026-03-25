@@ -795,6 +795,7 @@
 
       // Estados para IA
       const [isAiLoading, setIsAiLoading] = useState(false);
+      const [loading, setLoading] = useState(false);
       const [aiResult, setAiResult] = useState(null);
       const [showAiModal, setShowAiModal] = useState(false);
       const [showAddGroupModal, setShowAddGroupModal] = useState(false);
@@ -2748,7 +2749,7 @@
 
             if (group.dailyConfig && Object.keys(group.dailyConfig).length > 0) {
               const dates = Object.keys(group.dailyConfig).sort();
-              const hotelName = group.records[0]?.["Hotel_Asignado"] || group.records[0]?.["Hotel"] || "H. Pendiente";
+              const hotelName = group.hotel || group.records[0]?.["Hotel_Asignado"] || group.records[0]?.["Hotel"] || "H. Pendiente";
               
               dates.forEach(date => {
                 const config = group.dailyConfig[date];
@@ -2824,7 +2825,7 @@
               });
 
               if (group.extraCharges && group.extraCharges.length > 0) {
-                const hotelName = group.records[0]?.["Hotel_Asignado"] || group.records[0]?.["Hotel"] || "H. Pendiente";
+                const hotelName = group.hotel || group.records[0]?.["Hotel_Asignado"] || group.records[0]?.["Hotel"] || "H. Pendiente";
                 group.extraCharges.forEach(ext => {
                    const isGlobal = !ext.date || ext.date === 'Todas';
                    const d = isGlobal ? (dates[0] || "") : ext.date;
@@ -2858,7 +2859,7 @@
                 if (rowStatus.includes("anul") || rowStatus.includes("can"))
                   return;
 
-                const h = r["Hotel_Asignado"] || r["Hotel"] || "H. Pendiente";
+                const h = r["Hotel_Asignado"] || r["Hotel"] || group.hotel || "H. Pendiente";
                 const dIn = r["Entrada"];
                 const dOut = r["Salida"];
                 const key = `${h}|${dIn}|${dOut}`;
@@ -8789,6 +8790,17 @@
                   >
                     Cancelar
                   </button>
+                </div>
+              </div>
+            )}
+            {/* Overlay de Carga y Guardado */}
+            {(loading || isSaving) && (
+              <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
+                <div className="bg-white rounded-3xl p-8 flex flex-col items-center gap-4 shadow-2xl animate-fade-in border border-white/20">
+                  <div className="nexus-spinner"></div>
+                  <p className="text-sm font-black text-slate-700 uppercase tracking-widest animate-pulse">
+                    {(isSaving || isAiLoading) ? "Guardando Cambios..." : "Procesando Archivo..."}
+                  </p>
                 </div>
               </div>
             )}
