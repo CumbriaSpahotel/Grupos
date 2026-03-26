@@ -1280,6 +1280,15 @@
                 firebase.initializeApp(window.firebaseConfig);
             }
             if (typeof firebase !== 'undefined') window.db = firebase.firestore();
+            // Load global config for clauses
+            try {
+                const doc = await db.collection("settings").doc("main").get();
+                if (doc.exists) {
+                    window.globalConfig = doc.data();
+                }
+            } catch (e) {
+                console.error("Error loading global config:", e);
+            }
             await refreshConfigFromCloud();
             loadSelectedGroup();
             renderItems();
@@ -2016,6 +2025,44 @@
                 }
             } else if (qrBlock) {
                 qrBlock.style.display = 'none';
+            }
+
+            // --- Renderear Cláusulas de Confirmación ---
+            const polDiv = document.getElementById('tpl-policies');
+            if (polDiv && currentTemplate === 'confirmacion') {
+                const hotelKey = currentHotel === 'cumbria' ? 'cumbria' : 'guadiana';
+                const commonC = window.globalConfig?.common?.confirmationClauses || [];
+                const hotelC = window.globalConfig?.[hotelKey]?.confirmationClauses || [];
+                const allC = [...commonC, ...hotelC];
+
+                if (allC.length > 0) {
+                    const totalNeto = total - totalComision;
+                    const html = `
+                        <div class="mt-8 border-t border-slate-100 pt-6">
+                            <div class="flex items-center gap-2 mb-4">
+                                <div class="w-1 h-4 bg-slate-900 rounded-full"></div>
+                                <h4 class="text-[10px] font-black uppercase tracking-[0.2em] text-slate-800">Cláusulas de Confirmación y Políticas</h4>
+                            </div>
+                            <div class="grid grid-cols-2 gap-x-8 gap-y-4">
+                                ${allC.map((c, i) => {
+                                    const body = (c.body || '').replace(/{DEP_30}/g, formatNum(totalNeto * 0.3) + '€');
+                                    return `
+                                        <div class="space-y-1">
+                                            <p class="text-[9px] font-black uppercase text-slate-500 tracking-wider">${i + 1}. ${c.title}</p>
+                                            <p class="text-[8.5px] text-slate-500 leading-relaxed">${body}</p>
+                                        </div>
+                                    `;
+                                }).join('')}
+                            </div>
+                        </div>
+                    `;
+                    polDiv.innerHTML = html;
+                    polDiv.classList.remove('hidden');
+                } else {
+                    polDiv.classList.add('hidden');
+                }
+            } else if (polDiv) {
+                polDiv.classList.add('hidden');
             }
         }
 

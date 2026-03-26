@@ -1786,34 +1786,37 @@
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 print:grid-cols-2 gap-4 print:gap-2">
                           {(() => {
-                            const hotelKey = isCumbria ? 'cumbria' : 'guadiana';
-                            const clauses = globalConfig?.[hotelKey]?.clauses;
-                            const accentColor = isCumbria ? 'border-blue-200 print:border-blue-300' : 'border-orange-100 print:border-orange-200';
-                            const numColor = isCumbria ? 'text-blue-800' : 'text-orange-700';
-                            const titleColor = isCumbria ? 'text-blue-900' : 'text-orange-900';
-
-                            const renderClause = (clause, idx) => {
-                              const bodyParsed = clause.body.replace(/{DEP_30}/g, formatNum(calculatedTotal * 0.3) + '€');
-                              return (
-                                <div key={idx} className={`border-l-2 ${accentColor} pl-3 print:pl-2 py-1`}>
-                                  <p className={`text-[10px] print:text-[7.5px] font-black uppercase tracking-wider mb-0.5 ${titleColor}`}>
-                                    <span className={`${numColor} mr-1`}>{idx + 1}.</span>{clause.title}
-                                  </p>
-                                  <p className="text-[9.5px] print:text-[7px] text-slate-500 print:text-slate-600 leading-snug">{bodyParsed}</p>
-                                </div>
-                              );
-                            };
-
-                            if (clauses && clauses.length > 0) {
-                              return clauses.map(renderClause);
-                            } else {
-                              return [
-                                { title: "Cupo y Disponibilidad", body: "La presente oferta es válida por 48 horas. Dado que se requiere el bloqueo total de instalaciones, la disponibilidad no se garantiza hasta el primer depósito." },
-                                { title: "Confirmación y Depósito", body: `Bloqueo confirmado al recibir el 30% del total (${formatNum(calculatedTotal * 0.3)}€). El 70% restante deberá liquidarse 7 días antes de la entrada.` },
-                                { title: "Política de Cancelación", body: "Al ser un evento de carácter exclusivo con bloqueo de inventario, todos los depósitos entregados tienen carácter de NO REEMBOLSABLES." },
-                                { title: "Rooming List", body: "La relación detallada de ocupantes deberá entregarse 5 días hábiles antes de la llegada del primer pasajero." }
-                              ].map(renderClause);
-                            }
+                             const hotelKey = isCumbria ? 'cumbria' : 'guadiana';
+                             const commonClauses = globalConfig?.common?.clauses || [];
+                             const hotelClauses = globalConfig?.[hotelKey]?.clauses || [];
+                             const clauses = [...commonClauses, ...hotelClauses];
+                             
+                             const accentColor = isCumbria ? 'border-blue-200 print:border-blue-300' : 'border-orange-100 print:border-orange-200';
+                             const numColor = isCumbria ? 'text-blue-800' : 'text-orange-700';
+                             const titleColor = isCumbria ? 'text-blue-900' : 'text-orange-900';
+ 
+                             const renderClause = (clause, idx) => {
+                               const bodyParsed = (clause.body || '').replace(/{DEP_30}/g, formatNum(calculatedTotal * 0.3) + '€');
+                               return (
+                                 <div key={idx} className={`border-l-2 ${accentColor} pl-3 print:pl-2 py-1`}>
+                                   <p className={`text-[10px] print:text-[7.5px] font-black uppercase tracking-wider mb-0.5 ${titleColor}`}>
+                                     <span className={`${numColor} mr-1`}>{idx + 1}.</span>{clause.title}
+                                   </p>
+                                   <p className="text-[9.5px] print:text-[7px] text-slate-500 print:text-slate-600 leading-snug">{bodyParsed}</p>
+                                 </div>
+                               );
+                             };
+ 
+                             if (clauses && clauses.length > 0) {
+                               return clauses.map(renderClause);
+                             } else {
+                               return [
+                                 { title: "Cupo y Disponibilidad", body: "La presente oferta es válida por 48 horas. Dado que se requiere el bloqueo total de instalaciones, la disponibilidad no se garantiza hasta el primer depósito." },
+                                 { title: "Confirmación y Depósito", body: `Bloqueo confirmado al recibir el 30% del total (${formatNum(calculatedTotal * 0.3)}€). El 70% restante deberá liquidarse 7 días antes de la entrada.` },
+                                 { title: "Política de Cancelación", body: "Al ser un evento de carácter exclusivo con bloqueo de inventario, todos los depósitos entregados tienen carácter de NO REEMBOLSABLES." },
+                                 { title: "Rooming List", body: "La relación detallada de ocupantes deberá entregarse 5 días hábiles antes de la llegada del primer pasajero." }
+                               ].map(renderClause);
+                             }
                           })()}
                         </div>
                       </div>

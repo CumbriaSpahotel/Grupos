@@ -133,6 +133,7 @@
         IconFileText: "file-text",
         IconEye: "eye",
         IconFileSpreadsheet: "file-spreadsheet",
+        IconMessage: "message-square",
     };
 
     // ── Factory para crear wrapper components ─────────────
