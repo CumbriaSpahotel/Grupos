@@ -1745,7 +1745,9 @@
                 const fRelease = new Date(fechaEntrada);
                 fRelease.setDate(fRelease.getDate() - (parseInt(groupData["Com_Relix"]) || 22));
 
-                const totalNetoPagar = total - totalComision;
+                const suplementos = parseFloat(groupData.Suplementos || 0);
+                const descuentos = parseFloat(groupData.Descuentos || 0);
+                const totalNetoPagar = (total - totalComision) + suplementos - descuentos;
 
                 // Siempre recalcular importes basados en el neto actual para evitar discrepancias
                 if (groupPlan.length > 0) {
@@ -1915,7 +1917,9 @@
                         </div>
                     </div>`;
             } else if (currentTemplate === 'proforma') {
-                const netTotal = total - totalComision;
+                const suplementos = parseFloat(groupData.Suplementos || 0);
+                const descuentos = parseFloat(groupData.Descuentos || 0);
+                const netTotal = (total - totalComision) + suplementos - descuentos;
 
                 // Construir filas de desglose IVA
                 let ivaRows = '';

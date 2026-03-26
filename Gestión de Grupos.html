@@ -1275,8 +1275,12 @@
           }
 
           let importe = parseNum(row["Importe(*)"]);
+          const suplementos = parseFloat(row.Suplementos || 0);
+          const descuentos = parseFloat(row.Descuentos || 0);
+          importe = (importe + suplementos - descuentos);
+
           // Guard against corruption: Don't sum if it's already a glitch
-          if (importe > 10000000) importe = 0;
+          if (importe > 10000000 || importe < -1000000) importe = 0;
 
           const pax = parseInt(row["Pax."] || 0);
           let rooms = parseInt(
@@ -1301,10 +1305,19 @@
           if (!isNaN(rooms)) groups[key].totalRooms += rooms;
           if (!isNaN(noches)) groups[key].totalNights += noches;
 
-          // Acumular pagado: solo el primero que tenga Com_Pagado válido
-          const paid = parseNum(row["Com_Pagado"] || 0);
-          if (paid > 0 && groups[key].totalPaid === 0)
-            groups[key].totalPaid = paid;
+          // Acumular pagado: sumamos pagos de PaymentPlan_JSON con status "Cobrado"
+          let planPaid = 0;
+          try {
+            const plan = JSON.parse(row.PaymentPlan_JSON || "[]");
+            planPaid = plan.filter(p => p.status === "Cobrado").reduce((acc, p) => acc + (parseFloat(p.amount) || 0), 0);
+          } catch(e) {}
+          
+          groups[key].totalPaid += planPaid;
+          
+          // Fallback legacy Com_Pagado si es significativamente diferente/mayor
+          const legacyPaid = parseNum(row["Com_Pagado"] || 0);
+          if (legacyPaid > groups[key].totalPaid + 0.05) 
+            groups[key].totalPaid = legacyPaid;
 
           groups[key].records.push(row);
         });
@@ -2395,10 +2408,20 @@
 
           const docId = normalizeId(resID);
           const docRef = db.collection("groups").doc(docId);
+          
+          let oldTrack = [];
+          try { oldTrack = JSON.parse(row.tracking || "[]"); } catch(e){}
+          const importLog = {
+            id: Date.now(),
+            date: new Date().toLocaleString("es-ES"),
+            text: `Importación: Cambio autorizado desde validación.`
+          };
+
           batch.set(
             docRef,
             {
               ...clean,
+              tracking: JSON.stringify([...oldTrack, importLog]),
               _diff: firebase.firestore.FieldValue.delete(),
               _changes: firebase.firestore.FieldValue.delete(),
               updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
@@ -2593,19 +2616,24 @@
         if (!selectedGroupFicha) { setCrmHistory([]); return; }
         const rec = selectedGroupFicha.records[0] || {};
         try {
-          const hist = JSON.parse(rec['Com_CRM_History'] || '[]');
+          // Unificar: cargar desde 'tracking' como fuente principal de historial
+          const hist = JSON.parse(rec['tracking'] || rec['Com_CRM_History'] || '[]');
           setCrmHistory(Array.isArray(hist) ? hist : []);
         } catch { setCrmHistory([]); }
       }, [selectedGroupFicha?.id]);
 
       const addCrmNote = async () => {
         if (!crmNote.trim() || !selectedGroupFicha) return;
-        const newEntry = { date: new Date().toISOString(), text: crmNote.trim() };
+        const newEntry = { 
+          id: Date.now(),
+          date: new Date().toLocaleString("es-ES"), 
+          text: `Nota: ${crmNote.trim()}` 
+        };
         const updated = [newEntry, ...crmHistory];
         setCrmHistory(updated);
         setCrmNote('');
-        // Persist to Firestore
-        await updateGroupMetadata(selectedGroupFicha.id, 'Com_CRM_History', JSON.stringify(updated));
+        // Persist to Firestore en el campo unificado 'tracking'
+        await updateGroupMetadata(selectedGroupFicha.id, 'tracking', JSON.stringify(updated));
       };
 
 
@@ -3105,8 +3133,18 @@
       ) => {
         let updates =
           typeof fieldOrUpdates === "object"
-            ? fieldOrUpdates
+            ? { ...fieldOrUpdates }
             : { [fieldOrUpdates]: valueIfSingle };
+
+        // --- VALIDACIÓN HOTEL ---
+        const hVal = updates["Hotel_Asignado"] || updates["Hotel"];
+        if (hVal !== undefined) {
+          const normH = String(hVal).toLowerCase();
+          if (!normH || normH.includes("pend") || normH.trim() === "") {
+            alert("⚠️ Error: No se puede asignar un hotel 'PENDIENTE' o vacío.");
+            return;
+          }
+        }
 
         // Si el usuario cambia a CANCELADO desde el dropdown, sincronizar también el campo Estado
         if (
@@ -3274,10 +3312,29 @@
             if (resID) {
               const normRes = normalizeId(resID);
               const docRef = db.collection("groups").doc(normRes);
+              
               const payload = {
                 ...updates,
                 updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
               };
+
+              // No loggear tracking de forma recursiva o redundante si ya viene en updates
+              if (!updates.tracking && !updates.RoomingList_JSON && !updates.PaymentPlan_JSON && !updates.updatedAt) {
+                 const changesText = Object.keys(updates)
+                   .map(k => `${k}: ${row[k] || 'vacio'} -> ${updates[k]}`)
+                   .join(" | ");
+                 
+                 const logEntry = {
+                   id: Date.now(),
+                   date: new Date().toLocaleString("es-ES"),
+                   text: `Modificación field: ${changesText}`
+                 };
+                 
+                 let oldTrack = [];
+                 try { oldTrack = JSON.parse(row.tracking || "[]"); } catch(e){}
+                 payload.tracking = JSON.stringify([...oldTrack, logEntry]);
+              }
+
               batch.set(docRef, payload, { merge: true });
             }
           });

@@ -311,6 +311,13 @@
                     return;
                 }
 
+                // Validation: Mandatory Hotel
+                const hotelAsignado = String(extractedData.Hotel || "Sercotel Guadiana");
+                if (!hotelAsignado || hotelAsignado.toLowerCase().includes("pend") || hotelAsignado.trim() === "") {
+                    alert("⚠️ Error de Integridad: Debe asignar un hotel válido. No se permiten registros 'Pendientes'.");
+                    return;
+                }
+
                 setSaveStatus('saving');
                 try {
                     const rawReservaId = extractedData.Reserva || `PRES-${Math.floor(100000 + Math.random() * 900000)}`;
@@ -326,6 +333,9 @@
                         }
                     }
 
+                    const now = new Date();
+                    const formattedDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+
                     const groupToSave = {
                         "Nombre del Grupo": String(extractedData["Nombre del Grupo"] || "Sin Nombre").toUpperCase(),
                         "Entrada": entrada,
@@ -340,7 +350,7 @@
                         "Estado": "Presupuesto",
                         "Com_Estado_Interno": extractedData.Com_Estado_Interno || "PRESUPUESTO",
                         "Segment.": extractedData["Segment."] || "GRUPOS",
-                        "Hotel_Asignado": String(extractedData.Hotel || "Sercotel Guadiana"),
+                        "Hotel_Asignado": hotelAsignado,
                         "Com_Notas": String(extractedData.Observaciones || ""),
                         "Com_Vencimiento_Rel": releaseDate,
                         "Com_Nombre_Contacto": String(extractedData.Com_Nombre_Contacto || ""),
@@ -352,6 +362,7 @@
                         "Fiscal_CP": String(extractedData.Fiscal_CP || ""),
                         "Fiscal_Poblacion": String(extractedData.Fiscal_Poblacion || ""),
                         "Com_Comercial": extractedData.Com_Comercial || "",
+                        "tracking": extractedData.tracking || [{ id: Date.now(), date: formattedDate, text: "Alta Inteligente por Email (Escáner IA)." }],
                         "dailyConfig": extractedData.dailyConfig || {},
                         "createdAt": extractedData.createdAt || firebase.firestore.FieldValue.serverTimestamp(),
                         "updatedAt": firebase.firestore.FieldValue.serverTimestamp()
