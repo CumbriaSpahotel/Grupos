@@ -312,10 +312,17 @@
 
         <!-- Fila 2: Acciones -->
         <div class="flex items-center gap-2 px-5 py-2.5">
+            <!-- Guardar -->
+            <button onclick="saveProforma()"
+                class="flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg text-[10px] font-black uppercase tracking-wider transition-all">
+                <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                Guardar
+            </button>
+
             <!-- Guardar y Salir -->
             <button onclick="saveAndExit()"
                 class="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white border border-white/20 text-[10px] font-bold uppercase tracking-wider transition-all">
-                <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
                 Guardar y Salir
             </button>
 
@@ -876,6 +883,9 @@
 
         // Datos iniciales vacíos para permitir creación manual
         let items = [];
+        let total = 0;
+        let totalComision = 0;
+        let base10 = 0, iva10 = 0, base21 = 0, iva21 = 0;
 
         // Sincronización de datos comunes
         function syncFields() {
@@ -909,7 +919,44 @@
         }
         setInterval(syncFields, 3000);
 
+        async function saveProforma(silent = false) {
+            const saved = localStorage.getItem('selectedGroup');
+            if (!saved) return;
+            const group = JSON.parse(saved);
+            const id = group.Reserva || group.id;
+            if (!id) return;
+
+            try {
+                const normId = String(id).trim().replace(/\.0$/, "").replace(/[\/\\]/g, "-");
+                await db.collection("groups").doc(normId).set({
+                    "ProformaItems": items,
+                    "updatedAt": firebase.firestore.FieldValue.serverTimestamp()
+                }, { merge: true });
+                
+                // Actualizar localmente
+                group.ProformaItems = items;
+                localStorage.setItem('selectedGroup', JSON.stringify(group));
+                
+                if (!silent) {
+                    const btn = document.querySelector('button[onclick="saveProforma()"]');
+                    if (btn) {
+                        const originalText = btn.innerHTML;
+                        btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> ¡Guardado!';
+                        btn.classList.add('bg-emerald-600');
+                        setTimeout(() => {
+                            btn.innerHTML = originalText;
+                            btn.classList.remove('bg-emerald-600');
+                        }, 2000);
+                    }
+                }
+            } catch (e) {
+                console.error("Error al guardar proforma:", e);
+                if (!silent) alert("Error al guardar en el servidor: " + e.message);
+            }
+        }
+
         async function saveAndExit() {
+            await saveProforma(true);
             const targetFile = "Gestión de Grupos.html";
             const saved = localStorage.getItem('selectedGroup');
             let reservaId = "";
@@ -924,8 +971,6 @@
             }
 
             const url = encodeURI(targetFile) + (reservaId ? '?reserva=' + encodeURIComponent(reservaId) : '');
-
-            // Función para redirigir
             window.location.href = url;
         }
 
@@ -1257,21 +1302,35 @@
                 if (group.ProformaItems && Array.isArray(group.ProformaItems) && group.ProformaItems.length > 0) {
                     items = group.ProformaItems;
                 } else {
-                    const importe = parseMoney(group["Importe(*)"]);
+                    const importe = toNum(group["Importe(*)"]);
                     if (importe > 0) {
                         items = [{
-                            fecha: formatDate(group["Entrada"]),
+                            fecha: group["Entrada"] || today,
                             hab: '',
                             cant: group["Pax."] || '1',
                             concepto: `ESTANCIA GRUPO: ${group["Nombre del Grupo"]}`,
                             precio: importe,
-                    iva: 10,
+                            iva: 10,
                             regimen: group["Régimen"] || 'AD'
                         }];
                     }
                 }
             } catch (e) {
                 console.error("❌ Error en loadSelectedGroup:", e);
+            }
+        }
+
+        function removeItem(index) {
+            if (confirm("¿Eliminar este concepto?")) {
+                items.splice(index, 1);
+                renderItems();
+            }
+        }
+
+        function updateItem(index, field, value) {
+            if (items[index]) {
+                items[index][field] = value;
+                renderItems();
             }
         }
 
@@ -1475,10 +1534,12 @@
             const groupData = JSON.parse(localStorage.getItem('selectedGroup') || '{}');
             const containers = document.querySelectorAll('.invoice-items');
             const footer = document.getElementById('footer-totals');
-            let total = 0;
+            
+            // Reset de acumulados globales
+            total = 0;
+            totalComision = 0;
+            base10 = 0; iva10 = 0; base21 = 0; iva21 = 0;
             let runningTotal = 0;
-            let totalComision = 0;
-            let base10 = 0, iva10 = 0, base21 = 0, iva21 = 0;
 
             containers.forEach(c => c.innerHTML = '');
             if (footer) footer.innerHTML = '';

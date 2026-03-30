@@ -68,11 +68,12 @@
     let headers = [];
     let dataStartRow = 1;
 
-    for (let r = 0; r < Math.min(10, matrix.length); r++) {
+    for (let r = 0; r < Math.min(15, matrix.length); r++) {
       let rowVals = matrix[r];
-      if (Array.isArray(rowVals) && rowVals.length >= 3) {
-        let textValues = rowVals.filter((v) => typeof v === "string" && v.length > 2);
-        if (textValues.length >= 3) {
+      if (Array.isArray(rowVals) && rowVals.length >= 2) {
+        // Buscamos una fila que tenga al menos 2 celdas con texto (headers)
+        let textValues = rowVals.filter((v) => v !== null && v !== undefined && String(v).trim().length > 1);
+        if (textValues.length >= 2) {
           headers = rowVals.map((v) => String(v || "").trim());
           dataStartRow = r + 1;
           break;

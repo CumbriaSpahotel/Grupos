@@ -232,6 +232,14 @@
     const normalizeGroupData = (groupData) => {
       if (!groupData) return null;
       const newData = { ...groupData };
+      
+      // Normalizar Hotel
+      newData.Hotel_Asignado = groupData.Hotel_Asignado || groupData.Hotel || "";
+      if (!newData.Hotel_Asignado) {
+        const lowerName = (newData["Nombre del Grupo"] || "").toLowerCase();
+        if (lowerName.includes("cumbria")) newData.Hotel_Asignado = "Sercotel Cumbria";
+        else if (lowerName.includes("guadiana")) newData.Hotel_Asignado = "Sercotel Guadiana";
+      }
 
       const newRoomCounts = {};
       Object.entries(newData.roomCounts || {}).forEach(([oldType, count]) => {
