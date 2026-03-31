@@ -552,7 +552,7 @@
 
                             // Output all generated days/services
                             const sortedOutputDays = [...servicePaxMap.keys()].sort();
-                            const suggestedHours = { 'Desayuno': '08:00', 'Almuerzo': '13:30', 'Cena': '20:30' };
+                            const suggestedHours = { 'Desayuno': '___:___ h', 'Almuerzo': '___:___ h', 'Cena': '___:___ h' };
 
                             sortedOutputDays.forEach(dKey => {
                                 const dayLabel = formatD(dKey);
@@ -582,7 +582,7 @@
                                 : 1;
                             
                             const servicePaxMap = new Map();
-                            const suggestedHours = { 'Desayuno': '08:00', 'Almuerzo': '13:30', 'Cena': '20:30' };
+                            const suggestedHours = { 'Desayuno': '___:___ h', 'Almuerzo': '___:___ h', 'Cena': '___:___ h' };
 
                             for (let i = 0; i < nights; i++) {
                                 const cur = new Date(dIn);
@@ -646,7 +646,7 @@
                     const today = new Date().toISOString().split('T')[0];
                     const reg = document.getElementById('regimen-val').innerText || 'MP';
                     const svcs = getServicesForRegime(reg);
-                    const suggestedHours = { 'Desayuno': '08:00', 'Almuerzo': '13:30', 'Cena': '20:30' };
+                    const suggestedHours = { 'Desayuno': '___:___ h', 'Almuerzo': '___:___ h', 'Cena': '___:___ h' };
                     (svcs.length > 0 ? svcs : ['Cena']).forEach(s => {
                          addRowPlan(formatD(today), s, String(document.getElementById('pax-val').innerText || '---'), '', suggestedHours[s] || '');
                     });

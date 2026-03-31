@@ -365,6 +365,10 @@
           const departureStr = g.Salida || g.Entrada || "";
           const isPast = departureStr && departureStr < todayStr;
 
+          if (filterStatus === 'CONFIRMADOS') {
+            return isConfirmed;
+          }
+
           if (isConfirmed) {
             return false;
           }
@@ -643,6 +647,7 @@
                     className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-bold text-slate-600 outline-none focus:border-indigo-500 appearance-none shadow-sm cursor-pointer"
                   >
                     <option value="ACTIVOS">ACTIVOS</option>
+                    <option value="CONFIRMADOS">CONFIRMADOS</option>
                     <option value="DESESTIMADOS">DESESTIMADOS</option>
                     <option value="PASADOS">PASADOS</option>
                   </select>
