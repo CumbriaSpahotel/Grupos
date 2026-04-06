@@ -170,10 +170,12 @@
             }
             let cleanKey = k.trim();
             let cleanVal = val;
-            if (cleanKey === "Segment.") {
+            if (cleanKey === "Segment." || cleanKey === "Segmento") {
                 let seg = (val || "").toString().trim().toUpperCase();
-                if (seg === "GRTANTEO") cleanVal = "GRUPO TANTEO";
+                if (seg === "GRTANTEO" || seg === "GRUPO TANTEO") cleanVal = "GRUPO TANTEO";
+                else if (seg === "GRUPOS" || seg === "GRUPO") cleanVal = "GRUPO";
                 if (cleanVal !== "") foundSegment = true;
+                cleanKey = "Segment."; // Normalize the key name
             }
             cleanRow[cleanKey] = cleanVal;
         }

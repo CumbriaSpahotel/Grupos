@@ -638,7 +638,7 @@
               },
               {
                 label: "Ticket Promedio",
-                val: financials.confirmed > 0 ? (financials.totalRevenue / financials.confirmed).toLocaleString("es-ES", { maximumFractionDigits: 0 }) + "€" : "–",
+                val: financials.confirmed > 0 ? (financials.totalRevenue / financials.confirmed).toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + "€" : "–",
                 sub: "Por reserva confirmada",
                 icon: "Target",
                 color: "amber",
@@ -2200,7 +2200,8 @@
               revenue: new Intl.NumberFormat("es-ES", {
                 style: "currency",
                 currency: "EUR",
-                maximumFractionDigits: 0,
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
               }).format(totalRev),
               groups: new Set(
                 parsed.map((p) => p["Nombre del Grupo"] || p["Reserva"]),

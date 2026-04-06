@@ -690,11 +690,11 @@
 
     const normalizeHotelName = NexusUtils.normalizeHotelName;
 
-    const formatNum = (num, decimals = 0) =>
+    const formatNum = (num, decimals = 2) =>
       (num || 0).toLocaleString("es-ES", {
         useGrouping: true,
         maximumFractionDigits: decimals,
-        minimumFractionDigits: 0,
+        minimumFractionDigits: 2,
       });
 
 
@@ -868,13 +868,10 @@
 
 
       const formatNum = (n) =>
-
         (n || 0).toLocaleString("es-ES", {
-
           useGrouping: true,
-
-          maximumFractionDigits: 0,
-
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
         });
 
 
@@ -1339,54 +1336,38 @@
 
 
 
-        // 2. TENTATIVA / TANTEO / BLOQUEADO
-
-        if (
-
-          s.includes("TANTEO") ||
-
-          s.includes("TENTA") ||
-
-          s.includes("BLOQ") ||
-
-          s.includes("OPCI")
-
-        )
-
+        // 0.5 GRUPOS (ALTO NIVEL DE PRIORIDAD ANTES DE TANTEO SI ES EXPLÍCITO)
+        if (s === "GRUPOS" || s === "GRUPO") {
           return {
+            color: "bg-emerald-500",
+            text: "bg-emerald-100 text-emerald-700",
+            label: "CONFIRMADO",
+          };
+        }
 
+        // 2. TENTATIVA / TANTEO / BLOQUEADO
+        if (
+          s.includes("TANTEO") ||
+          s.includes("TENTA") ||
+          s.includes("BLOQ") ||
+          s.includes("OPCI")
+        )
+          return {
             color: "bg-amber-500",
-
             text: "bg-amber-100 text-amber-700",
-
             label: "TENTATIVA",
-
           };
 
-
-
-        // 3. CONFIRMADO / GARANTIZADO / GRUPOS
-
+        // 3. CONFIRMADO / GARANTIZADO / RESERVA
         if (
-
           s.includes("CONFIRM") ||
-
           s.includes("GARANT") ||
-
-          s.includes("RESERVA") ||
-
-          s === "GRUPOS"
-
+          s.includes("RESERVA")
         )
-
           return {
-
             color: "bg-emerald-500",
-
             text: "bg-emerald-100 text-emerald-700",
-
             label: "CONFIRMADO",
-
           };
 
 
@@ -5810,7 +5791,7 @@
 
               if (group.extraCharges && group.extraCharges.length > 0) {
 
-                const hotelName = group.hotel || group.records[0]?.["Hotel_Asignado"] || group.records[0]?.["Hotel"] || "S/H";
+                const hotelName = group.hotel || group.records[0]?.["Hotel_Asignado"] || group.records[0]?.["Hotel"] || "H. Pendiente";
 
                 group.extraCharges.forEach(ext => {
 
@@ -5878,7 +5859,7 @@
 
 
 
-                const h = r["Hotel_Asignado"] || r["Hotel"] || group.hotel || "S/H";
+                const h = r["Hotel_Asignado"] || r["Hotel"] || group.hotel || "H. Pendiente";
 
                 const dIn = r["Entrada"];
 
@@ -8886,7 +8867,6 @@
                                      </span>
 
                                      {group["Importe(*)"] && (() => {
-
                                        const total = parseNum(group["Importe(*)"]);
 
                                        const paid = parseNum(group["Com_Pagado"] || "0");
@@ -8899,7 +8879,7 @@
 
                                            <span className="text-emerald-600 font-bold">
 
-                                             {new Intl.NumberFormat("es-ES", { useGrouping: true, maximumFractionDigits: 0 }).format(total)} €
+                                             {new Intl.NumberFormat("es-ES", { useGrouping: true, minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(total)} €
 
                                            </span>
 
@@ -8907,7 +8887,7 @@
 
                                              <span className="text-rose-500 font-bold text-[8px]">
 
-                                               {new Intl.NumberFormat("es-ES", { useGrouping: true, maximumFractionDigits: 0 }).format(pending)} € pdte.
+                                               {new Intl.NumberFormat("es-ES", { useGrouping: true, minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(pending)} € pdte.
 
                                              </span>
 
@@ -12011,7 +11991,9 @@
 
                                     useGrouping: true,
 
-                                    maximumFractionDigits: 0,
+                                    minimumFractionDigits: 2,
+
+                                    maximumFractionDigits: 2,
 
                                   })}
 
@@ -12079,7 +12061,7 @@
 
                                        <p className="text-[8px] font-black uppercase text-rose-300 tracking-widest mb-1">Pendiente</p>
 
-                                       <p className="text-sm font-black text-rose-400 tabular-nums">{pVal.toLocaleString("es-ES", { maximumFractionDigits: 0 })}€</p>
+                                       <p className="text-sm font-black text-rose-400 tabular-nums">{pVal.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}€</p>
 
                                      </div>
 
@@ -12108,11 +12090,9 @@
                                 <p className="text-3xl font-black text-white drop-shadow-lg tabular-nums leading-none">
 
                                   {netTotal.toLocaleString("es-ES", {
-
                                     useGrouping: true,
-
-                                    maximumFractionDigits: 0,
-
+                                    minimumFractionDigits: 2,
+                                    maximumFractionDigits: 2,
                                   })}
 
                                   <span className="text-base ml-1 opacity-50 font-bold">
@@ -13651,15 +13631,10 @@
 
                                           <span className="text-[10px] font-bold text-slate-500 uppercase">
 
-                                            {item.hotel ||
-
-                                              selectedGroupFicha.records[0]?.[
-
-                                              "Hotel_Asignado"
-
-                                              ] ||
-
-                                              "Hotel"}
+                                            {item.hotel && item.hotel !== "S/H" ? item.hotel :
+                                              (selectedGroupFicha.records[0]?.["Hotel_Asignado"] ||
+                                              selectedGroupFicha.records[0]?.["Hotel"] ||
+                                              "H. Pendiente")}
 
                                           </span>
 
