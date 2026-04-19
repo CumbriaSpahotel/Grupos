@@ -795,7 +795,7 @@
                           <div className="space-y-1">
                             <div className="flex items-center gap-2 text-slate-400">
                               <i className="fas fa-building text-[9px] w-3 text-center"></i>
-                              <span className="text-[9px] font-bold uppercase truncate max-w-[150px]">
+                              <span className="text-[9px] font-bold uppercase">
                                 {g["Empresa/Agencia"] || "Venta Directa"}
                               </span>
                             </div>
@@ -1608,7 +1608,7 @@
                   <div className="space-y-4">
                     <div>
                       <h4 className="text-lg font-black text-slate-800">{g.Com_Nombre_Contacto}</h4>
-                      <p className="text-[10px] font-bold text-slate-400 uppercase truncate italic mt-1">{g["Empresa/Agencia"] || "Particular"}</p>
+                      <p className="text-[10px] font-bold text-slate-400 uppercase italic mt-1">{g["Empresa/Agencia"] || "Particular"}</p>
                     </div>
 
                     <div className="space-y-3">
@@ -2107,6 +2107,9 @@
                 </div>
               </div>
               <div className="flex items-center gap-6">
+                <a href="Proformas.html" className="text-[10px] font-black text-slate-400 hover:text-slate-900 transition-colors uppercase tracking-widest flex items-center gap-2 mr-4">
+                  <i className="fas fa-file-invoice"></i> Fac Proforma
+                </a>
                 <a href="Gestión de Grupos.html" className="text-[10px] font-black text-slate-400 hover:text-slate-900 transition-colors uppercase tracking-widest flex items-center gap-2">
                   <i className="fas fa-arrow-left"></i> Volver a Grupos
                 </a>

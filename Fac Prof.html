@@ -333,6 +333,13 @@
                 Redactar Email
             </button>
 
+            <!-- Añadir Cargo -->
+            <button onclick="addItem()"
+                class="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg text-[10px] font-black uppercase tracking-wider transition-all">
+                <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                Añadir Cargo
+            </button>
+
             <!-- Separador -->
             <div class="flex-1"></div>
 
@@ -928,13 +935,50 @@
 
             try {
                 const normId = String(id).trim().replace(/\.0$/, "").replace(/[\/\\]/g, "-");
-                await db.collection("groups").doc(normId).set({
+                
+                // Capturar campos manuales para persistencia
+                const customFields = {};
+                const fieldIds = [
+                    'solicitante-org', 'solicitante-nombre', 'solicitante-tel', 'solicitante-email',
+                    'reserva-personas', 'reserva-entrada', 'reserva-salida', 'client-address', 'client-city', 'client-nif',
+                    'f-pax-name', 'f-pax-count', 'f-date-in', 'f-date-out', 'f-room-summary', 'programa', 'reserva-id'
+                ];
+                
+                fieldIds.forEach(fid => {
+                    // Intentamos pillar el valor de cualquier variante del ID (-1, -2, -universal o exacto)
+                    const el = document.getElementById(fid + '-universal') || 
+                               document.getElementById(fid + '-2') || 
+                               document.getElementById(fid + '-1') || 
+                               document.getElementById(fid);
+                    
+                    if (el) {
+                        let val = el.innerText || el.value || "";
+                        // Limpiar prefijo "Prof. " si es el campo de proforma
+                        if (fid === 'reserva-id') val = val.replace(/^Prof\.\s*/i, "");
+                        customFields[fid] = val;
+                    }
+                });
+
+                const payload = {
                     "ProformaItems": items,
-                    "updatedAt": firebase.firestore.FieldValue.serverTimestamp()
-                }, { merge: true });
+                    "ProformaCustomFields": customFields,
+                    "updatedAt": firebase.firestore.FieldValue.serverTimestamp(),
+                    "total": total || 0,
+                    "solicitante_org": customFields["solicitante-org"] || "",
+                    "programa": customFields["programa"] || "",
+                    "Reserva": customFields["reserva-id"] || id, // Guardar el número modificado
+                    "hotel": currentHotel
+                };
+
+                if (group.isIndependentProforma) {
+                    payload.isIndependentProforma = true;
+                }
+
+                await db.collection("groups").doc(normId).set(payload, { merge: true });
                 
                 // Actualizar localmente
                 group.ProformaItems = items;
+                group.ProformaCustomFields = customFields;
                 localStorage.setItem('selectedGroup', JSON.stringify(group));
                 
                 if (!silent) {
@@ -957,15 +1001,24 @@
 
         async function saveAndExit() {
             await saveProforma(true);
-            const targetFile = "Gestión de Grupos.html";
             const saved = localStorage.getItem('selectedGroup');
+            let isIndependent = false;
             let reservaId = "";
+            let targetFile = "Gestión de Grupos.html";
+
             if (saved) {
                 try {
                     const group = JSON.parse(saved);
                     reservaId = group.Reserva || group["Reserva"] || "";
+                    isIndependent = group.isIndependentProforma;
                 } catch (e) { }
             }
+
+            if (isIndependent) {
+                window.location.href = "Proformas.html";
+                return;
+            }
+
             if (reservaId) {
                 localStorage.setItem('nexus_return_reserva', reservaId);
             }
@@ -1318,6 +1371,21 @@
             } catch (e) {
                 console.error("❌ Error en loadSelectedGroup:", e);
             }
+        }
+
+        function addItem() {
+            const today = new Date().toISOString().split('T')[0];
+            items.push({
+                fecha: today,
+                hab: '1',
+                cant: '1',
+                concepto: 'NUEVO CARGO',
+                precio: 0,
+                iva: 10,
+                regimen: '-',
+                dias: 1
+            });
+            renderItems();
         }
 
         function removeItem(index) {
