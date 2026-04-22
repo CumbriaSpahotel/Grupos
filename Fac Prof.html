@@ -728,7 +728,6 @@
                             </svg> Conexión Wi-Fi de alta velocidad</li>
                     </ul>
                 </div>
-                </ul>
             </div>
         </div>
 
@@ -909,6 +908,7 @@
 
         // Datos iniciales vacíos para permitir creación manual
         let items = [];
+        let paymentPlan = []; // Global payment plan/advances
         let total = 0;
         let totalComision = 0;
         let base10 = 0, iva10 = 0, base21 = 0, iva21 = 0;
@@ -940,8 +940,6 @@
                     else elExact.innerText = value;
                 }
             });
-            // Auto-guardado local
-            // syncWithFicha(); // Removed call to undefined function
         }
         setInterval(syncFields, 3000);
 
@@ -1014,6 +1012,7 @@
                 const payload = {
                     "ProformaItems": items,
                     "ProformaCustomFields": customFields,
+                    "PaymentPlan_JSON": JSON.stringify(paymentPlan), // Save the payment plan/advances
                     "updatedAt": firebase.firestore.FieldValue.serverTimestamp(),
                     "total": total || 0,
                     "solicitante_org": customFields["solicitante-org"] || "",
@@ -1258,9 +1257,7 @@
             const saved = localStorage.getItem('selectedGroup');
             const today = new Date().toLocaleDateString('es-ES');
 
-            // log
-
-            // Reset inicial de placeholders para evitar ver datos de otro grupo o placeholders hardcoded
+            // Reset inicial de placeholders
             const idsToReset = [
                 'reserva-id', 'solicitante-org', 'solicitante-nombre', 'solicitante-tel', 'solicitante-email',
                 'reserva-personas', 'reserva-entrada', 'reserva-salida', 'client-address', 'client-city', 'client-nif',
@@ -1283,26 +1280,14 @@
             const fechaUniv = document.getElementById('fecha-universal');
             if (fechaUniv) fechaUniv.innerText = today;
 
-            if (!saved) {
-                console.warn("⚠️ No se encontraron datos en 'selectedGroup'");
-                if (document.getElementById('reserva-id-1')) document.getElementById('reserva-id-1').innerText = 'MANUAL';
-                return;
-            }
+            if (!saved) return;
 
             try {
                 const group = JSON.parse(saved);
-                // log
-
-                // Detectar hotel desde Hotel_Asignado o Hotel
                 const hotelRaw = (group["Hotel_Asignado"] || group["Hotel"] || "").toLowerCase();
-                let detectedHotel = 'guadiana'; // Default
-                if (hotelRaw.includes('cumb')) {
-                    detectedHotel = 'cumbria';
-                }
-                console.log(`🏨 Hotel detectado: "${hotelRaw}" → plantilla: ${detectedHotel}`);
+                let detectedHotel = hotelRaw.includes('cumb') ? 'cumbria' : 'guadiana';
                 updateHotel(detectedHotel);
 
-                // Mapping robusto
                 const mapping = {
                     'reserva-id': group["Reserva"] || '',
                     'solicitante-org': group["Fiscal_RazonSocial"] || group["Empresa/Agencia"] || group["Nombre del Grupo"] || '',
@@ -1324,49 +1309,22 @@
                     'programa': group["Nombre del Grupo"] || group["Com_Programa"] || group["name"] || ''
                 };
 
-                // Override con campos personalizados SOLO si no hay dato en la ficha
-                // o si el campo no es de los vitales (fiscales)
                 const customFields = group.ProformaCustomFields || {};
-                const criticalFiscalFields = ['client-address', 'client-city', 'client-nif', 'solicitante-org'];
-                const placeholders = ["Calle Dirección", "RAZÓN SOCIAL", "CP, Ciudad", "B00000000", "---"];
+                const placeholders = ["---", "Calle Dirección", "RAZÓN SOCIAL", "CP, Ciudad", "B00000000"];
 
                 Object.keys(mapping).forEach(k => {
-                    const isCritical = criticalFiscalFields.includes(k);
                     const hasFichaData = mapping[k] && mapping[k] !== '' && !placeholders.includes(mapping[k]);
-                    const hasCustomData = customFields[k] && customFields[k] !== undefined && String(customFields[k]).trim() !== '' && !placeholders.includes(customFields[k]);
-
-                    if (isCritical) {
-                        // Para campos fiscales, si hay dato en la ficha, ignoramos cualquier custom
-                        if (hasFichaData) {
-                            // log
-                        } else if (hasCustomData) {
-                            // Si la ficha está vacía pero el usuario escribió algo manual (que no es placeholder), lo aceptamos
-                            mapping[k] = customFields[k];
-                        } else {
-                            // Si ambos están vacíos o tienen placeholders, vaciamos el campo por completo
-                            mapping[k] = "";
-                        }
-                    } else if (hasCustomData) {
-                        // Para campos no críticos, permitimos el override normal
-                        mapping[k] = customFields[k];
-                    } else if (!hasFichaData) {
-                        // Si no hay dato manual válido ni dato en la ficha, vaciamos para no mostrar placeholders feos (salvo en ciertos inputs)
-                        if (['reserva-personas', 'reserva-entrada', 'reserva-salida', 'f-pax-count', 'f-date-in', 'f-date-out'].includes(k)) {
-                            mapping[k] = "---";
-                        } else {
-                            mapping[k] = "";
-                        }
-                    }
+                    const hasCustomData = customFields[k] && String(customFields[k]).trim() !== '' && !placeholders.includes(customFields[k]);
+                    if (hasCustomData && !hasFichaData) mapping[k] = customFields[k];
+                    else if (!hasFichaData && !hasCustomData) mapping[k] = "";
                 });
 
-                // Renderizar mapeos
                 Object.keys(mapping).forEach(id => {
                     const el1 = document.getElementById(id + '-1');
                     const el2 = document.getElementById(id + '-2');
                     const elExact = document.getElementById(id);
                     const elUniversal = document.getElementById(id + '-universal');
-                    const finalVal = (mapping[id] !== undefined && mapping[id] !== null) ? String(mapping[id]) : "";
-
+                    const finalVal = mapping[id] || "";
                     if (el1) el1.innerText = finalVal;
                     if (el2) el2.innerText = finalVal;
                     if (elExact) {
@@ -1376,15 +1334,14 @@
                     if (elUniversal) elUniversal.innerText = finalVal;
 
                     if (id === 'reserva-id') {
-                        ['reserva-id-2', 'reserva-id-universal'].forEach(rid => {
-                            const e = document.getElementById(rid);
-                            if (e) e.innerText = rid === 'reserva-id-2' ? ('Prof. ' + finalVal) : finalVal;
-                        });
+                        const rid2 = document.getElementById('reserva-id-2');
+                        if (rid2) rid2.innerText = 'Prof. ' + finalVal;
+                        const ridU = document.getElementById('reserva-id-universal');
+                        if (ridU) ridU.innerText = finalVal;
                     }
                 });
 
-                // Restore dynamic rows
-                if (customFields.dynamicRows && Array.isArray(customFields.dynamicRows)) {
+                if (customFields.dynamicRows) {
                     const container = document.querySelector('#ocupante-box .flex-1');
                     if (container) {
                         const footer = [...container.children].find(child => child.classList.contains('border-t') && child.classList.contains('no-print'));
@@ -1395,8 +1352,7 @@
                             newRow.innerHTML = `
                                 <span class="w-24"><strong><span class="editable" contenteditable="true">${row.key}</span> :</strong></span>
                                 <span class="editable flex-1" contenteditable="true" style="min-width: 100px;">${row.value}</span>
-                                <button class="no-print text-red-200 hover:text-red-500 text-[10px] ml-auto"
-                                        onclick="this.parentElement.remove()" title="Eliminar">✕</button>
+                                <button class="no-print text-red-200 hover:text-red-500 text-[10px] ml-auto" onclick="this.parentElement.remove()">✕</button>
                             `;
                             if (footer) container.insertBefore(newRow, footer);
                             else container.appendChild(newRow);
@@ -1404,171 +1360,89 @@
                     }
                 }
 
-                // Cargar Items
-                if (group.ProformaItems && Array.isArray(group.ProformaItems) && group.ProformaItems.length > 0) {
-                    items = group.ProformaItems;
-                } else {
-                    const importe = toNum(group["Importe(*)"]);
-                    if (importe > 0) {
-                        items = [{
-                            fecha: group["Entrada"] || today,
-                            hab: '',
-                            cant: group["Pax."] || '1',
-                            concepto: `ESTANCIA GRUPO: ${group["Nombre del Grupo"]}`,
-                            precio: importe,
-                            iva: 10,
-                            regimen: group["Régimen"] || 'AD'
-                        }];
-                    }
+                if (group.ProformaItems && group.ProformaItems.length > 0) items = group.ProformaItems;
+                else if (toNum(group["Importe(*)"]) > 0) {
+                    items = [{
+                        fecha: group["Entrada"] || today,
+                        hab: '', cant: group["Pax."] || '1',
+                        concepto: `ESTANCIA GRUPO: ${group["Nombre del Grupo"]}`,
+                        precio: toNum(group["Importe(*)"]), iva: 10, regimen: group["Régimen"] || 'AD'
+                    }];
                 }
-            } catch (e) {
-                console.error("❌ Error en loadSelectedGroup:", e);
-            }
+
+                paymentPlan = JSON.parse(group.PaymentPlan_JSON || "[]");
+                if (paymentPlan.length === 0) {
+                    const entradaStr = mapping['reserva-entrada'] || today;
+                    const [d, m, yRaw] = entradaStr.split(/[-\/]/).map(Number);
+                    const fEntrada = (d && m && yRaw) ? new Date(yRaw < 100 ? 2000 + yRaw : yRaw, m - 1, d) : new Date();
+                    const d1 = new Date(fEntrada); d1.setDate(d1.getDate() - 60);
+                    const d2 = new Date(fEntrada); d2.setDate(d2.getDate() - 30);
+                    paymentPlan = [
+                        { label: "1er Pago Garantía", percent: 30, amount: 0, date: d1.toISOString().split('T')[0], status: "Pendiente" },
+                        { label: "Liquidación Final", percent: 70, amount: 0, date: d2.toISOString().split('T')[0], status: "Pendiente" }
+                    ];
+                }
+            } catch (e) { console.error(e); }
         }
 
         function addItem() {
-            const today = new Date().toISOString().split('T')[0];
-            items.push({
-                fecha: today,
-                hab: '1',
-                cant: '1',
-                concepto: 'NUEVO CARGO',
-                precio: 0,
-                iva: 10,
-                regimen: '-',
-                dias: 1
-            });
+            items.push({ fecha: new Date().toISOString().split('T')[0], hab: '1', cant: '1', concepto: 'NUEVO CARGO', precio: 0, iva: 10, regimen: '-', dias: 1 });
             renderItems();
         }
+        function removeItem(index) { if (confirm("¿Eliminar este concepto?")) { items.splice(index, 1); renderItems(); } }
+        function updateItem(index, field, value) { if (items[index]) { items[index][field] = field === 'iva' ? parseInt(value) : value; renderItems(); } }
 
-        function removeItem(index) {
-            if (confirm("¿Eliminar este concepto?")) {
-                items.splice(index, 1);
-                renderItems();
-            }
+        function addPayment() {
+            paymentPlan.push({ label: "Anticipo / Pago", percent: 0, amount: 0, date: new Date().toISOString().split('T')[0], status: "Cobrado" });
+            renderItems();
         }
-
-        function updateItem(index, field, value) {
-            if (items[index]) {
-                items[index][field] = field === 'iva' ? (parseInt(value, 10) || 10) : value;
-                renderItems();
-            }
-        }
+        function updatePayment(index, field, value) { if (paymentPlan[index]) { paymentPlan[index][field] = value; renderItems(); } }
+        function removePayment(index) { if (confirm("¿Eliminar este pago/anticipo?")) { paymentPlan.splice(index, 1); renderItems(); } }
 
         function renderTaxSelect(index, item) {
-            const ivaValue = parseInt(item.iva, 10) === 21 ? 21 : 10;
-            return `
-                <select class="no-print tax-select ml-1" title="IVA fiscal de esta línea" onchange="updateItem(${index}, 'iva', this.value)">
-                    <option value="10"${ivaValue === 10 ? ' selected' : ''}>10%</option>
-                    <option value="21"${ivaValue === 21 ? ' selected' : ''}>21%</option>
-                </select>`;
+            const ivaVal = parseInt(item.iva) === 21 ? 21 : 10;
+            return `<select class="no-print tax-select ml-1" onchange="updateItem(${index}, 'iva', this.value)">
+                <option value="10"${ivaVal === 10 ? ' selected' : ''}>10%</option>
+                <option value="21"${ivaVal === 21 ? ' selected' : ''}>21%</option>
+            </select>`;
         }
 
         window.addEventListener('DOMContentLoaded', async () => {
-            if (typeof firebase !== 'undefined' && !firebase.apps.length) {
-                firebase.initializeApp(window.firebaseConfig);
-            }
+            if (typeof firebase !== 'undefined' && !firebase.apps.length) firebase.initializeApp(window.firebaseConfig);
             if (typeof firebase !== 'undefined') window.db = firebase.firestore();
-            // Load global config for clauses
             try {
                 const doc = await db.collection("settings").doc("main").get();
-                if (doc.exists) {
-                    window.globalConfig = doc.data();
-                }
-            } catch (e) {
-                console.error("Error loading global config:", e);
-            }
+                if (doc.exists) window.globalConfig = doc.data();
+            } catch (e) { }
             await refreshConfigFromCloud();
             loadSelectedGroup();
             renderItems();
-            updatePaymentLink(); // Fuerza el href correcto desde el inicio
         });
 
         function copyAIContent() {
             navigator.clipboard.writeText(document.getElementById('ai-content').innerText);
             const btn = document.getElementById('btn-copy');
-            if (btn) {
-                btn.innerText = "¡Copiado!";
-                setTimeout(() => btn.innerText = "Copiar texto", 2000);
-            }
+            if (btn) { btn.innerText = "¡Copiado!"; setTimeout(() => btn.innerText = "Copiar texto", 2000); }
         }
 
         function switchTemplate(tpl) {
             currentTemplate = tpl;
             document.getElementById('tpl-confirmacion').classList.toggle('hidden', tpl !== 'confirmacion');
             document.getElementById('tpl-proforma').classList.toggle('hidden', tpl !== 'proforma');
-
             document.getElementById('tpl-policies').classList.toggle('hidden', tpl !== 'confirmacion');
-            document.getElementById('btn-confirmacion').className = tpl === 'confirmacion'
-                ? 'px-4 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest bg-white text-slate-900 shadow-md transition-all whitespace-nowrap'
-                : 'px-4 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest text-white/50 hover:text-white/80 hover:bg-white/10 transition-all whitespace-nowrap';
-            document.getElementById('btn-proforma').className = tpl === 'proforma'
-                ? 'px-4 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest bg-white text-slate-900 shadow-md transition-all whitespace-nowrap'
-                : 'px-4 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest text-white/50 hover:text-white/80 hover:bg-white/10 transition-all whitespace-nowrap';
+            
+            document.getElementById('btn-confirmacion').className = tpl === 'confirmacion' ? 'px-4 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest bg-white text-slate-900 shadow-md transition-all whitespace-nowrap' : 'px-4 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest text-white/50 hover:text-white/80 hover:bg-white/10 transition-all whitespace-nowrap';
+            document.getElementById('btn-proforma').className = tpl === 'proforma' ? 'px-4 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest bg-white text-slate-900 shadow-md transition-all whitespace-nowrap' : 'px-4 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest text-white/50 hover:text-white/80 hover:bg-white/10 transition-all whitespace-nowrap';
 
             const docTitle = document.getElementById('doc-type-title');
-            const docLabel = document.getElementById('doc-type-label');
-            const hReserva = document.getElementById('header-reserva-block');
-            const hFecha   = document.getElementById('header-fecha-block');
+            if (docTitle) { docTitle.style.display = tpl === 'proforma' ? 'none' : 'inline-block'; docTitle.innerText = tpl === 'confirmacion' ? 'Confirmación' : ''; }
+            const hFecha = document.getElementById('header-fecha-block');
+            if (hFecha) hFecha.style.display = tpl === 'confirmacion' ? 'flex' : 'none';
 
-            if (tpl === 'proforma') {
-                // Proforma: ocultar badge, mostrar solo Nº Factura en el header
-                if (docTitle) docTitle.style.display = 'none';
-                if (docLabel) docLabel.innerText = 'Nº Reserva';
-                if (hReserva) hReserva.style.display = 'flex';
-                if (hFecha)   hFecha.style.display   = 'none';
-            } else {
-                // Confirmación: mostrar badge + Nº Reserva + Fecha
-                if (docTitle) { docTitle.style.display = 'inline-block'; docTitle.innerText = 'Confirmación'; }
-                if (docLabel) docLabel.innerText = 'Nº Reserva';
-                if (hReserva) hReserva.style.display = 'flex';
-                if (hFecha)   hFecha.style.display   = 'flex';
-            }
-            // Mostrar/ocultar bloque de notas compartido
-            const sharedNotas = document.getElementById('shared-notas-block');
-            if (sharedNotas) sharedNotas.style.display = tpl === 'proforma' ? 'none' : 'block';
-
-            // Mostrar/ocultar bloques de pie de página específicos de cada plantilla
-            const footerTotals = document.getElementById('footer-totals');
-            const pSummary = document.getElementById('proforma-summary');
-            const pBank = document.getElementById('proforma-bank-container');
-
-            if (footerTotals) footerTotals.style.display = tpl === 'proforma' ? 'none' : 'block';
-            if (pSummary) pSummary.style.display = tpl === 'proforma' ? 'flex' : 'none';
-            if (pBank)    pBank.style.display    = tpl === 'proforma' ? 'block' : 'none';
-
-            document.body.classList.toggle('print-proforma', tpl === 'proforma');
-
-            const titleContainer = document.querySelector('.header-title-container');
-            const infoContainer = document.querySelector('.header-info-container');
-
-            if (tpl === 'proforma') {
-                if (titleContainer) titleContainer.style.display = 'block'; // Keep visible for 3-column layout
-                if (infoContainer) {
-                    infoContainer.style.textAlign = 'center';
-                    infoContainer.style.flex = '1';
-                    infoContainer.style.paddingLeft = '0';
-                    infoContainer.style.marginTop = '0';
-                }
-            } else {
-                if (titleContainer) titleContainer.style.display = 'block';
-                if (infoContainer) {
-                    infoContainer.style.textAlign = 'center';
-                    infoContainer.style.flex = '1';
-                    infoContainer.style.paddingLeft = '0';
-                }
-            }
             renderItems();
         }
 
-        function cleanConcept(text) {
-            // Elimina códigos internos entre paréntesis y normaliza nombres
-            let t = (text || '').replace(/\s*\((DBL|TPL|DUI|SGL|SA|TRP|JR|SU|STD|PC|AD|MP|BB|HB|FB|RO|CUA|QUA)\)/gi, '').trim();
-            // Normalizar: "Doble Uso Individual" → "Uso Individual"
-            t = t.replace(/Doble\s+Uso\s+Individual/gi, 'Uso Individual');
-            return t;
-        }
-
+        function cleanConcept(text) { return (text || '').replace(/\s*\((DBL|TPL|DUI|SGL|SA|TRP|JR|SU|STD|PC|AD|MP|BB|HB|FB|RO|CUA|QUA)\)/gi, '').trim().replace(/Doble\s+Uso\s+Individual/gi, 'Uso Individual'); }
         const formatNum = NexusUtils.formatNum;
 
         function updateHotel(hotelKey) {
@@ -1576,24 +1450,10 @@
             currentHotel = hotelKey;
             const h = HOTELS[hotelKey];
             if (!h) return;
-
-            // Actualizar título de la página
             const pageTitle = document.getElementById('page-title');
             if (pageTitle) pageTitle.innerText = `Generador de Facturas - ${h.name} ${h.subname}`;
-
-            // log
-
-            // Sync UI selector if it exists
-            const selector = document.getElementById('hotel-selector');
-            if (selector && selector.value !== hotelKey) {
-                selector.value = hotelKey;
-            }
-
             const imgUniversal = document.getElementById('logo-img-universal');
-            if (imgUniversal) {
-                imgUniversal.src = h.logo;
-                // log
-            }
+            if (imgUniversal) imgUniversal.src = h.logo;
             const hAddr = document.getElementById('header-address-line');
             const hCity = document.getElementById('header-city-line');
             const hTel = document.getElementById('header-tel-val');
@@ -1601,66 +1461,23 @@
             if (hCity) hCity.innerText = `${h.cp} - ${h.city} (España)`;
             if (hTel) hTel.innerText = h.tel;
             const legalVertical = document.getElementById('global-vertical-legal');
-            if (legalVertical) {
-                legalVertical.innerHTML = `<span class="italic">${h.company} &nbsp;&nbsp;&nbsp; ${h.address} &middot; ${h.cp} ${h.city} &nbsp;&nbsp;&nbsp; ${h.legal} ${h.irus ? `&nbsp;&nbsp;&nbsp; IRUS: ${h.irus}` : ''} &nbsp;&nbsp;&nbsp; N.I.F. ${h.nif}</span>`;
-            }
+            if (legalVertical) legalVertical.innerHTML = `<span class="italic">${h.company} &nbsp;&nbsp;&nbsp; ${h.address} &middot; ${h.cp} ${h.city} &nbsp;&nbsp;&nbsp; ${h.legal} ${h.irus ? `&nbsp;&nbsp;&nbsp; IRUS: ${h.irus}` : ''} &nbsp;&nbsp;&nbsp; N.I.F. ${h.nif}</span>`;
 
-            // DYNAMIC THEME OVERRIDE
             const primaryColor = hotelKey === 'cumbria' ? '#0f172a' : '#2d5a43';
-            const secondaryColor = hotelKey === 'cumbria' ? '#334155' : '#1e3a2c';
-            let styleTheme = document.getElementById('dynamic-theme-override');
-            if (!styleTheme) {
-                styleTheme = document.createElement('style');
-                styleTheme.id = 'dynamic-theme-override';
-                document.head.appendChild(styleTheme);
-            }
-            styleTheme.innerHTML = `
-                .text-\\[\\#2d5a43\\] { color: ${primaryColor} !important; }
-                .bg-\\[\\#2d5a43\\] { background-color: ${primaryColor} !important; }
-                .border-\\[\\#2d5a43\\] { border-color: ${primaryColor} !important; }
-                .focus\\:ring-\\[\\#2d5a43\\]:focus { --tw-ring-color: ${primaryColor} !important; }
-                .hover\\:bg-\\[\\#1e3a2c\\]:hover { background-color: ${secondaryColor} !important; }
-                .tab-active { border-bottom-color: ${primaryColor} !important; color: ${primaryColor} !important; }
-                .editable:focus { outline-color: ${primaryColor} !important; }
-            `;
-            const updateField = (selector, val) => {
-                const el = document.querySelector(selector);
-                if (el) el.innerText = val;
-            };
-            updateField('.hotel-address-footer', (h.address || '').toUpperCase());
-            updateField('.hotel-cp-footer', h.cp || '');
-            updateField('.hotel-city-footer', h.city || '');
-            updateField('.hotel-email-footer', h.email || '');
-            updateField('.hotel-web-footer', h.web || '');
-            updateField('.hotel-tel-footer', h.tel || '');
-            updateField('.hotel-fax-footer', h.fax || '');
-            updateField('.hotel-legal-footer', h.legal || '');
-            updateField('.hotel-bank-footer', h.bank || '');
-            updateField('.hotel-iban-footer', h.iban || '');
+            let styleTheme = document.getElementById('dynamic-theme-override') || document.createElement('style');
+            styleTheme.id = 'dynamic-theme-override';
+            document.head.appendChild(styleTheme);
+            styleTheme.innerHTML = `.text-\\[\\#2d5a43\\] { color: ${primaryColor} !important; } .bg-\\[\\#2d5a43\\] { background-color: ${primaryColor} !important; } .border-\\[\\#2d5a43\\] { border-color: ${primaryColor} !important; } .editable:focus { outline-color: ${primaryColor} !important; }`;
             renderItems();
         }
 
-        const formatDateSafe = (val) => {
-            if (!val || val === "---") return "-";
-            return formatDate(val);
-        };
-
         function renderItems() {
             const h = HOTELS[currentHotel];
-            const now = new Date();
-            const tsDate = document.getElementById('timestamp-date');
-            const tsTime = document.getElementById('timestamp-time');
-            if (tsDate) tsDate.innerText = now.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: '2-digit' });
-            if (tsTime) tsTime.innerText = now.getHours() + "." + String(now.getMinutes()).padStart(2, '0');
-
             const groupData = JSON.parse(localStorage.getItem('selectedGroup') || '{}');
             const containers = document.querySelectorAll('.invoice-items');
             const footer = document.getElementById('footer-totals');
             
-            // Reset de acumulados globales
-            total = 0;
-            totalComision = 0;
-            base10 = 0; iva10 = 0; base21 = 0; iva21 = 0;
+            total = 0; totalComision = 0; base10 = 0; iva10 = 0; base21 = 0; iva21 = 0;
             let runningTotal = 0;
 
             containers.forEach(c => c.innerHTML = '');
@@ -1671,648 +1488,156 @@
             if (pBank) pBank.innerHTML = '';
 
             items.forEach((item, index) => {
-                const precioUnitario = parseFloat(item.precio) || 0;
-                const habs = parseFloat(item.hab) || 1;
-                const cantidad = parseFloat(item.cant) || 1;
-                const dias = parseFloat(item.dias) || 1;
-                const subtotal = precioUnitario * habs * cantidad * dias;
-                let itemComision = (parseFloat(item.comision?.comision_unitaria) || 0) * habs * cantidad * dias;
-                if (itemComision <= 0 && item.comision?.porcentaje) {
-                    itemComision = subtotal * (parseFloat(item.comision.porcentaje) / 100);
-                }
+                const sub = (parseFloat(item.precio) || 0) * (parseFloat(item.hab) || 1) * (parseFloat(item.cant) || 1) * (parseFloat(item.dias) || 1);
+                let com = (parseFloat(item.comision?.comision_unitaria) || 0) * (parseFloat(item.hab) || 1) * (parseFloat(item.cant) || 1) * (parseFloat(item.dias) || 1);
+                if (com <= 0 && item.comision?.porcentaje) com = sub * (parseFloat(item.comision.porcentaje) / 100);
+                totalComision += com; total += sub; runningTotal += sub;
+                const net = sub - com;
+                if ((parseFloat(item.iva) || 10) === 10) { const b = net / 1.1; base10 += b; iva10 += (net - b); }
+                else { const b = net / 1.21; base21 += b; iva21 += (net - b); }
 
-                totalComision += itemComision;
-                const netSubtotal = subtotal - itemComision;
-
-                total += subtotal; // Gross total (sumado al final de la tabla)
-                runningTotal += subtotal;
-
-                const ivaVal = parseFloat(item.iva) || 10;
-                if (ivaVal === 10) {
-                    const base = netSubtotal / 1.1;
-                    base10 += base;
-                    iva10 += (netSubtotal - base);
-                } else {
-                    const base = netSubtotal / 1.21;
-                    base21 += base;
-                    iva21 += (netSubtotal - base);
-                }
-
-                // Date handling
-                const dateVal = toInputDate(item.fecha);
-
-                const draggables = `draggable="true" ondragstart="dragStart(event, ${index})" ondragover="allowDrop(event)" ondrop="drop(event, ${index})" style="cursor: grab;"`;
-
-                if (currentTemplate === 'confirmacion') {
-                    // Modelo 1: Reserva
-                    const row = `
-                        <tr class="border-b group" ${draggables}>
-                            <td class="p-1 flex items-center gap-1">
-                                <span class="no-print opacity-0 group-hover:opacity-40 cursor-grab">⋮⋮</span>
-                                <input type="date" value="${dateVal}" onchange="updateItem(${index}, 'fecha', this.value)" class="bg-transparent font-inherit text-gray-500 w-22 outline-none text-[9px]">
-                            </td>
-                            <td class="p-1 text-center font-bold text-gray-400 text-[10px]"><span class="editable" contenteditable="true" onblur="updateItem(${index}, 'cant', this.innerText)">${item.cant || '1'}</span></td>
-                            <td class="p-1 text-[11px] font-black text-gray-800">
-                            <span class="editable" contenteditable="true" onblur="updateItem(${index}, 'concepto', this.innerText)">${cleanConcept(item.concepto)}</span>
-                            ${renderTaxSelect(index, item)}
-                            </td>
-                            <td class="p-1 text-center text-gray-400">
-                                <span class="editable text-[9px]" contenteditable="true" onblur="updateItem(${index}, 'regimen', this.innerText)" placeholder="-">${item.regimen || '-'}</span>
-                            </td>
-                            <td class="p-1 text-center text-[9px] text-gray-500"><span class="editable" contenteditable="true" onblur="updateItem(${index}, 'dias', this.innerText)">${item.dias || 1}</span></td>
-                            <td class="p-1 text-right text-[10px]"><span class="editable" contenteditable="true" onblur="updateItem(${index}, 'precio', this.innerText)">${formatNum(precioUnitario)}</span></td>
-                            <td class="p-1 text-right font-black text-gray-900 text-[11px]">${formatNum(subtotal)}</td>
-                            <td class="p-1 text-right text-gray-300 font-medium text-[10px]">${formatNum(runningTotal)}</td>
-                            <td class="p-1 no-print text-center">
-                                <button onclick="removeItem(${index})" class="text-gray-300 hover:text-red-500">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
-                                </button>
-                            </td>
-                        </tr>`;
-                    document.querySelector('#tpl-confirmacion .invoice-items').insertAdjacentHTML('beforeend', row);
-                } else {
-                    // Modelo 2: Proforma / Factura (Sincronizado con el modelo visual solicitado)
-                    const row = `
-                        <tr class="h-7 group border-b border-gray-100" ${draggables}>
-                            <td class="align-middle flex items-center gap-1 py-1">
-                                <span class="no-print opacity-0 group-hover:opacity-40 cursor-grab">⋮⋮</span>
-                                <input type="date" value="${dateVal}" onchange="updateItem(${index}, 'fecha', this.value)" class="bg-transparent font-inherit w-20 outline-none text-[9px] text-gray-500">
-                            </td>
-                            <td class="align-middle text-center font-bold text-gray-400 text-[10px]"><span class="editable" contenteditable="true" onblur="updateItem(${index}, 'cant', this.innerText)">${item.cant || '1'}</span></td>
-                            <td class="align-middle font-black text-gray-800 text-[11px] uppercase py-1">
-                                <span class="editable" contenteditable="true" onblur="updateItem(${index}, 'concepto', this.innerText)">${cleanConcept(item.concepto)}</span>
-                                ${renderTaxSelect(index, item)}
-                            </td>
-                            <td class="align-middle text-center text-gray-400">
-                                <span class="editable text-[9px]" contenteditable="true" onblur="updateItem(${index}, 'regimen', this.innerText)" placeholder="-">${item.regimen || '-'}</span>
-                            </td>
-                            <td class="align-middle text-center text-[9px] text-gray-500">
-                                <span class="editable" contenteditable="true" onblur="updateItem(${index}, 'dias', this.innerText)">${item.dias || 1}</span>
-                            </td>
-                            <td class="align-middle text-right text-gray-600 text-[10px]"><span class="editable" contenteditable="true" onblur="updateItem(${index}, 'precio', this.innerText)">${formatNum(precioUnitario)}</span></td>
-                            <td class="align-middle text-right font-black text-gray-900 text-[11px]">${formatNum(subtotal)}</td>
-                            <td class="align-middle text-right text-gray-300 font-medium text-[10px]">${formatNum(runningTotal)}</td>
-                            <td class="no-print align-middle text-center py-1">
-                                <button onclick="removeItem(${index})" class="text-gray-300 hover:text-red-500">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
-                                </button>
-                            </td>
-                        </tr>`;
-                    document.querySelector('#tpl-proforma .invoice-items').insertAdjacentHTML('beforeend', row);
-                }
+                const row = currentTemplate === 'confirmacion' ? `
+                    <tr class="border-b group">
+                        <td class="p-1"><input type="date" value="${toInputDate(item.fecha)}" onchange="updateItem(${index}, 'fecha', this.value)" class="bg-transparent text-gray-500 w-22 outline-none text-[9px]"></td>
+                        <td class="p-1 text-center font-bold text-gray-400 text-[10px]"><span class="editable" contenteditable="true" onblur="updateItem(${index}, 'cant', this.innerText)">${item.cant || '1'}</span></td>
+                        <td class="p-1 text-[11px] font-black text-gray-800"><span class="editable" contenteditable="true" onblur="updateItem(${index}, 'concepto', this.innerText)">${cleanConcept(item.concepto)}</span>${renderTaxSelect(index, item)}</td>
+                        <td class="p-1 text-center text-gray-400"><span class="editable text-[9px]" contenteditable="true" onblur="updateItem(${index}, 'regimen', this.innerText)">${item.regimen || '-'}</span></td>
+                        <td class="p-1 text-center text-[9px] text-gray-500"><span class="editable" contenteditable="true" onblur="updateItem(${index}, 'dias', this.innerText)">${item.dias || 1}</span></td>
+                        <td class="p-1 text-right text-[10px]"><span class="editable" contenteditable="true" onblur="updateItem(${index}, 'precio', this.innerText)">${formatNum(item.precio)}</span></td>
+                        <td class="p-1 text-right font-black text-gray-900 text-[11px]">${formatNum(sub)}</td>
+                        <td class="p-1 text-right text-gray-300 font-medium text-[10px]">${formatNum(runningTotal)}</td>
+                        <td class="p-1 no-print text-center"><button onclick="removeItem(${index})" class="text-gray-300 hover:text-red-500">✕</button></td>
+                    </tr>` : `
+                    <tr class="h-7 border-b border-gray-100">
+                        <td class="py-1"><input type="date" value="${toInputDate(item.fecha)}" onchange="updateItem(${index}, 'fecha', this.value)" class="bg-transparent w-20 outline-none text-[9px] text-gray-500"></td>
+                        <td class="text-center font-bold text-gray-400 text-[10px]"><span class="editable" contenteditable="true" onblur="updateItem(${index}, 'cant', this.innerText)">${item.cant || '1'}</span></td>
+                        <td class="font-black text-gray-800 text-[11px] uppercase py-1"><span class="editable" contenteditable="true" onblur="updateItem(${index}, 'concepto', this.innerText)">${cleanConcept(item.concepto)}</span>${renderTaxSelect(index, item)}</td>
+                        <td class="text-center text-gray-400"><span class="editable text-[9px]" contenteditable="true" onblur="updateItem(${index}, 'regimen', this.innerText)">${item.regimen || '-'}</span></td>
+                        <td class="text-center text-[9px] text-gray-500"><span class="editable" contenteditable="true" onblur="updateItem(${index}, 'dias', this.innerText)">${item.dias || 1}</span></td>
+                        <td class="text-right text-gray-600 text-[10px]"><span class="editable" contenteditable="true" onblur="updateItem(${index}, 'precio', this.innerText)">${formatNum(item.precio)}</span></td>
+                        <td class="text-right font-black text-gray-900 text-[11px]">${formatNum(sub)}</td>
+                        <td class="text-right text-gray-300 font-medium text-[10px]">${formatNum(runningTotal)}</td>
+                        <td class="no-print text-center py-1"><button onclick="removeItem(${index})" class="text-gray-300 hover:text-red-500">✕</button></td>
+                    </tr>`;
+                containers.forEach(c => c.insertAdjacentHTML('beforeend', row));
             });
 
-            if (currentTemplate === 'propuesta') {
-                const dailyC = groupData.dailyConfig || {};
-                const dates = Object.keys(dailyC).sort();
-                const container = document.querySelector('.propuesta-items');
-                container.innerHTML = '';
-
-                // 1. Mostrar Desglose por Noche
-                dates.forEach((date, idx) => {
-                    const rooms = dailyC[date];
-                    const roomEntries = Object.entries(rooms);
-                    let dailyTotal = 0;
-                    let dailyRegimen = "";
-
-                    const roomHtml = roomEntries.map(([type, cfg]) => {
-                        const count = (groupData.roomCounts || {})[type] || 0;
-                        const sub = count * (parseFloat(cfg.price) || 0);
-                        dailyTotal += sub;
-                        dailyRegimen = cfg.board || dailyRegimen;
-                        return `<div class="flex justify-between items-center py-1">
-                                    <span class="font-bold text-slate-600">${count}x ${type} <span class="text-[8px] font-normal text-slate-400">(a ${formatNum(cfg.price)}€)</span></span>
-                                    <span class="font-black text-slate-800">${formatNum(sub)}€</span>
-                                </div>`;
-                    }).join('');
-
-                    const row = `
-                        <tr class="bg-white">
-                            <td class="p-6 align-top">
-                                <span class="bg-indigo-50 text-indigo-700 px-3 py-1 rounded-lg text-xs font-black uppercase tracking-widest">${formatDate(date)}</span>
-                                <p class="text-[9px] font-bold text-slate-400 uppercase mt-2">Noche ${idx + 1}</p>
-                            </td>
-                            <td class="p-6 text-center align-middle">
-                                <span class="px-3 py-1 bg-slate-100 rounded-full text-[9px] font-black text-slate-600 uppercase tracking-widest">${dailyRegimen}</span>
-                            </td>
-                            <td class="p-6 align-top">
-                                <div class="space-y-1">
-                                    ${roomHtml}
-                                </div>
-                            </td>
-                            <td class="p-6 text-right align-middle">
-                                <span class="text-sm font-black text-[#2d5a43]">${formatNum(dailyTotal)}€</span>
-                            </td>
-                        </tr>
-                    `;
-                    container.insertAdjacentHTML('beforeend', row);
-                });
-
-                // 2. Mostrar Otros Conceptos si existen
-                if (items.length > 0) {
-                    const otherItemsHeader = `
-                        <tr class="bg-slate-50 border-y border-slate-200">
-                            <td colspan="4" class="px-6 py-3 text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">Otros Servicios y Conceptos Adicionales</td>
-                        </tr>
-                    `;
-                    container.insertAdjacentHTML('beforeend', otherItemsHeader);
-
-                    items.forEach((item, idx) => {
-                        const sub = (parseFloat(item.precio) || 0) * (parseFloat(item.hab) || 1) * (parseFloat(item.cant) || 1) * (parseFloat(item.dias) || 1);
-                        const row = `
-                            <tr class="bg-white/50">
-                                <td class="p-6 text-[10px] font-bold text-slate-400 uppercase">${formatDate(item.fecha)}</td>
-                                <td class="p-6 text-center">
-                                    <span class="px-3 py-1 bg-amber-50 rounded-full text-[9px] font-black text-amber-600 uppercase tracking-widest">${item.regimen || '-'}</span>
-                                </td>
-                                <td class="p-6">
-                                    <div class="flex justify-between items-center">
-                                        <span class="font-black text-slate-700 uppercase">${item.concepto}</span>
-                                        <span class="text-[9px] font-bold text-slate-400">UNID: ${item.cant}</span>
-                                    </div>
-                                </td>
-                                <td class="p-6 text-right">
-                                    <span class="text-sm font-black text-slate-800">${formatNum(sub)}€</span>
-                                </td>
-                            </tr>
-                        `;
-                        container.insertAdjacentHTML('beforeend', row);
-                    });
-                }
-
-                // Sync the shared headers
-                document.querySelectorAll('#programa-3').forEach(el => el.innerText = document.getElementById('programa-1')?.innerText || groupData["Nombre del Grupo"] || '---');
-                document.querySelectorAll('#solicitante-org-3').forEach(el => el.innerText = document.getElementById('solicitante-org-1')?.innerText || groupData["Empresa/Agencia"] || '---');
-                document.querySelectorAll('#reserva-entrada-3').forEach(el => el.innerText = document.getElementById('reserva-entrada-1')?.innerText || groupData["Entrada"] || '---');
-                document.querySelectorAll('#reserva-salida-3').forEach(el => el.innerText = document.getElementById('reserva-salida-1')?.innerText || groupData["Salida"] || '---');
-                document.querySelectorAll('#solicitante-nombre-3').forEach(el => el.innerText = document.getElementById('solicitante-nombre-1')?.innerText || groupData["Com_Nombre_Contacto"] || '---');
-                document.querySelectorAll('#solicitante-email-3').forEach(el => el.innerText = document.getElementById('solicitante-email-1')?.innerText || groupData["Com_Email_Contacto"] || '---');
-            }
-
             if (totalComision > 0) {
-                const uniquePercs = new Set();
-                items.forEach(item => {
-                    if (item.comision?.porcentaje) uniquePercs.add(item.comision.porcentaje);
-                });
-                const percLabel = uniquePercs.size === 1 ? ` (${Array.from(uniquePercs)[0]}%)` : "";
-
-                containers.forEach(c => {
-                    const row = currentTemplate === 'confirmacion'
-                        ? `<tr class="border-b bg-gray-50/50 italic text-gray-400">
-                            <td class="p-1"></td>
-                            <td class="p-1 text-center font-bold">1</td>
-                            <td class="p-1 text-[10px] uppercase font-bold">(-) COM/DTO${percLabel} SOBRE ${formatNum(total)}</td>
-                            <td class="p-1"></td>
-                            <td class="p-1"></td>
-                            <td class="p-1 text-right text-[10px]">${formatNum(totalComision)}</td>
-                            <td class="p-1 text-right font-bold text-red-500">-${formatNum(totalComision)}</td>
-                            <td class="p-1 text-right text-gray-300 font-medium text-[10px]"></td>
-                            <td class="p-1 no-print"></td>
-                           </tr>`
-                        : `<tr class="h-7 border-b border-gray-100 italic text-gray-400 bg-gray-50/30">
-                            <td class="py-1"></td>
-                            <td class="text-center font-bold">1</td>
-                            <td class="font-bold py-1 text-[9px] uppercase">(-) COM/DTO${percLabel} SOBRE ${formatNum(total)}</td>
-                            <td class="text-center"></td>
-                            <td class="text-center"></td>
-                            <td class="text-right text-[10px]">${formatNum(totalComision)}</td>
-                            <td class="text-right font-bold text-red-500">-${formatNum(totalComision)}</td>
-                            <td class="text-right text-gray-300 font-medium text-[10px]"></td>
-                            <td class="no-print"></td>
-                           </tr>`;
-                    c.insertAdjacentHTML('beforeend', row);
-                });
+                const comRow = `<tr class="border-b bg-gray-50/50 italic text-gray-400"><td class="p-1"></td><td class="p-1 text-center font-bold">1</td><td class="p-1 text-[10px] uppercase font-bold">(-) COM/DTO SOBRE ${formatNum(total)}</td><td class="p-1"></td><td class="p-1"></td><td class="p-1 text-right text-[10px]">${formatNum(totalComision)}</td><td class="p-1 text-right font-bold text-red-500">-${formatNum(totalComision)}</td><td colspan="2"></td></tr>`;
+                containers.forEach(c => c.insertAdjacentHTML('beforeend', comRow));
             }
 
-            // --- Footer Logic per Template ---
-            if (currentTemplate === 'propuesta') {
-                // Cálculo de total para Propuesta (Alojamientos + Extras)
-                let grandTotalPropuesta = 0;
-                const dailyC = groupData.dailyConfig || {};
-                Object.values(dailyC).forEach(rooms => {
-                    Object.entries(rooms).forEach(([type, cfg]) => {
-                        const count = (groupData.roomCounts || {})[type] || 0;
-                        grandTotalPropuesta += count * (parseFloat(cfg.price) || 0);
-                    });
-                });
-                items.forEach(item => {
-                    grandTotalPropuesta += (parseFloat(item.precio) || 0) * (parseFloat(item.hab) || 1) * (parseFloat(item.cant) || 1) * (parseFloat(item.dias) || 1);
-                });
+            if (currentTemplate === 'confirmacion') {
+                const totalNetoPagar = (total - totalComision) + parseFloat(groupData.Suplementos || 0) - parseFloat(groupData.Descuentos || 0);
+                const totalPaid = paymentPlan.filter(p => p.status === "Cobrado").reduce((acc, p) => acc + (parseFloat(p.amount) || 0), 0);
+                const totalPending = totalNetoPagar - totalPaid;
 
-                footer.innerHTML = `
-                    <div class="mt-6">
-                        <div class="rounded-2xl bg-slate-900 px-10 py-6 text-white flex justify-between items-center shadow-xl overflow-hidden relative">
-                            <!-- Background accent -->
-                            <div class="absolute inset-0 opacity-10 pointer-events-none" style="background: radial-gradient(circle at right, #4f46e5, transparent);"></div>
-                            <span class="text-xs font-black uppercase tracking-[0.3em] opacity-80 relative z-10">Total General Propuesta (Neto):</span>
-                            <span class="text-4xl font-black tabular-nums transition-all relative z-10" id="propuesta-total-final">${formatNum(grandTotalPropuesta)} €</span>
-                        </div>
-                    </div>
-                `;
-            } else if (currentTemplate === 'confirmacion') {
-                const h = HOTELS[currentHotel];
-
-                // --- PAGO PLAN LOGIC ---
-                let groupPlan = [];
-                try {
-                    groupPlan = JSON.parse(groupData.PaymentPlan_JSON || "[]");
-                } catch (e) { groupPlan = []; }
-
-                const entradaStr = document.getElementById('reserva-entrada-1')?.innerText || groupData["Entrada"] || '21-04-2026';
-                const [dId, mId, yId] = entradaStr.split(/[-\/]/).map(Number);
-                const fechaEntrada = (dId && mId && yId) ? new Date(yId < 100 ? 2000 + yId : yId, mId - 1, dId) : new Date();
-
-                const formatDateSafe = (date) => {
-                    if (!(date instanceof Date) || isNaN(date.getTime())) return "-";
-                    return date.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' });
-                };
-
-                const fRelease = new Date(fechaEntrada);
-                fRelease.setDate(fRelease.getDate() - (parseInt(groupData["Com_Relix"]) || 22));
-
-                const suplementos = parseFloat(groupData.Suplementos || 0);
-                const descuentos = parseFloat(groupData.Descuentos || 0);
-                const totalNetoPagar = (total - totalComision) + suplementos - descuentos;
-
-                // Siempre recalcular importes basados en el neto actual para evitar discrepancias
-                if (groupPlan.length > 0) {
-                    const pendingRows = groupPlan.filter(p => p.status !== "Cobrado");
-                    const totalPaid = groupPlan.filter(p => p.status === "Cobrado").reduce((acc, p) => acc + (parseFloat(p.amount) || 0), 0);
+                if (paymentPlan.length > 0) {
+                    const pendingRows = paymentPlan.filter(p => p.status !== "Cobrado");
                     const totalToDistribute = totalNetoPagar - totalPaid;
-
                     if (pendingRows.length > 0) {
                         const totalPendingPercent = pendingRows.reduce((acc, p) => acc + (parseFloat(p.percent) || 0), 0) || 100;
-                        pendingRows.forEach((p, idx) => {
-                            if (pendingRows.length === 1) {
-                                p.amount = totalToDistribute.toFixed(2);
-                            } else {
-                                const weight = (parseFloat(p.percent) || 0) / totalPendingPercent;
-                                p.amount = (totalToDistribute * weight).toFixed(2);
-                            }
+                        pendingRows.forEach(p => {
+                            if (pendingRows.length === 1) p.amount = totalToDistribute.toFixed(2);
+                            else p.amount = (totalToDistribute * ((parseFloat(p.percent) || 0) / totalPendingPercent)).toFixed(2);
                         });
                     }
                 }
 
-                // If no plan, create a default 30/70 for display based on totalNetoPagar
-                if (groupPlan.length === 0) {
-                    const d1 = new Date(fechaEntrada); d1.setDate(d1.getDate() - 60);
-                    const d2 = new Date(fechaEntrada); d2.setDate(d2.getDate() - 30);
-                    groupPlan = [
-                        { label: "1er Pago Garantía", percent: 30, amount: (totalNetoPagar * 0.3).toFixed(2), date: d1.toISOString().split('T')[0], status: "Pendiente" },
-                        { label: "Liquidación Final", percent: 70, amount: (totalNetoPagar * 0.7).toFixed(2), date: d2.toISOString().split('T')[0], status: "Pendiente" }
-                    ];
-                }
-
-                // Calculate paid/pending balance
-                const totalPaid = groupPlan.filter(p => p.status === "Cobrado").reduce((acc, p) => acc + (parseFloat(p.amount) || 0), 0);
-                const totalPending = totalNetoPagar - totalPaid;
-
                 footer.innerHTML = `
                     <div class="mt-4 font-pro" style="page-break-inside: avoid;">
-                        <!-- Divider decorativo -->
                         <div class="flex items-center gap-4 mb-4">
-                            <div class="flex-1 h-px" style="background: linear-gradient(to right, transparent, #cbd5e1 40%, #cbd5e1 60%, transparent); -webkit-print-color-adjust: exact; print-color-adjust: exact;"></div>
-                            <div class="flex items-center gap-2">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" class="text-slate-300" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg>
-                                <span class="text-[8px] font-black text-slate-400 uppercase tracking-[0.25em]">Condiciones de Pago</span>
-                                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" class="text-slate-300" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg>
-                            </div>
-                            <div class="flex-1 h-px" style="background: linear-gradient(to left, transparent, #cbd5e1 40%, #cbd5e1 60%, transparent); -webkit-print-color-adjust: exact; print-color-adjust: exact;"></div>
+                            <div class="flex-1 h-px" style="background: linear-gradient(to right, transparent, #cbd5e1 40%, #cbd5e1 60%, transparent);"></div>
+                            <span class="text-[8px] font-black text-slate-400 uppercase tracking-[0.25em]">Condiciones de Pago</span>
+                            <div class="flex-1 h-px" style="background: linear-gradient(to left, transparent, #cbd5e1 40%, #cbd5e1 60%, transparent);"></div>
                         </div>
-
-                        <!-- TOTALES - Premium Block -->
-                        <div class="mb-4 rounded-2xl bg-white shadow-sm border border-slate-200 overflow-hidden flex relative" style="-webkit-print-color-adjust: exact; print-color-adjust: exact;">
-                            <div class="w-1.5" style="background: linear-gradient(to bottom, ${currentHotel === 'cumbria' ? '#0f172a, #334155' : '#16a34a, #14532d'}); -webkit-print-color-adjust: exact; print-color-adjust: exact;"></div>
+                        <div class="mb-4 rounded-2xl bg-white shadow-sm border border-slate-200 overflow-hidden flex relative">
+                            <div class="w-1.5" style="background: linear-gradient(to bottom, ${currentHotel === 'cumbria' ? '#0f172a, #334155' : '#16a34a, #14532d'});"></div>
                             <div class="flex-1 px-8 py-4 flex justify-between items-center bg-gradient-to-r from-slate-50/40 to-white">
-                                <div>
-                                    <span class="text-[8px] font-black uppercase tracking-[0.25em] text-slate-400 block mb-1">Total Presupuestado</span>
-                                    <div class="flex items-baseline gap-1">
-                                        <span class="tabular-nums tracking-tight" style="font-size: 20px; font-weight: 900; color: #0f172a; -webkit-print-color-adjust: exact; print-color-adjust: exact;">${formatNum(totalNetoPagar)}</span>
-                                        <span class="font-bold text-slate-400" style="font-size: 11px;">€</span>
-                                    </div>
-                                </div>
-                                ${totalPaid >= Math.abs(totalNetoPagar) ? `
-                                <div class="text-right flex flex-col items-end gap-1.5 border-l border-slate-100 pl-8">
-                                    <span class="px-3 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-[0.15em] flex items-center gap-1.5 shadow-sm" style="background-color: #ecfdf5; color: #059669; border: 1px solid #a7f3d0; -webkit-print-color-adjust: exact; print-color-adjust: exact;">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
-                                        Pagado Total
-                                    </span>
-                                    <span class="text-[8px] font-bold tabular-nums text-slate-400 tracking-wide mt-1">0,00 € pendiente</span>
-                                </div>
-                                ` : `
-                                <div class="text-right border-l border-slate-200/60 pl-8 flex flex-col justify-center">
-                                    <span class="text-[7.5px] font-black uppercase tracking-[0.25em] block mb-1" style="color: ${currentHotel === 'cumbria' ? '#475569' : '#15803d'};">Pendiente a Pagar</span>
-                                    <div class="flex items-baseline justify-end gap-1">
-                                        <span class="tabular-nums tracking-tighter" style="font-size: 20px; font-weight: 900; color: ${currentHotel === 'cumbria' ? '#0f172a' : '#14532d'}; -webkit-print-color-adjust: exact; print-color-adjust: exact; letter-spacing: -0.02em;">${formatNum(totalPending)}</span>
-                                        <span class="font-bold" style="font-size: 11px; color: ${currentHotel === 'cumbria' ? '#64748b' : '#22c55e'};">€</span>
-                                    </div>
-                                </div>
-                                `}
+                                <div><span class="text-[8px] font-black uppercase tracking-[0.25em] text-slate-400 block mb-1">Total Presupuestado</span><div class="flex items-baseline gap-1"><span class="tabular-nums" style="font-size: 20px; font-weight: 900; color: #0f172a;">${formatNum(totalNetoPagar)}</span><span class="font-bold text-slate-400" style="font-size: 11px;">€</span></div></div>
+                                ${totalPaid >= Math.abs(totalNetoPagar) - 0.01 ? `<div class="text-right flex flex-col items-end gap-1.5 border-l border-slate-100 pl-8"><span class="px-3 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-[0.15em] flex items-center gap-1.5 shadow-sm" style="background-color: #ecfdf5; color: #059669; border: 1px solid #a7f3d0;">Pagado Total</span></div>` : `<div class="text-right border-l border-slate-200/60 pl-8 flex flex-col justify-center"><span class="text-[7.5px] font-black uppercase tracking-[0.25em] block mb-1" style="color: ${currentHotel === 'cumbria' ? '#475569' : '#15803d'};">Pendiente a Pagar</span><div class="flex items-baseline justify-end gap-1"><span class="tabular-nums" style="font-size: 20px; font-weight: 900;">${formatNum(totalPending)}</span><span class="font-bold" style="font-size: 11px; color: ${currentHotel === 'cumbria' ? '#64748b' : '#22c55e'};">€</span></div></div>`}
                             </div>
                         </div>
-
                         <div class="space-y-4">
                             ${!(groupData["Enlace_TPV"] || h.paymentGateway) ? `
-                            <!-- BLOQUE BANCO / TITULAR -->
-                            <div class="bg-gradient-to-br from-slate-50 to-white pt-2 pb-4 px-5 rounded-2xl border border-slate-200/80 shadow-sm relative overflow-hidden" style="-webkit-print-color-adjust: exact; print-color-adjust: exact;">
-                                 <!-- Decorative corner -->
-                                 <div class="absolute -top-6 -right-6 w-28 h-28 rounded-full pointer-events-none" style="background: radial-gradient(circle, rgba(100,116,139,0.06) 0%, transparent 70%); -webkit-print-color-adjust: exact; print-color-adjust: exact;"></div>
-                                 
-                                 <!-- Header -->
-                                 <div class="flex items-center gap-2 mb-3 relative z-10">
-                                     <div class="w-5 h-5 rounded-full flex items-center justify-center shadow-sm" style="background: linear-gradient(135deg, ${currentHotel === 'cumbria' ? '#0f172a' : '#214732'}, ${currentHotel === 'cumbria' ? '#334155' : '#2d5a43'}); -webkit-print-color-adjust: exact; print-color-adjust: exact;">
-                                         <svg xmlns="http://www.w3.org/2000/svg" width="9" height="9" viewBox="0 0 24 24" fill="none" style="color: rgba(255,255,255,0.85); -webkit-print-color-adjust: exact; print-color-adjust: exact;" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M3 10h18"/><path d="M5 6l7-3 7 3"/><path d="M4 10v11"/><path d="M20 10v11"/><path d="M8 14v4"/><path d="M12 14v4"/><path d="M16 14v4"/></svg>
-                                     </div>
-                                     <h5 class="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] pt-0.5">Transferencia Bancaria</h5>
-                                 </div>
-                                 
-                                 <!-- Content: Side by Side -->
+                            <div class="bg-gradient-to-br from-slate-50 to-white pt-2 pb-4 px-5 rounded-2xl border border-slate-200/80 shadow-sm relative overflow-hidden">
+                                 <div class="flex items-center gap-2 mb-3 relative z-10"><h5 class="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] pt-0.5">Transferencia Bancaria</h5></div>
                                  <div class="relative z-10 flex border-t border-slate-100 pt-3">
-                                     <!-- Beneficiario -->
-                                     <div class="flex-1">
-                                         <p class="text-[5px] font-bold text-slate-300 uppercase tracking-[0.1em] mb-0.5">Beneficiario</p>
-                                         <p class="font-black text-slate-800 uppercase" style="font-size: 8.5px; letter-spacing: -0.01em;">${h.company}</p>
-                                         <p class="font-bold text-slate-500 mt-0.5" style="font-size: 7px;">NIF: <span class="font-black text-slate-700">${h.nif}</span></p>
-                                     </div>
-                                     
-                                     <!-- Cuenta IBAN -->
-                                     <div class="flex-1 flex justify-end">
-                                         <div class="bg-white p-2.5 rounded-xl border border-slate-100 shadow-sm flex flex-col justify-center min-w-[280px]" style="-webkit-print-color-adjust: exact; print-color-adjust: exact;">
-                                            <div class="flex items-center justify-between mb-0.5">
-                                                <p class="text-[5.5px] font-bold text-slate-300 tracking-tight leading-none uppercase">${h.bank}</p>
-                                                <span class="text-[4.5px] font-black px-1 py-0.5 rounded-[2px] uppercase tracking-[0.1em] leading-none" style="background: #e2e8f0; color: #64748b; -webkit-print-color-adjust: exact; print-color-adjust: exact;">IBAN</span>
-                                            </div>
-                                            <p class="font-black text-slate-700 tabular-nums" style="font-size: 11px; letter-spacing: 0.1em; line-height: 1;">${h.iban}</p>
-                                         </div>
-                                     </div>
+                                     <div class="flex-1"><p class="text-[5px] font-bold text-slate-300 uppercase mb-0.5">Beneficiario</p><p class="font-black text-slate-800 uppercase" style="font-size: 8.5px;">${h.company}</p><p class="font-bold text-slate-500 mt-0.5" style="font-size: 7px;">NIF: ${h.nif}</p></div>
+                                     <div class="flex-1 flex justify-end"><div class="bg-white p-2.5 rounded-xl border border-slate-100 min-w-[280px]"><p class="text-[5.5px] font-bold text-slate-300 uppercase">${h.bank}</p><p class="font-black text-slate-700 tabular-nums" style="font-size: 11px;">${h.iban}</p></div></div>
                                  </div>
-                            </div>
-                            ` : ''}
-
-                            <!-- PLAN DE PAGOS -->
+                            </div>` : ''}
                             <div>
-                                <div class="flex items-center gap-2 mb-2">
-                                    <h5 class="text-[7.5px] font-black text-slate-400 uppercase tracking-[0.2em]">Plan de Garantía y Pagos</h5>
-                                </div>
-                                
+                                <div class="flex items-center justify-between mb-2"><h5 class="text-[7.5px] font-black text-slate-400 uppercase tracking-[0.2em]">Plan de Garantía y Pagos</h5><button onclick="addPayment()" class="no-print px-2 py-1 bg-emerald-50 text-emerald-600 rounded-lg text-[8px] font-black uppercase">+ Añadir Anticipo</button></div>
                                 <div class="grid grid-cols-2 gap-3 mb-3">
-                                    ${groupPlan.map((dep, idx) => {
-                    const isPaid = dep.status === "Cobrado";
-                    const depDate = dep.date ? new Date(dep.date) : null;
-                    return `
-                                            <div class="rounded-xl relative overflow-hidden" style="border: 1.5px solid ${isPaid ? '#a7f3d0' : '#e2e8f0'}; ${isPaid ? 'background-color: #ecfdf5;' : 'background-color: #ffffff;'} -webkit-print-color-adjust: exact; print-color-adjust: exact;">
-                                                <div class="w-full" style="height: 3px; background: ${isPaid ? 'linear-gradient(to right, #059669, #34d399)' : `linear-gradient(to right, ${currentHotel === 'cumbria' ? '#0f172a' : '#214732'}, ${currentHotel === 'cumbria' ? '#475569' : '#2d5a43'})`}; opacity: ${isPaid ? '1' : '0.4'}; -webkit-print-color-adjust: exact; print-color-adjust: exact;"></div>
-                                                
-                                                ${isPaid ? `
-                                                <div class="absolute inset-0 flex items-center justify-center opacity-[0.05] pointer-events-none" style="color: #059669; -webkit-print-color-adjust: exact; print-color-adjust: exact;">
-                                                    <span class="text-3xl font-black -rotate-12 uppercase tracking-widest border-4 border-current px-2 py-0.5 rounded-lg">Pagado</span>
+                                    ${paymentPlan.map((dep, idx) => {
+                                        const isPaid = dep.status === "Cobrado";
+                                        return `<div class="rounded-xl relative overflow-hidden group/dep" style="border: 1.5px solid ${isPaid ? '#a7f3d0' : '#e2e8f0'}; background-color: ${isPaid ? '#ecfdf5' : '#ffffff'};">
+                                            <div class="w-full" style="height: 3px; background: ${isPaid ? 'linear-gradient(to right, #059669, #34d399)' : `linear-gradient(to right, ${currentHotel === 'cumbria' ? '#0f172a' : '#214732'}, ${currentHotel === 'cumbria' ? '#475569' : '#2d5a43'})`}; opacity: ${isPaid ? '1' : '0.4'};"></div>
+                                            <button onclick="removePayment(${idx})" class="no-print absolute top-1 right-1 w-5 h-5 bg-rose-50 text-rose-500 rounded-md flex items-center justify-center opacity-0 group-hover/dep:opacity-100 transition-all z-20">✕</button>
+                                            <div class="p-2 relative z-10 flex flex-col h-full justify-between">
+                                                <div class="flex justify-between items-start mb-2 border-b border-slate-100 pb-1">
+                                                    <span class="text-[7.5px] font-bold ${isPaid ? 'text-emerald-700' : 'text-slate-500'} uppercase editable" contenteditable="true" onblur="updatePayment(${idx}, 'label', this.innerText)">${dep.label}</span>
+                                                    <div class="flex items-center gap-1"><span class="text-[7px] font-black tabular-nums editable" contenteditable="true" onblur="updatePayment(${idx}, 'percent', this.innerText)" style="color: ${isPaid ? '#059669' : '#94a3b8'};">${dep.percent}</span><span class="text-[7px] font-black" style="color: ${isPaid ? '#059669' : '#94a3b8'};">%</span><select onchange="updatePayment(${idx}, 'status', this.value)" class="no-print ml-2 bg-transparent text-[7px] font-bold border rounded px-1"><option value="Pendiente" ${dep.status === 'Pendiente' ? 'selected' : ''}>Pendiente</option><option value="Cobrado" ${dep.status === 'Cobrado' ? 'selected' : ''}>Cobrado</option></select></div>
                                                 </div>
-                                                ` : ''}
-                                                
-                                                <div class="p-2 relative z-10 flex flex-col h-full justify-between">
-                                                    <div class="flex justify-between items-start mb-2 border-b border-slate-100 pb-1">
-                                                        <span class="text-[7.5px] font-bold ${isPaid ? 'text-emerald-700' : 'text-slate-500'} uppercase leading-none">
-                                                            ${isPaid ? 'Pagado' : dep.label}
-                                                        </span>
-                                                        <span class="text-[7px] font-black tabular-nums" style="color: ${isPaid ? '#059669' : '#94a3b8'}; -webkit-print-color-adjust: exact; print-color-adjust: exact;">${dep.percent}%</span>
-                                                    </div>
-                                                    <div class="flex justify-between items-end mt-1">
-                                                        <div>
-                                                            <p class="text-[8px] ${isPaid ? 'text-emerald-500' : 'text-rose-600'} font-black uppercase tracking-wider mb-0.5">${isPaid ? 'Cobrado' : 'Fecha Límite'}</p>
-                                                            <p class="text-[11px] font-bold ${isPaid ? 'text-slate-600' : 'text-slate-800'}">${formatDateSafe(depDate)}</p>
-                                                        </div>
-                                                        <div class="text-right">
-                                                            <p class="tabular-nums leading-none flex items-baseline gap-0.5" style="font-size: 11px; font-weight: 900; ${isPaid ? 'color: #047857;' : 'color: #1e293b;'} -webkit-print-color-adjust: exact; print-color-adjust: exact;">${formatNum(dep.amount)}<span style="font-size: 8px; opacity: 0.6;">€</span></p>
-                                                        </div>
-                                                    </div>
+                                                <div class="flex justify-between items-end mt-1">
+                                                    <div><p class="text-[8px] ${isPaid ? 'text-emerald-500' : 'text-rose-600'} font-black uppercase tracking-wider mb-0.5">${isPaid ? 'Cobrado' : 'Fecha Límite'}</p><input type="date" value="${toInputDate(dep.date)}" onchange="updatePayment(${idx}, 'date', this.value)" class="text-[10px] font-bold ${isPaid ? 'text-slate-600' : 'text-slate-800'} bg-transparent outline-none"></div>
+                                                    <div class="text-right"><p class="tabular-nums flex items-baseline justify-end gap-0.5" style="font-size: 11px; font-weight: 900; ${isPaid ? 'color: #047857;' : 'color: #1e293b;'}"><span class="editable" contenteditable="true" onblur="updatePayment(${idx}, 'amount', toNum(this.innerText))">${formatNum(dep.amount)}</span><span style="font-size: 8px; opacity: 0.6;">€</span></p></div>
                                                 </div>
                                             </div>
-                                         `;
-                }).join('')}
+                                        </div>`;
+                                    }).join('')}
                                 </div>
-                                <!-- NON REFUNDABLE NOTICE -->
-                                <div class="pt-1 pb-2 w-full flex justify-center">
-                                    <div class="flex items-center gap-1.5 opacity-80" style="-webkit-print-color-adjust: exact; print-color-adjust: exact; font-size: 9px; line-height: 1;">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" style="color: #e11d48;" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
-                                        <span class="text-slate-500 font-medium tracking-wide whitespace-nowrap"><span class="font-bold text-slate-600">TÉRMINOS DE PAGO:</span> Todos los pagos anticipados a cuenta son <strong class="font-bold text-slate-700">No Reembolsables</strong>.</span>
-                                    </div>
-                                </div>
-                                
+                                <div class="pt-1 pb-2 w-full flex justify-center"><div class="flex items-center gap-1.5 opacity-80" style="font-size: 9px;"><svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#e11d48" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg><span class="text-slate-500 font-medium tracking-wide"><strong>TÉRMINOS DE PAGO:</strong> Todos los pagos anticipados a cuenta son <strong>No Reembolsables</strong>.</span></div></div>
                             </div>
                         </div>
                     </div>`;
             } else if (currentTemplate === 'proforma') {
-                const suplementos = parseFloat(groupData.Suplementos || 0);
-                const descuentos = parseFloat(groupData.Descuentos || 0);
-                const netTotal = (total - totalComision) + suplementos - descuentos;
-
-                // Construir filas de desglose IVA
+                const netTotal = (total - totalComision) + parseFloat(groupData.Suplementos || 0) - parseFloat(groupData.Descuentos || 0);
                 let ivaRows = '';
-                if (base10 > 0) {
-                    ivaRows += `
-                        <tr><td class="text-left py-0.5 text-slate-500">Base Imponible (10%)</td><td class="text-right py-0.5 tabular-nums">${formatNum(base10)} €</td></tr>
-                        <tr class="border-b border-gray-200"><td class="text-left py-0.5 text-slate-500">IVA (10%)</td><td class="text-right py-0.5 tabular-nums font-bold">${formatNum(iva10)} €</td></tr>`;
-                }
-                if (base21 > 0) {
-                    ivaRows += `
-                        <tr><td class="text-left py-0.5 text-slate-500">Base Imponible (21%)</td><td class="text-right py-0.5 tabular-nums">${formatNum(base21)} €</td></tr>
-                        <tr class="border-b border-gray-200"><td class="text-left py-0.5 text-slate-500">IVA (21%)</td><td class="text-right py-0.5 tabular-nums font-bold">${formatNum(iva21)} €</td></tr>`;
-                }
-
-                const h = HOTELS[currentHotel];
-                const summaryHtml = `
-                    <div class="flex flex-col items-end gap-3 w-full">
-                        <!-- TOTAL -->
-                        <div class="proforma-total-box w-[240px] shadow-lg" style="-webkit-print-color-adjust:exact; print-color-adjust:exact;">
-                            <span class="text-[9px] font-bold uppercase tracking-widest mr-4">Total:</span>
-                            <span class="text-lg tabular-nums font-black">${formatNum(netTotal)} €</span>
-                        </div>
-                        <!-- Desglose IVA -->
-                        ${ivaRows ? `
-                        <table class="text-[9px] w-[300px] border-collapse border border-gray-200 rounded-lg overflow-hidden" style="-webkit-print-color-adjust:exact; print-color-adjust:exact;">
-                            <thead><tr class="bg-gray-50"><td colspan="2" class="text-[8px] font-black text-slate-400 uppercase tracking-widest px-3 py-2">Desglose Fiscal</td></tr></thead>
-                            <tbody class="font-mono text-[9px]">${ivaRows.replace(/py-0\.5/g,'py-1.5 px-3')}</tbody>
-                        </table>` : ''}
-                    </div>`;
-
-                // Renderizar dentro de la proforma (para que quede en la misma hoja)
-                const proformaSummary = document.getElementById('proforma-summary');
-                if (proformaSummary) proformaSummary.innerHTML = summaryHtml;
-
-                // Datos bancarios en el PIE de página del documento proforma
-                const proformaBankContainer = document.getElementById('proforma-bank-container');
-                const bankHidden = sessionStorage.getItem('proforma_bank_hidden') === '1';
-                if (proformaBankContainer) {
-                    proformaBankContainer.innerHTML = `
-                        <div class="mt-3 w-full h-px bg-slate-200" style="-webkit-print-color-adjust:exact;"></div>
-                        ${h?.iban ? `
-                        <div id="bank-data-block" style="margin-top:8px; display:${bankHidden ? 'none' : 'flex'}; align-items:stretch; border:1px solid #e2e8f0; border-radius:8px; overflow:hidden; -webkit-print-color-adjust:exact; print-color-adjust:exact; background:white; position:relative;">
-                            <!-- Franja lateral acento -->
-                            <div style="width:4px; background:#1e293b; flex-shrink:0;"></div>
-                            <!-- Contenido -->
-                            <div style="padding:8px 14px; display:flex; flex-direction:column; gap:2px; flex:1;">
-                                <div style="font-size:5px; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; color:#cbd5e1;">Transferencia Bancaria · Datos de Pago</div>
-                                <div style="font-size:14px; font-weight:900; letter-spacing:0.08em; color:#0f172a; font-family:'Courier Prime', monospace; margin-top:2px;">${h.iban}</div>
-                                <div style="font-size:6px; color:#94a3b8; margin-top:1px; text-transform:uppercase;">${h.bank} &nbsp;<span style="color:#e2e8f0;">·</span>&nbsp; Beneficiario: <strong style="color:#475569;">${h.company}</strong> (NIF: ${h.nif})</div>
-                            </div>
-                            <!-- Badge entidad -->
-                            <div style="display:flex; align-items:center; padding:0 12px; background:#f8fafc; border-left:1px solid #e2e8f0;">
-                                <span style="font-size:5px; font-weight:900; color:#94a3b8; letter-spacing:0.05em; white-space:nowrap;">IBAN</span>
-                            </div>
-                            <!-- Botón cerrar (no imprime) -->
-                            <button class="no-print" onclick="document.getElementById('bank-data-block').style.display='none'; sessionStorage.setItem('proforma_bank_hidden','1'); document.getElementById('bank-show-btn').style.display='flex';" style="position:absolute; top:4px; right:4px; background:#f1f5f9; border:1px solid #e2e8f0; border-radius:4px; padding:1px 5px; font-size:9px; cursor:pointer; color:#64748b; line-height:1.4;" title="Ocultar datos bancarios">✕</button>
-                        </div>
-                        <!-- Botón para mostrar de nuevo (no imprime) -->
-                        <button id="bank-show-btn" class="no-print" onclick="document.getElementById('bank-data-block').style.display='flex'; sessionStorage.setItem('proforma_bank_hidden','0'); this.style.display='none';" style="display:${bankHidden ? 'flex' : 'none'}; margin-top:6px; align-items:center; gap:4px; background:#f1f5f9; border:1px solid #e2e8f0; border-radius:6px; padding:3px 10px; font-size:8px; cursor:pointer; color:#475569; font-weight:700; letter-spacing:0.05em;">＋ Incluir datos bancarios</button>
-                        ` : ''}`;
-                }
-
-
+                if (base10 > 0) ivaRows += `<tr><td class="text-left px-3 py-1.5 text-slate-500">Base Imponible (10%)</td><td class="text-right px-3 py-1.5 tabular-nums">${formatNum(base10)} €</td></tr><tr><td class="text-left px-3 py-1.5 text-slate-500">IVA (10%)</td><td class="text-right px-3 py-1.5 tabular-nums font-bold">${formatNum(iva10)} €</td></tr>`;
+                if (base21 > 0) ivaRows += `<tr><td class="text-left px-3 py-1.5 text-slate-500">Base Imponible (21%)</td><td class="text-right px-3 py-1.5 tabular-nums">${formatNum(base21)} €</td></tr><tr><td class="text-left px-3 py-1.5 text-slate-500">IVA (21%)</td><td class="text-right px-3 py-1.5 tabular-nums font-bold">${formatNum(iva21)} €</td></tr>`;
+                if (pSummary) pSummary.innerHTML = `<div class="flex flex-col items-end gap-3 w-full"><div class="proforma-total-box w-[240px] shadow-lg"><span class="text-[9px] font-bold uppercase tracking-widest mr-4">Total:</span><span class="text-lg tabular-nums font-black">${formatNum(netTotal)} €</span></div>${ivaRows ? `<table class="text-[9px] w-[300px] border-collapse border border-gray-200 rounded-lg overflow-hidden"><thead><tr class="bg-gray-50"><td colspan="2" class="text-[8px] font-black text-slate-400 uppercase tracking-widest px-3 py-2">Desglose Fiscal</td></tr></thead><tbody class="font-mono text-[9px]">${ivaRows}</tbody></table>` : ''}</div>`;
+                if (pBank) pBank.innerHTML = `<div class="mt-3 w-full h-px bg-slate-200"></div><div style="margin-top:8px; display:flex; align-items:stretch; border:1px solid #e2e8f0; border-radius:8px; overflow:hidden; background:white;"><div style="width:4px; background:#1e293b;"></div><div style="padding:8px 14px; flex:1;"><div style="font-size:5px; font-weight:700; text-transform:uppercase; color:#cbd5e1;">Transferencia Bancaria</div><div style="font-size:14px; font-weight:900; letter-spacing:0.08em; color:#0f172a; font-family:'Courier Prime', monospace;">${h.iban}</div><div style="font-size:6px; color:#94a3b8;">${h.bank} · Beneficiario: <strong>${h.company}</strong></div></div></div>`;
             }
-
             updatePaymentLink();
         }
 
         function updatePaymentLink() {
             const groupData = JSON.parse(localStorage.getItem('selectedGroup') || '{}');
             const h = HOTELS[currentHotel] || HOTELS['guadiana'];
-
-            // --- PAGO PLAN LOGIC ---
-            let groupPlan = [];
-            try {
-                groupPlan = JSON.parse(groupData.PaymentPlan_JSON || "[]");
-            } catch (e) { groupPlan = []; }
-
-            const payUrl = (()=>{ 
-                const l = groupData['Enlace_TPV'] || h.paymentGateway || ''; 
-                return (l && !l.startsWith('http')) ? 'https://'+l : l; 
-            })();
-            
+            const payUrl = (()=>{ const l = groupData['Enlace_TPV'] || h.paymentGateway || ''; return (l && !l.startsWith('http')) ? 'https://'+l : l; })();
             const qrBlock = document.getElementById('payment-qr-block');
-            const qrLink = document.getElementById('payment-qr-link');
-            const qrImg = document.getElementById('payment-qr-img');
-            const qrInner = document.getElementById('payment-qr-inner');
-            
-            const isQrHidden = sessionStorage.getItem('proforma_qr_hidden') === '1';
-            const qrShowBtn = document.getElementById('qr-show-btn');
-
-            if (qrBlock && payUrl && (groupPlan.length === 0 || groupPlan.some(p => p.status !== "Cobrado"))) {
-                qrBlock.style.display = isQrHidden ? 'none' : 'block';
-                if (qrShowBtn) qrShowBtn.style.display = isQrHidden ? 'flex' : 'none';
-
+            if (qrBlock && payUrl) {
+                qrBlock.style.display = sessionStorage.getItem('proforma_qr_hidden') === '1' ? 'none' : 'block';
+                const qrLink = document.getElementById('payment-qr-link');
+                const qrImg = document.getElementById('payment-qr-img');
                 if (qrLink) qrLink.href = payUrl;
                 if (qrImg) qrImg.src = 'https://api.qrserver.com/v1/create-qr-code/?size=100x100&color=064e3b&bgcolor=ffffff&data=' + encodeURIComponent(payUrl);
-                
                 const qrUrlSpan = document.getElementById('payment-raw-url-link');
-                if (qrUrlSpan) {
-                    qrUrlSpan.innerText = payUrl;
-                    qrUrlSpan.href = payUrl;
-                }
-                if (qrInner) {
-                    const grad = currentHotel === 'cumbria' ? 'linear-gradient(135deg,#0f172a,#1e293b)' : 'linear-gradient(135deg,#064e3b,#065f46)';
-                    qrInner.style.background = grad;
-                }
-            } else if (qrBlock) {
-                qrBlock.style.display = 'none';
-            }
+                if (qrUrlSpan) { qrUrlSpan.innerText = payUrl; qrUrlSpan.href = payUrl; }
+            } else if (qrBlock) qrBlock.style.display = 'none';
 
-            // --- Renderear Cláusulas de Confirmación ---
             const polDiv = document.getElementById('tpl-policies');
             if (polDiv && currentTemplate === 'confirmacion') {
-                const hotelKey = currentHotel === 'cumbria' ? 'cumbria' : 'guadiana';
-                const commonC = window.globalConfig?.common?.confirmationClauses || [];
-                const hotelC = window.globalConfig?.[hotelKey]?.confirmationClauses || [];
-                const allC = [...commonC, ...hotelC];
-
+                const allC = [...(window.globalConfig?.common?.confirmationClauses || []), ...(window.globalConfig?.[currentHotel]?.confirmationClauses || [])];
                 if (allC.length > 0) {
                     const totalNeto = total - totalComision;
-                    const html = `
-                        <div class="mt-8 border-t border-slate-100 pt-6">
-                            <div class="flex items-center gap-2 mb-4">
-                                <div class="w-1 h-4 bg-slate-900 rounded-full"></div>
-                                <h4 class="text-[10px] font-black uppercase tracking-[0.2em] text-slate-800">Cláusulas de Confirmación y Políticas</h4>
-                            </div>
-                            <div class="grid grid-cols-2 gap-x-8 gap-y-4">
-                                ${allC.map((c, i) => {
-                                    const body = (c.body || '').replace(/{DEP_30}/g, formatNum(totalNeto * 0.3) + '€');
-                                    return `
-                                        <div class="space-y-1">
-                                            <p class="text-[9px] font-black uppercase text-slate-500 tracking-wider">${i + 1}. ${c.title}</p>
-                                            <p class="text-[8.5px] text-slate-500 leading-relaxed">${body}</p>
-                                        </div>
-                                    `;
-                                }).join('')}
-                            </div>
-                        </div>
-                    `;
-                    polDiv.innerHTML = html;
+                    polDiv.innerHTML = `<div class="mt-8 border-t border-slate-100 pt-6"><div class="flex items-center gap-2 mb-4"><div class="w-1 h-4 bg-slate-900 rounded-full"></div><h4 class="text-[10px] font-black uppercase tracking-[0.2em]">Cláusulas de Confirmación</h4></div><div class="grid grid-cols-2 gap-x-8 gap-y-4">${allC.map((c, i) => `<div class="space-y-1"><p class="text-[9px] font-black uppercase text-slate-500">${i + 1}. ${c.title}</p><p class="text-[8.5px] text-slate-500 leading-relaxed">${(c.body || '').replace(/{DEP_30}/g, formatNum(totalNeto * 0.3) + '€')}</p></div>`).join('')}</div></div>`;
                     polDiv.classList.remove('hidden');
-                } else {
-                    polDiv.classList.add('hidden');
-                }
-            } else if (polDiv) {
-                polDiv.classList.add('hidden');
-            }
+                } else polDiv.classList.add('hidden');
+            } else if (polDiv) polDiv.classList.add('hidden');
         }
 
-        // Botón Imprimir: ocultar controles, imprimir y restaurar
         function printDoc() {
             updatePaymentLink();
-
-            // 1. Ocultar TODOS los elementos no-print antes de imprimir
             const noPrints = Array.from(document.querySelectorAll('.no-print'));
-            noPrints.forEach(el => {
-                el._savedDisplay = el.style.display;
-                el.style.setProperty('display', 'none', 'important');
-            });
-
-            // 2. Ajustar título (nombre del PDF)
-            const groupData = JSON.parse(localStorage.getItem('selectedGroup') || '{}');
-            const reserva = groupData["Reserva"] || groupData["id"] || '';
-            const grupo   = groupData["Nombre del Grupo"] || '';
-            const ref = (reserva && grupo) ? `${reserva} - ${grupo}` : (grupo || reserva || 'Documento');
+            noPrints.forEach(el => { el._savedDisplay = el.style.display; el.style.setProperty('display', 'none', 'important'); });
             const oldTitle = document.title;
-            document.title = ref;
-
-            // 3. Pequeño delay para que el DOM se pinte sin esos elementos
-            setTimeout(() => {
-                window.print();
-                document.title = oldTitle;
-                // 4. Restaurar después de imprimir
-                noPrints.forEach(el => {
-                    el.style.display = el._savedDisplay || '';
-                    delete el._savedDisplay;
-                });
-            }, 80);
+            const groupData = JSON.parse(localStorage.getItem('selectedGroup') || '{}');
+            document.title = (groupData["Reserva"] || groupData["id"] || '') + ' - ' + (groupData["Nombre del Grupo"] || '');
+            setTimeout(() => { window.print(); document.title = oldTitle; noPrints.forEach(el => { el.style.display = el._savedDisplay || ''; delete el._savedDisplay; }); }, 80);
         }
-
-        // Print handlers
-        window.onbeforeprint = () => {
-            updatePaymentLink();
-            // Ocultar todos los elementos no-print por JS (refuerza el CSS @media print)
-            document.querySelectorAll('.no-print').forEach(el => {
-                el.dataset._prevDisplay = el.style.display;
-                el.style.display = 'none';
-            });
-            const notas = document.getElementById('propuesta-notas');
-            const placeholder = "Escriba aquí cualquier observación adicional";
-            if (notas && (notas.innerText.includes(placeholder) || !notas.innerText.trim())) {
-                const section = notas.closest('.mt-8');
-                if (section) section.style.display = 'none';
-            }
-        };
-        window.onafterprint = () => {
-            // Restaurar todos los elementos no-print
-            document.querySelectorAll('.no-print').forEach(el => {
-                el.style.display = el.dataset._prevDisplay || '';
-                delete el.dataset._prevDisplay;
-            });
-            const notas = document.getElementById('propuesta-notas');
-            if (notas) {
-                const section = notas.closest('.mt-8');
-                if (section) section.style.display = '';
-            }
-        };
     </script>
 </body>
 </html>
