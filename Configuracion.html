@@ -62,6 +62,9 @@
     <script src="js/firebase-init.js"></script>
 
     <script type="text/babel">
+        const BUDGET_MODEL_TEMPLATES = [{"title":"Cupo y Disponibilidad","body":"La presente oferta es válida por 48 horas. Dado que se requiere el bloqueo total de instalaciones, la disponibilidad no se garantiza hasta el primer depósito. [EN] This offer is valid for 48 hours. Since total facility blocking is required, availability is not guaranteed until the first deposit."},{"title":"Confirmación y Depósito","body":"Bloqueo confirmado al recibir el 30% del total ({DEP_30}). El 70% restante deberá liquidarse 7 días antes de la entrada. [EN] Booking confirmed upon receipt of 30% of the total ({DEP_30}). The remaining 70% must be settled 7 days before entry."},{"title":"Política de Cancelación","body":"Al ser un evento de carácter exclusivo con bloqueo de inventario, todos los depósitos entregados tienen carácter de NO REEMBOLSABLES. [EN] Being an exclusive event with inventory blocking, all deposits delivered are NON-REFUNDABLE."},{"title":"Rooming List","body":"La relación detallada de ocupantes deberá entregarse 5 días hábiles antes de la llegada del primer pasajero. [EN] The detailed list of occupants must be delivered 5 business days before the arrival of the first passenger."}];
+        const CONF_MODEL_TEMPLATES = [{"title":"Confirmación y Depósito","body":"Para garantizar la reserva definitiva, se requiere un primer depósito del 30% ({DEP_30}) en concepto de garantía. La reserva no se considerará confirmada hasta la recepción del mismo. [EN] To guarantee the definitive reservation, a first deposit of 30% ({DEP_30}) is required as a guarantee. The reservation will not be considered confirmed until it is received."},{"title":"Calendario de Pagos y Release","body":"Se establece un release de 30 días previos a la entrada ({RELEASE_30}), fecha en la cual el hotel deberá haber recibido el 50% del total ({DEP_50}). El pago final del 100% ({DEP_100}) deberá estar liquidado 7 días antes de la llegada ({RELEASE_7}). [EN] A release is established 30 days prior to entry ({RELEASE_30}), by which date the hotel must have received 50% of the total ({DEP_50}). The final payment of 100% ({DEP_100}) must be settled 7 days before arrival ({RELEASE_7})."},{"title":"Reducciones y Cancelaciones","body":"Se permite una reducción de hasta el 10% del número de habitaciones contratadas sin gastos hasta 15 días antes de la llegada ({RELEASE_15}). Cancelaciones totales posteriores a esta fecha incurrirán en un 100% de gastos. [EN] A reduction of up to 10% of the number of rooms contracted without charge is allowed until 15 days before arrival ({RELEASE_15}). Total cancellations after this date will incur 100% charges."},{"title":"Rooming List y Régimen","body":"La lista definitiva de ocupantes (Rooming List) deberá ser enviada antes del {RELEASE_7}. Cualquier cambio posterior queda sujeto a disponibilidad. [EN] The final list of occupants (Rooming List) must be sent before {RELEASE_7}. Any subsequent change is subject to availability."}];
+
         const { useState, useEffect, useRef } = React;
 
         // LucideIcon cargado desde js/icons.js (window.LucideIcon)
@@ -93,14 +96,41 @@
                     iban: "ES30 3190 3953 1851 8526 3521",
                     paymentGateway: "",
                     clauses: [
-                        { title: "Cupo y Disponibilidad", body: "La presente oferta es válida por 48 horas. Dado que se requiere el bloqueo total de instalaciones, la disponibilidad no se garantiza hasta el primer depósito." },
-                        { title: "Confirmación y Depósito", body: "Bloqueo confirmado al recibir el 30% del total ({DEP_30}). El 70% restante deberá liquidarse 7 días antes de la entrada." },
-                        { title: "Política de Cancelación", body: "Al ser un evento de carácter exclusivo con bloqueo de inventario, todos los depósitos entregados tienen carácter de NO REEMBOLSABLES." },
-                        { title: "Rooming List", body: "La relación detallada de ocupantes deberá entregarse 5 días hábiles antes de la llegada del primer pasajero." }
-                    ],
+          {
+                    "title": "Cupo y Disponibilidad",
+                    "body": "La presente oferta es válida por 48 horas. Dado que se requiere el bloqueo total de instalaciones, la disponibilidad no se garantiza hasta el primer depósito. [EN] This offer is valid for 48 hours. Since total facility blocking is required, availability is not guaranteed until the first deposit."
+          },
+          {
+                    "title": "Confirmación y Depósito",
+                    "body": "Bloqueo confirmado al recibir el 30% del total ({DEP_30}). El 70% restante deberá liquidarse 7 días antes de la entrada. [EN] Booking confirmed upon receipt of 30% of the total ({DEP_30}). The remaining 70% must be settled 7 days before entry."
+          },
+          {
+                    "title": "Política de Cancelación",
+                    "body": "Al ser un evento de carácter exclusivo con bloqueo de inventario, todos los depósitos entregados tienen carácter de NO REEMBOLSABLES. [EN] Being an exclusive event with inventory blocking, all deposits delivered are NON-REFUNDABLE."
+          },
+          {
+                    "title": "Rooming List",
+                    "body": "La relación detallada de ocupantes deberá entregarse 5 días hábiles antes de la llegada del primer pasajero. [EN] The detailed list of occupants must be delivered 5 business days before the arrival of the first passenger."
+          }
+],
                     confirmationClauses: [
-                        { title: "Firma y Aceptación", body: "La firma de este documento implica la aceptación total de los servicios indicados y condiciones pactadas." }
-                    ]
+          {
+                    "title": "Confirmación y Depósito",
+                    "body": "Para garantizar la reserva definitiva, se requiere un primer depósito del 30% ({DEP_30}) en concepto de garantía. La reserva no se considerará confirmada hasta la recepción del mismo. [EN] To guarantee the definitive reservation, a first deposit of 30% ({DEP_30}) is required as a guarantee. The reservation will not be considered confirmed until it is received."
+          },
+          {
+                    "title": "Calendario de Pagos y Release",
+                    "body": "Se establece un release de 30 días previos a la entrada ({RELEASE_30}), fecha en la cual el hotel deberá haber recibido el 50% del total ({DEP_50}). El pago final del 100% ({DEP_100}) deberá estar liquidado 7 días antes de la llegada ({RELEASE_7}). [EN] A release is established 30 days prior to entry ({RELEASE_30}), by which date the hotel must have received 50% of the total ({DEP_50}). The final payment of 100% ({DEP_100}) must be settled 7 days before arrival ({RELEASE_7})."
+          },
+          {
+                    "title": "Reducciones y Cancelaciones",
+                    "body": "Se permite una reducción de hasta el 10% del número de habitaciones contratadas sin gastos hasta 15 días antes de la llegada ({RELEASE_15}). Cancelaciones totales posteriores a esta fecha incurrirán en un 100% de gastos. [EN] A reduction of up to 10% of the number of rooms contracted without charge is allowed until 15 days before arrival ({RELEASE_15}). Total cancellations after this date will incur 100% charges."
+          },
+          {
+                    "title": "Rooming List y Régimen",
+                    "body": "La lista definitiva de ocupantes (Rooming List) deberá ser enviada antes del {RELEASE_7}. Cualquier cambio posterior queda sujeto a disponibilidad. [EN] The final list of occupants (Rooming List) must be sent before {RELEASE_7}. Any subsequent change is subject to availability."
+          }
+]
                 },
                 cumbria: {
                     name: "Hotel",
@@ -119,14 +149,41 @@
                     iban: "ES19 3081 0601 0850 0004 8966",
                     paymentGateway: "",
                     clauses: [
-                        { title: "Cupo y Disponibilidad", body: "La presente oferta es válida por 48 horas. Dado que se requiere el bloqueo total de instalaciones, la disponibilidad no se garantiza hasta el primer depósito." },
-                        { title: "Confirmación y Depósito", body: "Bloqueo confirmado al recibir el 30% del total ({DEP_30}). El 70% restante deberá liquidarse 7 días antes de la entrada." },
-                        { title: "Política de Cancelación", body: "Al ser un evento de carácter exclusivo con bloqueo de inventario, todos los depósitos entregados tienen carácter de NO REEMBOLSABLES." },
-                        { title: "Rooming List", body: "La relación detallada de ocupantes deberá entregarse 5 días hábiles antes de la llegada del primer pasajero." }
-                    ],
+          {
+                    "title": "Cupo y Disponibilidad",
+                    "body": "La presente oferta es válida por 48 horas. Dado que se requiere el bloqueo total de instalaciones, la disponibilidad no se garantiza hasta el primer depósito. [EN] This offer is valid for 48 hours. Since total facility blocking is required, availability is not guaranteed until the first deposit."
+          },
+          {
+                    "title": "Confirmación y Depósito",
+                    "body": "Bloqueo confirmado al recibir el 30% del total ({DEP_30}). El 70% restante deberá liquidarse 7 días antes de la entrada. [EN] Booking confirmed upon receipt of 30% of the total ({DEP_30}). The remaining 70% must be settled 7 days before entry."
+          },
+          {
+                    "title": "Política de Cancelación",
+                    "body": "Al ser un evento de carácter exclusivo con bloqueo de inventario, todos los depósitos entregados tienen carácter de NO REEMBOLSABLES. [EN] Being an exclusive event with inventory blocking, all deposits delivered are NON-REFUNDABLE."
+          },
+          {
+                    "title": "Rooming List",
+                    "body": "La relación detallada de ocupantes deberá entregarse 5 días hábiles antes de la llegada del primer pasajero. [EN] The detailed list of occupants must be delivered 5 business days before the arrival of the first passenger."
+          }
+],
                     confirmationClauses: [
-                        { title: "Firma y Aceptación", body: "La firma de este documento implica la aceptación total de los servicios indicados y condiciones pactadas." }
-                    ]
+          {
+                    "title": "Confirmación y Depósito",
+                    "body": "Para garantizar la reserva definitiva, se requiere un primer depósito del 30% ({DEP_30}) en concepto de garantía. La reserva no se considerará confirmada hasta la recepción del mismo. [EN] To guarantee the definitive reservation, a first deposit of 30% ({DEP_30}) is required as a guarantee. The reservation will not be considered confirmed until it is received."
+          },
+          {
+                    "title": "Calendario de Pagos y Release",
+                    "body": "Se establece un release de 30 días previos a la entrada ({RELEASE_30}), fecha en la cual el hotel deberá haber recibido el 50% del total ({DEP_50}). El pago final del 100% ({DEP_100}) deberá estar liquidado 7 días antes de la llegada ({RELEASE_7}). [EN] A release is established 30 days prior to entry ({RELEASE_30}), by which date the hotel must have received 50% of the total ({DEP_50}). The final payment of 100% ({DEP_100}) must be settled 7 days before arrival ({RELEASE_7})."
+          },
+          {
+                    "title": "Reducciones y Cancelaciones",
+                    "body": "Se permite una reducción de hasta el 10% del número de habitaciones contratadas sin gastos hasta 15 días antes de la llegada ({RELEASE_15}). Cancelaciones totales posteriores a esta fecha incurrirán en un 100% de gastos. [EN] A reduction of up to 10% of the number of rooms contracted without charge is allowed until 15 days before arrival ({RELEASE_15}). Total cancellations after this date will incur 100% charges."
+          },
+          {
+                    "title": "Rooming List y Régimen",
+                    "body": "La lista definitiva de ocupantes (Rooming List) deberá ser enviada antes del {RELEASE_7}. Cualquier cambio posterior queda sujeto a disponibilidad. [EN] The final list of occupants (Rooming List) must be sent before {RELEASE_7}. Any subsequent change is subject to availability."
+          }
+]
                 },
                 system: {
                     pin: "1234",
@@ -147,14 +204,25 @@
                         { label: "Desayuno", pax: 1, isService: true }
                     ],
                     clauses: [
-                        { title: "Cupo y Disponibilidad", body: "La presente oferta es válida por 48 horas. Dado que se requiere el bloqueo total de instalaciones, la disponibilidad no se garantiza hasta el primer depósito." },
-                        { title: "Confirmación y Depósito", body: "Bloqueo confirmado al recibir el 30% del total ({DEP_30}). El 70% restante deberá liquidarse 7 días antes de la entrada." },
-                        { title: "Política de Cancelación", body: "Al ser un evento de carácter exclusivo con bloqueo de inventario, todos los depósitos entregados tienen carácter de NO REEMBOLSABLES." },
-                        { title: "Rooming List", body: "La relación detallada de ocupantes deberá entregarse 5 días hábiles antes de la llegada del primer pasajero." }
-                    ],
+          {
+                    "title": "VALIDEZ Y DISPONIBILIDAD / VALIDITY & AVAILABILITY",
+                    "body": "Este presupuesto tiene una validez de 7 días. Las habitaciones no quedan bloqueadas y, pasado este plazo, tanto la disponibilidad como las tarifas pueden presentar cambios. [EN] This quote is valid for 7 days. Rooms are not blocked and, after this period, both availability and rates are subject to change."
+          },
+          {
+                    "title": "CÓMO CONFIRMAR / HOW TO CONFIRM",
+                    "body": "Para confirmar su reserva, simplemente responda a este correo manifestando su aceptación. Una vez recibida su respuesta, procederemos a bloquear las habitaciones y le enviaremos la confirmación definitiva. [EN] To confirm your booking, simply reply to this email stating your acceptance. Upon receipt, we will proceed to block the rooms and send you the final confirmation."
+          }
+],
                     confirmationClauses: [
-                        { title: "Firma y Aceptación", body: "La firma de este documento implica la aceptación total de los servicios indicados y condiciones pactadas." }
-                    ]
+          {
+                    "title": "CONFIRMACIÓN Y DEPÓSITO / CONFIRMATION & DEPOSIT",
+                    "body": "Para garantizar la reserva definitiva, se requiere un primer depósito del 30% ({DEP_30}) en concepto de garantía. La reserva no se considerará confirmada hasta la recepción del mismo. [EN] To guarantee the definitive reservation, a first deposit of 30% ({DEP_30}) is required as a guarantee. The reservation will not be considered confirmed until it is received."
+          },
+          {
+                    "title": "CALENDARIO DE PAGOS / PAYMENT SCHEDULE",
+                    "body": "El pago restante deberá realizarse según los plazos establecidos en el plan de pagos adjunto. [EN] The remaining payment must be made according to the deadlines established in the attached payment plan."
+          }
+]
                 }
             });
 
@@ -186,6 +254,25 @@
                 }
                 setLoading(false);
                 setTimeout(() => setMessage(null), 3000);
+            };
+
+            const handleTranslateClause = async (idx, fieldKey, hotel) => {
+                const currentList = [...(config[hotel][fieldKey] || [])];
+                const textToTranslate = currentList[idx].body.split('[EN]')[0].trim();
+                if (!textToTranslate) return;
+
+                try {
+                    const prompt = `Traduce el siguiente texto de un presupuesto de hotel al inglés. Mantén un tono profesional y corporativo. Devuelve SOLO el texto traducido, sin comillas ni introducciones: "${textToTranslate}"`;
+                    const translated = await window.callGemini(prompt);
+                    if (translated && !translated.includes('ERROR')) {
+                        currentList[idx].body = `${textToTranslate} [EN] ${translated.trim()}`;
+                        handleChange(hotel, fieldKey, currentList);
+                    } else {
+                        alert("Error en la traducción: " + translated);
+                    }
+                } catch (e) {
+                    alert("Error al conectar con la IA.");
+                }
             };
 
             const handleChange = (hotel, field, value) => {
@@ -387,21 +474,31 @@
                                                         Añadir
                                                     </button>
                                                 </div>
-                                                {(config.common?.[key] || []).map((clause, idx) => (
-                                                    <div key={idx} className="bg-slate-50 border border-slate-100 rounded-xl p-4 space-y-2">
+                                                {((config.common?.[key] || []).length > 0) && (config.common?.[key] || []).map((clause, idx) => (
+                                                    <div key={idx} className={`border border-slate-100 rounded-2xl p-5 space-y-4 relative group ${key === 'clauses' ? 'bg-indigo-50/30' : 'bg-emerald-50/30'}`}>
                                                         <div className="flex gap-2 items-start">
-                                                            <div className="flex-1 space-y-2">
-                                                                <input
-                                                                    type="text"
-                                                                    value={clause.title}
-                                                                    onChange={(e) => {
-                                                                        const arr = [...config.common[key]];
-                                                                        arr[idx] = { ...arr[idx], title: e.target.value };
-                                                                        handleChange('common', key, arr);
-                                                                    }}
-                                                                    className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm font-bold focus:border-[#2d5a43] outline-none"
-                                                                    placeholder="Título de la cláusula"
-                                                                />
+                                                            <div className="flex-1 space-y-3">
+                                                                <div className="flex gap-2">
+                                                                    <input
+                                                                        type="text"
+                                                                        value={clause.title}
+                                                                        onChange={(e) => {
+                                                                            const arr = [...config.common[key]];
+                                                                            arr[idx] = { ...arr[idx], title: e.target.value };
+                                                                            handleChange('common', key, arr);
+                                                                        }}
+                                                                        className="flex-1 bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm font-bold focus:border-[#2d5a43] outline-none shadow-sm"
+                                                                        placeholder="Título de la cláusula"
+                                                                    />
+                                                                    <button 
+                                                                        onClick={() => handleTranslateClause(idx, key, 'common')}
+                                                                        className={`px-3 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 shadow-sm ${key === 'clauses' ? 'bg-indigo-500 text-white hover:bg-indigo-600' : 'bg-emerald-500 text-white hover:bg-emerald-600'}`}
+                                                                        title="Traducir al Inglés con IA"
+                                                                    >
+                                                                        <LucideIcon name="languages" className="w-4 h-4" />
+                                                                        Traducir
+                                                                    </button>
+                                                                </div>
                                                                 <textarea
                                                                     value={clause.body}
                                                                     onChange={(e) => {
@@ -409,7 +506,7 @@
                                                                         arr[idx] = { ...arr[idx], body: e.target.value };
                                                                         handleChange('common', key, arr);
                                                                     }}
-                                                                    className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-600 focus:border-[#2d5a43] outline-none min-h-[70px] resize-none"
+                                                                    className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-600 focus:border-[#2d5a43] outline-none min-h-[80px] resize-none shadow-sm"
                                                                     placeholder="Cuerpo de la cláusula. Puedes usar {DEP_30} para el 30% del total."
                                                                 />
                                                             </div>
@@ -745,37 +842,46 @@
                                                 </div>
 
                                                 <div className="space-y-6">
-                                                    {config[activeHotel].clauses && config[activeHotel].clauses.map((clause, idx) => (
-                                                        <div key={idx} className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm relative group">
+                                                    {(config[activeHotel].clauses || []).map((clause, idx) => (
+                                                        <div key={idx} className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm relative group hover:border-indigo-200 transition-all">
                                                             <button
                                                                 onClick={() => {
                                                                     const newClauses = [...config[activeHotel].clauses];
                                                                     newClauses.splice(idx, 1);
                                                                     handleChange(activeHotel, 'clauses', newClauses);
                                                                 }}
-                                                                className="absolute top-4 right-4 text-slate-300 hover:text-red-500 transition-colors bg-white p-1 rounded opacity-0 group-hover:opacity-100"
+                                                                className="absolute top-4 right-4 text-slate-300 hover:text-red-500 transition-colors bg-white p-2 rounded-xl opacity-0 group-hover:opacity-100 shadow-sm border border-slate-100"
                                                                 title="Eliminar cláusula">
                                                                 <LucideIcon name="trash-2" size={16} />
                                                             </button>
 
-                                                            <div className="flex items-center gap-4 mb-4 pr-8">
-                                                                <span className="w-6 h-6 shrink-0 bg-slate-100 rounded-full flex items-center justify-center font-black text-slate-600 text-xs">
+                                                            <div className="flex items-center gap-4 mb-4 pr-12">
+                                                                <span className="w-8 h-8 shrink-0 bg-indigo-50 border border-indigo-100 rounded-xl flex items-center justify-center font-black text-indigo-600 text-xs">
                                                                     {idx + 1}
                                                                 </span>
-                                                                <input
-                                                                    type="text"
-                                                                    value={clause.title}
-                                                                    placeholder="Título de la cláusula (ej. Cupo y Disponibilidad)"
-                                                                    onChange={(e) => {
-                                                                        const newClauses = [...config[activeHotel].clauses];
-                                                                        newClauses[idx].title = e.target.value;
-                                                                        handleChange(activeHotel, 'clauses', newClauses);
-                                                                    }}
-                                                                    className="flex-1 bg-transparent border-b border-slate-200 py-1 text-sm font-bold text-slate-800 outline-none focus:border-[#2d5a43] transition-colors"
-                                                                />
+                                                                <div className="flex-1 flex gap-3">
+                                                                    <input
+                                                                        type="text"
+                                                                        value={clause.title}
+                                                                        placeholder="Título de la cláusula (ej. Cupo y Disponibilidad)"
+                                                                        onChange={(e) => {
+                                                                            const newClauses = [...config[activeHotel].clauses];
+                                                                            newClauses[idx].title = e.target.value;
+                                                                            handleChange(activeHotel, 'clauses', newClauses);
+                                                                        }}
+                                                                        className="flex-1 bg-transparent border-b border-slate-200 py-1 text-sm font-black text-slate-800 outline-none focus:border-indigo-500 transition-colors"
+                                                                    />
+                                                                    <button 
+                                                                        onClick={() => handleTranslateClause(idx, 'clauses', activeHotel)}
+                                                                        className="bg-indigo-50 text-indigo-600 px-3 py-1.5 rounded-xl text-[10px] font-black hover:bg-indigo-600 hover:text-white transition-all flex items-center gap-2"
+                                                                    >
+                                                                        <LucideIcon name="languages" className="w-3.5 h-3.5" />
+                                                                        TRADUCIR
+                                                                    </button>
+                                                                </div>
                                                             </div>
                                                             <textarea
-                                                                rows="2"
+                                                                rows="3"
                                                                 value={clause.body}
                                                                 placeholder="Contenido descriptivo de la cláusula..."
                                                                 onChange={(e) => {
@@ -783,7 +889,7 @@
                                                                     newClauses[idx].body = e.target.value;
                                                                     handleChange(activeHotel, 'clauses', newClauses);
                                                                 }}
-                                                                className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-slate-600 text-sm outline-none focus:border-[#2d5a43] transition-all resize-y ml-10 w-[calc(100%-2.5rem)]"
+                                                                className="w-full bg-slate-50/50 border border-slate-100 rounded-2xl px-5 py-4 text-slate-600 text-sm outline-none focus:border-indigo-400 transition-all resize-none ml-12 w-[calc(100%-3rem)] font-medium"
                                                             />
                                                         </div>
                                                     ))}
@@ -796,7 +902,7 @@
                                                         className="w-full flex items-center justify-center gap-2 py-4 border-2 border-dashed border-slate-200 rounded-2xl text-slate-400 font-bold hover:border-[#2d5a43] hover:text-[#2d5a43] hover:bg-emerald-50/50 transition-all text-sm"
                                                     >
                                                         <LucideIcon name="plus" className="w-4 h-4" />
-                                                        Añadir Nueva Cláusula
+                                                        Añadir Nueva Cláusula</button><button onClick={() => handleChange(activeHotel, "clauses", BUDGET_MODEL_TEMPLATES)} className="w-full flex items-center justify-center gap-2 py-3 mt-2 bg-indigo-50 text-indigo-600 rounded-2xl font-bold hover:bg-indigo-600 hover:text-white transition-all text-[10px] uppercase tracking-widest"><LucideIcon name="refresh-cw" className="w-3 h-3" /> Cargar Modelo Estándar (Presupuesto)
                                                     </button>
                                                 </div>
                                             </div>
@@ -813,36 +919,45 @@
                                                     <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Textos legales para la carta de confirmación</p>
                                                 </div>
                                             </div>
-                                            <div className="bg-slate-50 border border-slate-200 rounded-3xl p-6 md:p-8">
+                                            <div className="bg-slate-50 border border-emerald-100 rounded-[2rem] p-6 md:p-8">
                                                 <div className="space-y-6">
                                                     {(config[activeHotel].confirmationClauses || []).map((clause, idx) => (
-                                                        <div key={idx} className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm relative group">
+                                                        <div key={idx} className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm relative group hover:border-emerald-200 transition-all">
                                                             <button
                                                                 onClick={() => {
                                                                     const nc = [...(config[activeHotel].confirmationClauses || [])];
                                                                     nc.splice(idx, 1);
                                                                     handleChange(activeHotel, 'confirmationClauses', nc);
                                                                 }}
-                                                                className="absolute top-4 right-4 text-slate-300 hover:text-red-500 transition-colors bg-white p-1 rounded opacity-0 group-hover:opacity-100"
+                                                                className="absolute top-4 right-4 text-slate-300 hover:text-red-500 transition-colors bg-white p-2 rounded-xl opacity-0 group-hover:opacity-100 shadow-sm border border-slate-100"
                                                                 title="Eliminar cláusula">
                                                                 <LucideIcon name="trash-2" size={16} />
                                                             </button>
-                                                            <div className="flex items-center gap-4 mb-4 pr-8">
-                                                                <span className="w-6 h-6 shrink-0 bg-emerald-50 border border-emerald-200 rounded-full flex items-center justify-center font-black text-emerald-700 text-xs">{idx + 1}</span>
-                                                                <input
-                                                                    type="text"
-                                                                    value={clause.title}
-                                                                    placeholder="Título (ej. Firma y Aceptación)"
-                                                                    onChange={(e) => {
-                                                                        const nc = [...(config[activeHotel].confirmationClauses || [])];
-                                                                        nc[idx].title = e.target.value;
-                                                                        handleChange(activeHotel, 'confirmationClauses', nc);
-                                                                    }}
-                                                                    className="flex-1 bg-transparent border-b border-slate-200 py-1 text-sm font-bold text-slate-800 outline-none focus:border-emerald-500 transition-colors"
-                                                                />
+                                                            <div className="flex items-center gap-4 mb-4 pr-12">
+                                                                <span className="w-8 h-8 shrink-0 bg-emerald-50 border border-emerald-100 rounded-xl flex items-center justify-center font-black text-emerald-700 text-xs">{idx + 1}</span>
+                                                                <div className="flex-1 flex gap-3">
+                                                                    <input
+                                                                        type="text"
+                                                                        value={clause.title}
+                                                                        placeholder="Título (ej. Firma y Aceptación)"
+                                                                        onChange={(e) => {
+                                                                            const nc = [...(config[activeHotel].confirmationClauses || [])];
+                                                                            nc[idx].title = e.target.value;
+                                                                            handleChange(activeHotel, 'confirmationClauses', nc);
+                                                                        }}
+                                                                        className="flex-1 bg-transparent border-b border-slate-200 py-1 text-sm font-black text-slate-800 outline-none focus:border-emerald-500 transition-colors"
+                                                                    />
+                                                                    <button 
+                                                                        onClick={() => handleTranslateClause(idx, 'confirmationClauses', activeHotel)}
+                                                                        className="bg-emerald-50 text-emerald-600 px-3 py-1.5 rounded-xl text-[10px] font-black hover:bg-emerald-600 hover:text-white transition-all flex items-center gap-2"
+                                                                    >
+                                                                        <LucideIcon name="languages" className="w-3.5 h-3.5" />
+                                                                        TRADUCIR
+                                                                    </button>
+                                                                </div>
                                                             </div>
                                                             <textarea
-                                                                rows="2"
+                                                                rows="3"
                                                                 value={clause.body}
                                                                 placeholder="Contenido de la cláusula..."
                                                                 onChange={(e) => {
@@ -850,19 +965,19 @@
                                                                     nc[idx].body = e.target.value;
                                                                     handleChange(activeHotel, 'confirmationClauses', nc);
                                                                 }}
-                                                                className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-slate-600 text-sm outline-none focus:border-emerald-400 transition-all resize-y ml-10 w-[calc(100%-2.5rem)]"
+                                                                className="w-full bg-slate-50/50 border border-slate-100 rounded-2xl px-5 py-4 text-slate-600 text-sm outline-none focus:border-emerald-400 transition-all resize-none ml-12 w-[calc(100%-3rem)] font-medium"
                                                             />
                                                         </div>
                                                     ))}
                                                     <button
                                                         onClick={() => {
                                                             const current = config[activeHotel].confirmationClauses || [];
-                                                            handleChange(activeHotel, 'confirmationClauses', [...current, { title: "Nueva Cláusula", body: "" }]);
+                                                            handleChange(activeHotel, 'confirmationClauses', [...current, { title: "Nueva Cláusula Conf.", body: "" }]);
                                                         }}
                                                         className="w-full flex items-center justify-center gap-2 py-4 border-2 border-dashed border-emerald-200 rounded-2xl text-emerald-500 font-bold hover:border-emerald-500 hover:bg-emerald-50/50 transition-all text-sm"
                                                     >
                                                         <LucideIcon name="plus" className="w-4 h-4" />
-                                                        Añadir Cláusula de Confirmación
+                                                        Añadir Cláusula de Confirmación</button><button onClick={() => handleChange(activeHotel, "confirmationClauses", CONF_MODEL_TEMPLATES)} className="w-full flex items-center justify-center gap-2 py-3 mt-2 bg-emerald-50 text-emerald-600 rounded-2xl font-bold hover:bg-emerald-600 hover:text-white transition-all text-[10px] uppercase tracking-widest"><LucideIcon name="refresh-cw" className="w-3 h-3" /> Cargar Modelo Estándar (Confirmación)
                                                     </button>
                                                 </div>
                                             </div>

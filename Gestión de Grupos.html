@@ -707,14 +707,8 @@
         const reservaStr = String(g.Reserva || "");
 
         const isBudget =
-
           reservaStr.startsWith("PRES-") ||
-
-          String(g.uid || "").startsWith("PRES-") ||
-
-          (g.Estado || "").toUpperCase() === "PRESUPUESTO" ||
-
-          (g.Com_Estado_Interno || "").toUpperCase() === "PRESUPUESTO";
+          String(g.uid || "").startsWith("PRES-");
 
 
 
@@ -732,20 +726,13 @@
 
         ).toUpperCase();
 
+        // No ocultamos confirmados aquí para que el comercial pueda ver su historial reciente
         if (
-
-          rawStatus.includes("CONFIRM") ||
-
           rawStatus.includes("DESESTIMADO") ||
-
           rawStatus.includes("CANCEL") ||
-
           rawStatus.includes("ANUL")
-
         ) {
-
           return false;
-
         }
 
 
@@ -1183,30 +1170,27 @@
 
 
 
-        // 1. PASADO (Si la fecha de entrada ya pasó)
-
-        if (arrival && arrival < today) {
-
-          return {
-
-            color: "bg-slate-400",
-
-            text: "bg-slate-100 text-slate-500",
-
-            label: "PASADO",
-
-          };
-
-        }
-
-
-
-        // 0.5 GRUPOS (ALTO NIVEL DE PRIORIDAD ANTES DE TANTEO SI ES EXPLÍCITO)
-        if (s === "GRUPOS" || s === "GRUPO") {
+        // 1. CONFIRMADO / OK / BLOQUEADO (PRIORIDAD SOBRE PASADO)
+        if (
+          s.includes("CONF") ||
+          s.includes("OK") ||
+          s.includes("BLOQ") ||
+          s === "GRUPOS" ||
+          s === "GRUPO"
+        ) {
           return {
             color: "bg-emerald-500",
             text: "bg-emerald-100 text-emerald-700",
             label: "CONFIRMADO",
+          };
+        }
+
+        // 2. PASADO (Si la fecha de entrada ya pasó y NO está confirmado)
+        if (arrival && arrival < today) {
+          return {
+            color: "bg-slate-400",
+            text: "bg-slate-100 text-slate-500",
+            label: "PASADO",
           };
         }
 
@@ -1709,11 +1693,22 @@
 
       const processedData = useMemo(() => {
 
-        if (!data) return [];
-
-
-
-        let filtered = [...(data || [])];
+        // Pre-procesar campos costosos una sola vez
+        let filtered = (data || []).map(row => {
+          const normArrival = toInputDate(row["Entrada"]);
+          const stateProps = getStatusProps(
+            row["Com_Estado_Interno"] || row["Segment."],
+            row["Entrada"],
+            row["Estado"],
+          );
+          return {
+            ...row,
+            _normArrival: normArrival,
+            _stateLabel: stateProps.label.toLowerCase(),
+            _normReserva: normalizeId(row["Reserva"]).toLowerCase(),
+            _baseReserva: getBaseId(row["Reserva"]).toLowerCase()
+          };
+        });
 
 
 
@@ -1766,184 +1761,74 @@
 
 
         // 1. Filtro de Estado
-
         if (filterStatus !== "all") {
-
           filtered = filtered.filter((row) => {
-
-            const stateProps = getStatusProps(
-
-              row["Com_Estado_Interno"] || row["Segment."],
-
-              row["Entrada"],
-
-              row["Estado"],
-
-            );
-
-            const label = stateProps.label.toLowerCase();
-
-
+            const label = row._stateLabel;
 
             if (filterStatus === "activos") return label !== "cancelado" && label !== "desestimado" && label !== "pasado";
-
             if (filterStatus === "activos_y_desestimados") return label !== "pasado";
-
             if (filterStatus === "confirmada") return label === "confirmado";
-
             if (filterStatus === "tentativa") return label === "tentativa";
-
-            if (filterStatus === "presupuesto")
-
-              return label === "presupuesto";
-
+            if (filterStatus === "presupuesto") return label === "presupuesto";
             if (filterStatus === "desestimada") return label === "cancelado" || label === "desestimado";
-
             if (filterStatus === "pasado") return label === "pasado";
-
-
-
-            // Fallback case just in case something didn't match
-
             return true;
-
           });
-
         }
 
 
 
         // 2. Filtro de Tiempo
         if (filterTime !== "all" && filterStatus !== "pasado" && !startDate && !endDate) {
-
           filtered = filtered.filter((row) => {
-
-            const arrival = toInputDate(row["Entrada"]);
-
+            const arrival = row._normArrival;
             if (!arrival) return false;
-
             if (filterTime === "future") return arrival >= today;
-
             if (filterTime === "past") return arrival < today;
-
             return true;
-
           });
-
         }
 
 
 
         // 2.5 Filtro de Fecha (Rango Manual)
-
         if (startDate || endDate) {
-
           filtered = filtered.filter((row) => {
-
-            const arrival = toInputDate(row["Entrada"]);
-
+            const arrival = row._normArrival;
             if (!arrival) return false;
-
             if (startDate && arrival < startDate) return false;
-
             if (endDate && arrival > endDate) return false;
-
             return true;
-
           });
-
         }
 
 
 
         if (searchTerm) {
-
           const lowerTerm = searchTerm.toLowerCase();
-
-          const baseTerm = getBaseId(searchTerm).toLowerCase();
-
-          const isNumericTerm = /^\d+$/.test(baseTerm);
-
-
+          const isNumericTerm = /^\d+$/.test(lowerTerm);
 
           filtered = filtered.filter((row) => {
-
-            const res = (row["Reserva"] || "").toString();
-
-            const normRes = normalizeId(res).toLowerCase();
-
-            const baseRes = getBaseId(res).toLowerCase();
-
-
-
-            // Match logic
-
             const idMatch =
-
-              normRes.includes(lowerTerm) ||
-
-              baseRes === baseTerm ||
-
-              (isNumericTerm && baseRes.startsWith(baseTerm));
-
-
-
-            const stateProps = getStatusProps(
-
-              row["Com_Estado_Interno"] || row["Segment."],
-
-              row["Entrada"],
-
-              row["Estado"],
-
-            );
-
-            const stateLabel = (stateProps.label || "").toLowerCase();
-
-
+              row._normReserva.includes(lowerTerm) ||
+              row._baseReserva === lowerTerm ||
+              (isNumericTerm && row._baseReserva.startsWith(lowerTerm));
 
             return (
-
               idMatch ||
-
-              (row["Nombre del Grupo"] || "")
-
-                .toLowerCase()
-
-                .includes(lowerTerm) ||
-
-              (row["Empresa/Agencia"] || "")
-
-                .toLowerCase()
-
-                .includes(lowerTerm) ||
-
-              (row["Com_Comercial"] || "")
-
-                .toLowerCase()
-
-                .includes(lowerTerm) ||
-
+              (row["Nombre del Grupo"] || "").toLowerCase().includes(lowerTerm) ||
+              (row["Empresa/Agencia"] || "").toLowerCase().includes(lowerTerm) ||
+              (row["Com_Comercial"] || "").toLowerCase().includes(lowerTerm) ||
               (row["Segment."] || "").toLowerCase().includes(lowerTerm) ||
-
               (row["Entrada"] || "").toString().includes(lowerTerm) ||
-
-              toInputDate(row["Entrada"]).includes(lowerTerm) ||
-
+              row._normArrival.includes(lowerTerm) ||
               (row["Salida"] || "").toString().includes(lowerTerm) ||
-
               toInputDate(row["Salida"]).includes(lowerTerm) ||
-
               (row["Importe(*)"] || "").toString().includes(lowerTerm) ||
-
               (row["Pax."] || "").toString().includes(lowerTerm) ||
-
-              stateLabel.includes(lowerTerm)
-
+              row._stateLabel.includes(lowerTerm)
             );
-
           });
-
         }
 
 
@@ -2630,120 +2515,87 @@
 
 
 
-        const normId = normalizeId(reservaId);
+        const normId = normalizeId(reservaId).toLowerCase();
 
-
-
-        // Intentar buscar en groupedData primero (con los filtros actuales)
-
-        let group = groupedData.find((g) =>
-
-          g.records.some((r) => normalizeId(r["Reserva"]) === normId),
-
+        // 1. Buscar en la fuente cruda (data) para ver si existe
+        const matchInData = (data || []).find(r => 
+          normalizeId(r.Reserva).toLowerCase() === normId || 
+          normalizeId(r._docId || "").toLowerCase() === normId ||
+          normalizeId(r.uid || "").toLowerCase() === normId
         );
 
-
-
-        if (!group) {
-
-          // No encontrado con los filtros actuales: borrar filtros temporalmente para mostrarlo
-
-          if (filterStatus !== "all" || filterTime !== "all") {
-
-            setFilterStatus("all");
-
-            setFilterTime("all");
-
-            setSearchTerm("");
-
-            setKpiFilter(null);
-
-            return; // Re-ejecutar tras actualización de estado
-
+        if (!matchInData) {
+          // Si no existe en absoluto, limpiamos y salimos
+          if (data && data.length > 0) {
+            console.warn("❌ [Deep Link] ID no encontrado en DB:", normId);
+            safeStorage.removeItem("nexus_return_reserva");
+            if (rUrl) {
+              const newUrl = window.location.origin + window.location.pathname;
+              window.history.replaceState({}, document.title, newUrl);
+            }
           }
-
+          return;
         }
 
+        // 2. Buscar en el listado procesado/filtrado (groupedData)
+        const group = (groupedData || []).find((g) =>
+          g.id.toLowerCase() === normId ||
+          g.records.some(r => normalizeId(r.Reserva).toLowerCase() === normId || normalizeId(r._docId || "").toLowerCase() === normId)
+        );
 
+        if (!group) {
+          // Si existe en data pero no en groupedData, es que los filtros actuales lo bloquean.
+          // Abrimos filtros y esperamos al siguiente render.
+          if (filterStatus !== "all" || filterTime !== "all" || searchTerm !== "") {
+            setFilterStatus("all");
+            setFilterTime("all");
+            setSearchTerm("");
+            setKpiFilter(null);
+          }
+          return; 
+        }
 
+        // 3. Si lo encontramos en groupedData, lo abrimos
         if (group) {
-
-          // Limpieza de tokens
-
+          // Limpieza de tokens y URL
           safeStorage.removeItem("nexus_return_reserva");
-
           if (rUrl) {
-
             const newUrl = window.location.origin + window.location.pathname;
-
             window.history.replaceState({}, document.title, newUrl);
-
           }
 
+          // Restaurar los filtros por defecto SOLO si el grupo encaja en ellos.
+          const label = group.statusLabel?.toLowerCase() || "";
+          const arrival = group.arrival;
+          const today = new Date().toISOString().split("T")[0];
+          const isActivo = label !== "cancelado" && label !== "desestimado" && label !== "pasado";
+          const isFuturo = arrival && arrival >= today;
 
-
-          // Restaurar los filtros por defecto (Activos / Futuros) para que al cerrar la ficha los vea
-
-          setFilterStatus("activos");
-
-          setFilterTime("future");
+          if (isActivo && isFuturo) {
+            setFilterStatus("activos");
+            setFilterTime("future");
+          } else {
+            // Si el grupo es pasado/confirmado-antiguo, mantenemos "all" para asegurar visibilidad
+            setFilterStatus("all");
+            setFilterTime("all");
+          }
 
           setSearchTerm("");
-
           setKpiFilter(null);
 
-
-
           // Delay para asegurar que el DOM y el estado de React estén estables
-
           setTimeout(() => {
-
             openFicha(group);
-
-          }, 800);
-
-        } else {
-
-          console.warn(
-
-            "❌ [Deep Link] El ID no existe en la base de datos:",
-
-            normId,
-
-          );
-
-          safeStorage.removeItem("nexus_return_reserva");
-
-          if (rUrl) {
-
-            const newUrl = window.location.origin + window.location.pathname;
-
-            window.history.replaceState({}, document.title, newUrl);
-
-          }
-
-          // Restaurar filtros por defecto aunque no se encuentre
-
-          setFilterStatus("activos");
-
-          setFilterTime("future");
-
+          }, 400);
         }
 
       }, [
-
-        data?.length,
-
-        (groupedData || []).length,
-
+        data,
+        groupedData,
         filterStatus,
-
         filterTime,
-
         kpiFilter,
-
         searchTerm,
-
       ]);
 
 
@@ -3775,89 +3627,32 @@
       // --- Persistencia FIREBASE ---
 
       useEffect(() => {
-
         const unsubscribe = db.collection("groups").onSnapshot(
-
           (snapshot) => {
-
-            const roomData = [];
-
-            snapshot.forEach((doc) => {
-
-              const d = doc.data();
-
-              roomData.push({
-
-                ...d,
-
-                _docId: doc.id,
-
-                Reserva: d.Reserva || doc.id,
-
-              });
-
-            });
-
-
-
-            // DEDUPLICAR por ID normalizado: si hay docs "71375.0" y "71375" para la misma reserva,
-
-            // quedarnos solo con el más reciente (updatedAt) para evitar que el viejo sobreescriba al nuevo
-
             const dedupedMap = new Map();
-
-            roomData.forEach((row) => {
-
-              const normId = normalizeId(row.Reserva);
+            snapshot.forEach((doc) => {
+              const d = doc.data();
+              const reserva = d.Reserva || doc.id;
+              const normId = normalizeId(reserva);
+              const row = { ...d, _docId: doc.id, Reserva: reserva };
 
               const existing = dedupedMap.get(normId);
-
               if (!existing) {
-
                 dedupedMap.set(normId, row);
-
               } else {
-
-                // Preferir el doc cuyo _docId sea exactamente el normId (es el nuevo normalizado)
-
-                // o el que tenga updatedAt más reciente
-
                 const existingIsExact = existing._docId === normId;
-
                 const newIsExact = row._docId === normId;
-
                 if (newIsExact && !existingIsExact) {
-
                   dedupedMap.set(normId, row);
-
                 } else if (!newIsExact && existingIsExact) {
-
-                  // mantener existing
-
+                  // Keep existing
                 } else {
-
-                  // Ambos son exactos o ninguno: preferir el más reciente por updatedAt
-
-                  const existingTs = existing.updatedAt
-
-                    ? existing.updatedAt.seconds || 0
-
-                    : 0;
-
-                  const newTs = row.updatedAt
-
-                    ? row.updatedAt.seconds || 0
-
-                    : 0;
-
+                  const existingTs = existing.updatedAt?.seconds || 0;
+                  const newTs = row.updatedAt?.seconds || 0;
                   if (newTs > existingTs) dedupedMap.set(normId, row);
-
                 }
-
               }
-
             });
-
             const dedupedRoomData = Array.from(dedupedMap.values());
 
 
@@ -5578,17 +5373,17 @@
 
                      if (config.prices) {
 
-                        const pk = Object.keys(config.prices).find(k => k.toLowerCase() === v.type.toLowerCase());
+                        const pk = Object.keys(config.prices).find(k => k.trim().toLowerCase() === v.type.trim().toLowerCase());
 
                         price = pk ? parseFloat(config.prices[pk] || 0) : 0;
 
-                        const gk = config.gratuities ? Object.keys(config.gratuities).find(k => k.toLowerCase() === v.type.toLowerCase()) : null;
+                        const gratKey = config.gratuities ? Object.keys(config.gratuities).find(k => k.trim().toLowerCase() === v.type.trim().toLowerCase()) : null;
 
-                        gratuities = gk ? parseInt(config.gratuities[gk] || 0) : 0;
+                        gratuities = gratKey ? parseInt(config.gratuities[gratKey] || 0) : 0;
 
                      } else {
 
-                        const tk = Object.keys(config).find(k => k.toLowerCase() === v.type.toLowerCase());
+                        const tk = Object.keys(config).find(k => k.trim().toLowerCase() === v.type.trim().toLowerCase());
 
                         if (tk && config[tk]) {
 
@@ -5688,7 +5483,23 @@
 
                 const hotelName = group.hotel || group.records[0]?.["Hotel_Asignado"] || group.records[0]?.["Hotel"] || "H. Pendiente";
 
+                
+
+                // Filtramos cargos extra que sean duplicados del régimen
+
+                const regimesToFilter = ["PC", "MP", "AD", "HB", "FB", "SA", "RO", "BB", "HD", "TI"];
+
+                
+
                 group.extraCharges.forEach(ext => {
+
+                   const conceptNorm = (ext.concept || "").trim().toUpperCase();
+
+                   // Si el concepto es exactamente un régimen, lo saltamos (ya está en la línea de la habitación)
+
+                   if (regimesToFilter.includes(conceptNorm)) return;
+
+
 
                    const isGlobal = !ext.date || ext.date === 'Todas';
 
@@ -14745,55 +14556,39 @@
 
                                                     </div>
 
-                                                    {isLastUnpaid ? (
+                                                    <div className="flex items-center justify-center bg-blue-50 shadow-inner rounded px-1 min-w-[45px] h-6 border border-blue-100 mx-auto">
 
-                                                      <div className="flex items-center justify-center bg-blue-50 shadow-inner rounded px-1 min-w-[45px] h-6 border border-blue-100 mx-auto">
+                                                      <input
 
-                                                        <input
+                                                        type="number"
 
-                                                          type="number"
+                                                        className="bg-transparent border-none text-[11px] font-black text-blue-700 w-8 text-center outline-none"
 
-                                                          className="bg-transparent border-none text-[11px] font-black text-blue-700 w-8 text-center outline-none"
+                                                        defaultValue={dep.releaseDays}
 
-                                                          defaultValue={
+                                                        onBlur={(e) =>
 
-                                                            dep.releaseDays
+                                                          handlePlanChange(
 
-                                                          }
+                                                            idx,
 
-                                                          onBlur={(e) =>
+                                                            "releaseDays",
 
-                                                            handlePlanChange(
+                                                            e.target.value,
 
-                                                              idx,
+                                                          )
 
-                                                              "releaseDays",
+                                                        }
 
-                                                              e.target.value,
+                                                      />
 
-                                                            )
+                                                      <span className="text-[8px] font-black text-blue-400 ml-0.5 transition-colors">
 
-                                                          }
+                                                        D
 
-                                                        />
+                                                      </span>
 
-                                                        <span className="text-[8px] font-black text-blue-400 ml-0.5 transition-colors">
-
-                                                          D
-
-                                                        </span>
-
-                                                      </div>
-
-                                                    ) : (
-
-                                                      <div className="text-center text-[10px] font-bold text-slate-300">
-
-                                                        -
-
-                                                      </div>
-
-                                                    )}
+                                                    </div>
 
                                                     <div
 
