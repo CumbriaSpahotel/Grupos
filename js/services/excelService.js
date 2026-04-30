@@ -88,10 +88,25 @@
         const rowData = matrix[i];
         if (rowData.length === 0) continue;
         
+        const HEADER_ALIASES = {
+            "CÓDIGO": "Reserva", "CODIGO": "Reserva", "LOCALIZADOR": "Reserva", "RES.": "Reserva", "REF.": "Reserva",
+            "NOMBRE": "Nombre del Grupo", "GRUPO": "Nombre del Grupo", "CLIENTE": "Nombre del Grupo",
+            "AGENCIA": "Empresa/Agencia", "EMPRESA": "Empresa/Agencia",
+            "PAX": "Pax.", "PERS.": "Pax.", "PERSONAS": "Pax.",
+            "PERNOCTACIONES": "Pernoct.", "PERN.": "Pernoct.",
+            "RÉGIMEN": "Régimen", "REGIMEN": "Régimen",
+            "ESTADO": "Estado", "SITUACIÓN": "Estado", "SITUACION": "Estado",
+            "ENTRADA": "Entrada", "LLEGADA": "Entrada",
+            "SALIDA": "Salida",
+            "SEGMENTO": "Segment.", "SEGMENT.": "Segment."
+        };
+
         let rowObj = {};
         headers.forEach((h, idx) => {
             if (h && h !== "") {
-                rowObj[h] = rowData[idx] !== undefined ? rowData[idx] : "";
+                const upperH = h.toUpperCase();
+                const standardKey = HEADER_ALIASES[upperH] || h;
+                rowObj[standardKey] = rowData[idx] !== undefined ? rowData[idx] : "";
             }
         });
         
@@ -298,7 +313,7 @@
 
             const NUMERIC_KEYS = new Set(["Importe(*)", "Pax.", "Noches", "Pernoct.", "Cant. Habitaciones"]);
             const DATE_KEYS = new Set(["Entrada", "Salida"]);
-            const relevantKeys = ["Entrada", "Salida", "Pax.", "Importe(*)", "Régimen", "Segment.", "Nombre del Grupo", "Noches", "Pernoct.", "Empresa/Agencia", "Cant. Habitaciones"];
+            const relevantKeys = ["Estado", "Entrada", "Salida", "Pax.", "Importe(*)", "Régimen", "Segment.", "Nombre del Grupo", "Noches", "Pernoct.", "Empresa/Agencia", "Cant. Habitaciones"];
 
             relevantKeys.forEach((key) => {
                 const rawOld = existingRow[key];

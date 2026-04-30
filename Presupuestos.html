@@ -312,6 +312,12 @@
       }
       newData.DateRanges_JSON = Array.isArray(groupData.DateRanges_JSON) ? groupData.DateRanges_JSON : [];
       newData.tracking = Array.isArray(groupData.tracking) ? groupData.tracking : [];
+
+      // Sincronizar campos de contacto si faltan los comerciales
+      newData.Com_Nombre_Contacto = groupData.Com_Nombre_Contacto || groupData.Persona_Contacto || "";
+      newData.Com_Email_Contacto = groupData.Com_Email_Contacto || groupData.Email || "";
+      newData.Com_Telefono_Contacto = groupData.Com_Telefono_Contacto || groupData.Telefono || groupData.Teléfono || "";
+
       return newData;
     };
 
@@ -1771,21 +1777,21 @@
                       <span className="text-slate-200">|</span>
                       <span className="text-indigo-600 font-bold">{formatNum(calculatedTotal)} €</span>
                     </p>
-                    {(g.Com_Email_Contacto || g.Com_Telefono_Contacto || g.Com_Nombre_Contacto) && (
+                    {(g.Com_Email_Contacto || g.Email || g.Com_Telefono_Contacto || g.Telefono || g.Teléfono || g.Com_Nombre_Contacto || g.Persona_Contacto) && (
                       <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tight flex flex-wrap items-center gap-x-4 gap-y-1">
-                        {g.Com_Nombre_Contacto && (
+                        {(g.Com_Nombre_Contacto || g.Persona_Contacto) && (
                           <span className="flex items-center gap-1.5 text-slate-500">
-                            <i className="far fa-user text-slate-300"></i> {g.Com_Nombre_Contacto}
+                            <i className="far fa-user text-slate-300"></i> {g.Com_Nombre_Contacto || g.Persona_Contacto}
                           </span>
                         )}
-                        {g.Com_Email_Contacto && (
-                          <a href={`mailto:${g.Com_Email_Contacto}`} className="flex items-center gap-1.5 hover:text-indigo-600 transition-colors">
-                            <i className="far fa-envelope text-slate-300"></i> {g.Com_Email_Contacto}
+                        {(g.Com_Email_Contacto || g.Email) && (
+                          <a href={`mailto:${g.Com_Email_Contacto || g.Email}`} className="flex items-center gap-1.5 hover:text-indigo-600 transition-colors">
+                            <i className="far fa-envelope text-slate-300"></i> {g.Com_Email_Contacto || g.Email}
                           </a>
                         )}
-                        {g.Com_Telefono_Contacto && (
-                          <a href={`tel:${g.Com_Telefono_Contacto}`} className="flex items-center gap-1.5 hover:text-indigo-600 transition-colors">
-                            <i className="fas fa-phone-alt text-slate-300 text-[8px]"></i> {g.Com_Telefono_Contacto}
+                        {(g.Com_Telefono_Contacto || g.Telefono || g.Teléfono) && (
+                          <a href={`tel:${g.Com_Telefono_Contacto || g.Telefono || g.Teléfono}`} className="flex items-center gap-1.5 hover:text-indigo-600 transition-colors">
+                            <i className="fas fa-phone-alt text-slate-300 text-[8px]"></i> {g.Com_Telefono_Contacto || g.Telefono || g.Teléfono}
                           </a>
                         )}
                       </p>
@@ -1846,14 +1852,14 @@
                         <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Contacto</p>
                         <div className="flex items-center gap-3 bg-white border border-slate-100 p-3 rounded-xl">
                           <i className="far fa-user text-indigo-400"></i>
-                          <span className="text-xs font-bold text-slate-600">{g.Com_Nombre_Contacto || "No indicado"}</span>
+                          <span className="text-xs font-bold text-slate-600">{g.Com_Nombre_Contacto || g.Persona_Contacto || "No indicado"}</span>
                         </div>
                       </div>
                       <div>
                         <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Email</p>
                         <div className="flex items-center gap-3 bg-white border border-slate-100 p-3 rounded-xl overflow-hidden">
                           <i className="far fa-envelope text-indigo-400"></i>
-                          <span className="text-xs font-bold text-slate-600 truncate">{g.Com_Email_Contacto || "No indicado"}</span>
+                          <span className="text-xs font-bold text-slate-600 truncate">{g.Com_Email_Contacto || g.Email || "No indicado"}</span>
                         </div>
                       </div>
                     </div>
@@ -1963,24 +1969,24 @@
                       </div>
                     </div>
 
-                    {(g.Com_Nombre_Contacto || g.Com_Email_Contacto || g.Com_Telefono_Contacto) && (
+                    {(g.Com_Nombre_Contacto || g.Persona_Contacto || g.Com_Email_Contacto || g.Email || g.Com_Telefono_Contacto || g.Telefono || g.Teléfono) && (
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8 print:mb-6 border-t border-slate-50 pt-4">
-                        {g.Com_Nombre_Contacto && (
+                        {(g.Com_Nombre_Contacto || g.Persona_Contacto) && (
                           <div className="space-y-0.5">
                             <span className="text-[9px] print:text-[7px] font-black text-slate-400 uppercase tracking-widest">Contacto</span>
-                            <p className="text-xs print:text-[10px] font-bold text-slate-800 uppercase">{g.Com_Nombre_Contacto}</p>
+                            <p className="text-xs print:text-[10px] font-bold text-slate-800 uppercase">{g.Com_Nombre_Contacto || g.Persona_Contacto}</p>
                           </div>
                         )}
-                        {g.Com_Email_Contacto && (
+                        {(g.Com_Email_Contacto || g.Email) && (
                           <div className="space-y-0.5">
                             <span className="text-[9px] print:text-[7px] font-black text-slate-400 uppercase tracking-widest">Email</span>
-                            <p className="text-xs print:text-[10px] font-bold text-slate-800">{g.Com_Email_Contacto}</p>
+                            <p className="text-xs print:text-[10px] font-bold text-slate-800">{g.Com_Email_Contacto || g.Email}</p>
                           </div>
                         )}
-                        {g.Com_Telefono_Contacto && (
+                        {(g.Com_Telefono_Contacto || g.Telefono || g.Teléfono) && (
                           <div className="space-y-0.5">
                             <span className="text-[9px] print:text-[7px] font-black text-slate-400 uppercase tracking-widest">Teléfono</span>
-                            <p className="text-xs print:text-[10px] font-bold text-slate-800">{g.Com_Telefono_Contacto}</p>
+                            <p className="text-xs print:text-[10px] font-bold text-slate-800">{g.Com_Telefono_Contacto || g.Telefono || g.Teléfono}</p>
                           </div>
                         )}
                         {g["Empresa/Agencia"] && g["Empresa/Agencia"] !== "Venta Directa" && (
