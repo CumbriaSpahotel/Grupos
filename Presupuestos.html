@@ -319,8 +319,17 @@
       const [docMode, setDocMode] = useState('presupuesto'); // 'presupuesto' o 'confirmacion'
       const [filterTab, setFilterTab] = useState('activos'); // 'activos', 'confirmados', 'desestimados'
       const [searchTerm, setSearchTerm] = useState('');
+      const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
       const [startDate, setStartDate] = useState('');
       const [endDate, setEndDate] = useState('');
+
+      // Debounce search term
+      useEffect(() => {
+        const handler = setTimeout(() => {
+          setDebouncedSearchTerm(searchTerm);
+        }, 300);
+        return () => clearTimeout(handler);
+      }, [searchTerm]);
 
       useEffect(() => {
         const unsubscribe = db.collection("settings").doc("main").onSnapshot(doc => {
@@ -393,48 +402,54 @@
       const processedGroups = useMemo(() => {
         const todayStr = new Date().toISOString().split('T')[0];
 
-        return groups.filter(g => {
-          const intEst = (g.Com_Estado_Interno || "").toUpperCase();
-          const extEst = (g.Estado || "").toUpperCase();
-          const isCancelled = ["CANCEL", "ANUL", "GASTOS", "DESESTIMADO", "BAJA"].some(status => intEst.includes(status) || extEst.includes(status));
-          const isConfirmed = intEst.includes("CONFIRM") || extEst.includes("CONFIRM");
-          
-          const departureStr = g.Salida || g.Entrada || "";
-          const isPast = departureStr && departureStr < todayStr;
+        return groups
+          .map(rawG => {
+            const g = normalizeGroupData(rawG);
+            const totalAmount = calculateTotal(g);
+            return { ...g, _totalAmount: totalAmount };
+          })
+          .filter(g => {
+            const intEst = (g.Com_Estado_Interno || "").toUpperCase();
+            const extEst = (g.Estado || "").toUpperCase();
+            const isCancelled = ["CANCEL", "ANUL", "GASTOS", "DESESTIMADO", "BAJA"].some(status => intEst.includes(status) || extEst.includes(status));
+            const isConfirmed = intEst.includes("CONFIRM") || extEst.includes("CONFIRM");
+            
+            const departureStr = g.Salida || g.Entrada || "";
+            const isPast = departureStr && departureStr < todayStr;
 
-          // Filtro por Pestaña
-          if (filterTab === 'confirmados' && !isConfirmed) return false;
-          if (filterTab === 'desestimados' && !isCancelled) return false;
-          if (filterTab === 'activos') {
-            const isActiveStatus = ["PRESUPUESTO", "PENDIENTE", "ENVIADO", "SEGUIMIENTO"].some(s => intEst.includes(s));
-            if (isCancelled || isConfirmed || (isPast && !isActiveStatus)) return false;
-          }
+            // Filtro por Pestaña
+            if (filterTab === 'confirmados' && !isConfirmed) return false;
+            if (filterTab === 'desestimados' && !isCancelled) return false;
+            if (filterTab === 'activos') {
+              const isActiveStatus = ["PRESUPUESTO", "PENDIENTE", "ENVIADO", "SEGUIMIENTO"].some(s => intEst.includes(s));
+              if (isCancelled || isConfirmed || (isPast && !isActiveStatus)) return false;
+            }
 
-          // Filtro de Búsqueda
-          if (searchTerm) {
-            const term = searchTerm.toLowerCase();
-            const groupName = (g["Nombre del Grupo"] || "").toLowerCase();
-            const agency = (g["Empresa/Agencia"] || "").toLowerCase();
-            const resId = String(g.Reserva || "").toLowerCase();
-            const fullId = (g.uid || "").toLowerCase();
-            if (!groupName.includes(term) && !agency.includes(term) && !resId.includes(term) && !fullId.includes(term)) return false;
-          }
+            // Filtro de Búsqueda (usar debouncedSearchTerm)
+            if (debouncedSearchTerm) {
+              const term = debouncedSearchTerm.toLowerCase();
+              const groupName = (g["Nombre del Grupo"] || "").toLowerCase();
+              const agency = (g["Empresa/Agencia"] || "").toLowerCase();
+              const resId = String(g.Reserva || "").toLowerCase();
+              const fullId = (g.uid || "").toLowerCase();
+              if (!groupName.includes(term) && !agency.includes(term) && !resId.includes(term) && !fullId.includes(term)) return false;
+            }
 
-          // Filtro de Fecha (Rango Manual)
-          if (startDate || endDate) {
-            const entry = toInputDate(g.Entrada);
-            if (!entry) return false;
-            if (startDate && entry < startDate) return false;
-            if (endDate && entry > endDate) return false;
-          }
+            // Filtro de Fecha (Rango Manual)
+            if (startDate || endDate) {
+              const entry = toInputDate(g.Entrada);
+              if (!entry) return false;
+              if (startDate && entry < startDate) return false;
+              if (endDate && entry > endDate) return false;
+            }
 
-          return true;
-        }).sort((a, b) => {
-          const dateA = a.createdAt?.seconds ? a.createdAt.seconds : (a.createdAt ? new Date(a.createdAt).getTime() / 1000 : 0);
-          const dateB = b.createdAt?.seconds ? b.createdAt.seconds : (b.createdAt ? new Date(b.createdAt).getTime() / 1000 : 0);
-          return dateB - dateA;
-        });
-      }, [groups, filterTab, searchTerm, startDate, endDate]);
+            return true;
+          }).sort((a, b) => {
+            const dateA = a.createdAt?.seconds ? a.createdAt.seconds : (a.createdAt ? new Date(a.createdAt).getTime() / 1000 : 0);
+            const dateB = b.createdAt?.seconds ? b.createdAt.seconds : (b.createdAt ? new Date(b.createdAt).getTime() / 1000 : 0);
+            return dateB - dateA;
+          });
+      }, [groups, filterTab, debouncedSearchTerm, startDate, endDate]);
 
       const calculateTotal = (rawGroupData) => {
         const groupData = normalizeGroupData(rawGroupData);
@@ -853,9 +868,8 @@
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
-                  {processedGroups.map(rawG => {
-                    const g = normalizeGroupData(rawG);
-                    const totalAmount = calculateTotal(g);
+                  {processedGroups.map(g => {
+                    const totalAmount = g._totalAmount;
                     
                     let totalPaidFromPlan = 0;
                     try {

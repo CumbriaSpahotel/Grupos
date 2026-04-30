@@ -698,76 +698,87 @@
 
       const [searchTerm, setSearchTerm] = React.useState("");
 
+      const [debouncedSearchTerm, setDebouncedSearchTerm] = React.useState("");
+
       const [statusFilter, setStatusFilter] = React.useState("TODOS");
 
-
-
-      const budgetData = data.filter((g) => {
-
-        const reservaStr = String(g.Reserva || "");
-
-        const isBudget =
-          reservaStr.startsWith("PRES-") ||
-          String(g.uid || "").startsWith("PRES-");
+      React.useEffect(() => {
+        const handler = setTimeout(() => {
+          setDebouncedSearchTerm(searchTerm);
+        }, 300);
+        return () => clearTimeout(handler);
+      }, [searchTerm]);
 
 
 
-        if (!isBudget) return false;
+      const budgetData = React.useMemo(() => {
+        return data.filter((g) => {
+
+          const reservaStr = String(g.Reserva || "");
+
+          const isBudget =
+            reservaStr.startsWith("PRES-") ||
+            String(g.uid || "").startsWith("PRES-");
 
 
 
-        const rawStatus = (
-
-          g.Com_Estado_Interno ||
-
-          g.Estado ||
-
-          ""
-
-        ).toUpperCase();
-
-        // No ocultamos confirmados aquí para que el comercial pueda ver su historial reciente
-        if (
-          rawStatus.includes("DESESTIMADO") ||
-          rawStatus.includes("CANCEL") ||
-          rawStatus.includes("ANUL")
-        ) {
-          return false;
-        }
+          if (!isBudget) return false;
 
 
 
-        const term = searchTerm.toLowerCase();
+          const rawStatus = (
 
-        const name = (g["Nombre del Grupo"] || "").toLowerCase();
+            g.Com_Estado_Interno ||
 
-        const agency = (g["Empresa/Agencia"] || "").toLowerCase();
+            g.Estado ||
 
-        const reserva = reservaStr.toLowerCase();
+            ""
 
+          ).toUpperCase();
 
-
-        const matchesSearch =
-
-          name.includes(term) ||
-
-          agency.includes(term) ||
-
-          reserva.includes(term);
-
-        const matchesStatus =
-
-          statusFilter === "TODOS" || rawStatus.includes(statusFilter);
+          // No ocultamos confirmados aquí para que el comercial pueda ver su historial reciente
+          if (
+            rawStatus.includes("DESESTIMADO") ||
+            rawStatus.includes("CANCEL") ||
+            rawStatus.includes("ANUL")
+          ) {
+            return false;
+          }
 
 
 
-        return matchesSearch && matchesStatus;
+          const term = debouncedSearchTerm.toLowerCase();
 
-      }).sort((a, b) => {
-        const dateA = a.createdAt?.seconds ? a.createdAt.seconds : (a.createdAt ? new Date(a.createdAt).getTime() / 1000 : 0);
-        const dateB = b.createdAt?.seconds ? b.createdAt.seconds : (b.createdAt ? new Date(b.createdAt).getTime() / 1000 : 0);
-        return dateB - dateA;
-      });
+          const name = (g["Nombre del Grupo"] || "").toLowerCase();
+
+          const agency = (g["Empresa/Agencia"] || "").toLowerCase();
+
+          const reserva = reservaStr.toLowerCase();
+
+
+
+          const matchesSearch =
+
+            name.includes(term) ||
+
+            agency.includes(term) ||
+
+            reserva.includes(term);
+
+          const matchesStatus =
+
+            statusFilter === "TODOS" || rawStatus.includes(statusFilter);
+
+
+
+          return matchesSearch && matchesStatus;
+
+        }).sort((a, b) => {
+          const dateA = a.createdAt?.seconds ? a.createdAt.seconds : (a.createdAt ? new Date(a.createdAt).getTime() / 1000 : 0);
+          const dateB = b.createdAt?.seconds ? b.createdAt.seconds : (b.createdAt ? new Date(b.createdAt).getTime() / 1000 : 0);
+          return dateB - dateA;
+        });
+      }, [data, debouncedSearchTerm, statusFilter]);
 
 
 
@@ -1414,6 +1425,14 @@
       const [activeTab, setActiveTab] = useState("groups");
 
       const [searchTerm, setSearchTerm] = useState("");
+      const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
+
+      useEffect(() => {
+        const handler = setTimeout(() => {
+          setDebouncedSearchTerm(searchTerm);
+        }, 300);
+        return () => clearTimeout(handler);
+      }, [searchTerm]);
 
       const [newColumnName, setNewColumnName] = useState("");
 
@@ -1689,26 +1708,49 @@
 
 
 
+      // --- Normalización de Datos (Fuente de Verdad) ---
+
+      const normalizedData = useMemo(() => {
+
+        return (data || []).map(row => {
+
+          const normArrival = toInputDate(row["Entrada"]);
+
+          const stateProps = getStatusProps(
+
+            row["Com_Estado_Interno"] || row["Segment."],
+
+            row["Entrada"],
+
+            row["Estado"],
+
+          );
+
+          return {
+
+            ...row,
+
+            _normArrival: normArrival,
+
+            _stateLabel: stateProps.label.toLowerCase(),
+
+            _normReserva: normalizeId(row["Reserva"]).toLowerCase(),
+
+            _baseReserva: getBaseId(row["Reserva"]).toLowerCase()
+
+          };
+
+        });
+
+      }, [data]);
+
+
+
       // --- Procesamiento de Datos (Filtrado y Ordenación) ---
 
       const processedData = useMemo(() => {
 
-        // Pre-procesar campos costosos una sola vez
-        let filtered = (data || []).map(row => {
-          const normArrival = toInputDate(row["Entrada"]);
-          const stateProps = getStatusProps(
-            row["Com_Estado_Interno"] || row["Segment."],
-            row["Entrada"],
-            row["Estado"],
-          );
-          return {
-            ...row,
-            _normArrival: normArrival,
-            _stateLabel: stateProps.label.toLowerCase(),
-            _normReserva: normalizeId(row["Reserva"]).toLowerCase(),
-            _baseReserva: getBaseId(row["Reserva"]).toLowerCase()
-          };
-        });
+        let filtered = normalizedData;
 
 
 
@@ -1804,8 +1846,8 @@
 
 
 
-        if (searchTerm) {
-          const lowerTerm = searchTerm.toLowerCase();
+        if (debouncedSearchTerm) {
+          const lowerTerm = debouncedSearchTerm.toLowerCase();
           const isNumericTerm = /^\d+$/.test(lowerTerm);
 
           filtered = filtered.filter((row) => {
@@ -2180,29 +2222,17 @@
         return filtered;
 
       }, [
-
-        data,
-
+        normalizedData,
         filterStatus,
-
         filterTime,
-
-        searchTerm,
-
+        debouncedSearchTerm,
         kpiFilter,
-
         sortConfig,
-
         filterDirHotel,
-
         filterDirCommercial,
-
         showOnlyChanges,
-
         startDate,
-
         endDate,
-
       ]);
 
 
