@@ -238,7 +238,7 @@
     if (s.includes("CONFIRM")) return "bg-green-100 text-green-700 border-green-200";
     if (s.includes("ENVIADO")) return "bg-blue-100 text-blue-700 border-blue-200";
     if (s.includes("SEGUIMIENTO")) return "bg-indigo-100 text-indigo-700 border-indigo-200";
-    if (s.includes("DESESTIMADO") || s.includes("CANCEL")) return "bg-red-100 text-red-700 border-red-200";
+    if (s.includes("DESESTIMADO") || s.includes("CANCEL") || s.includes("CADUCADO")) return "bg-red-100 text-red-700 border-red-200";
     return "bg-amber-100 text-amber-700 border-amber-200";
   }
 

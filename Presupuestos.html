@@ -478,7 +478,7 @@
           .filter(g => {
             const intEst = (g.Com_Estado_Interno || "").toUpperCase();
             const extEst = (g.Estado || "").toUpperCase();
-            const isCancelled = ["CANCEL", "ANUL", "GASTOS", "DESESTIMADO", "BAJA"].some(status => intEst.includes(status) || extEst.includes(status));
+            const isCancelled = ["CANCEL", "ANUL", "GASTOS", "DESESTIMADO", "BAJA", "CADUCADO"].some(status => intEst.includes(status) || extEst.includes(status));
             const isConfirmed = intEst.includes("CONFIRM") || extEst.includes("CONFIRM");
             
             const departureStr = g.Salida || g.Entrada || "";
@@ -1031,6 +1031,7 @@
                             <option value="CONFIRMADO">Confirmado</option>
                             <option value="CANCELADO">Cancelado</option>
                             <option value="DESESTIMADO">Desestimado</option>
+                            <option value="CADUCADO">Caducado</option>
                           </select>
                         </td>
 
@@ -1106,6 +1107,8 @@
                     <option value="SEGUIMIENTO">Seguimiento</option>
                     <option value="CONFIRMADO">Confirmado</option>
                     <option value="CANCELADO">Cancelado</option>
+                    <option value="DESESTIMADO">Desestimado</option>
+                    <option value="CADUCADO">Caducado</option>
                   </select>
                 </div>
                 <div className="flex items-center gap-2">
@@ -1777,6 +1780,7 @@
                     <option value="CONFIRMADO">Confirmado</option>
                     <option value="CANCELADO">Cancelado</option>
                     <option value="DESESTIMADO">Desestimado</option>
+                    <option value="CADUCADO">Caducado</option>
                   </select>
                 </div>
 
