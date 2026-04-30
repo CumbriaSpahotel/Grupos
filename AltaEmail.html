@@ -563,6 +563,13 @@
                                                         <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">Pax</p>
                                                         <p className="text-sm font-black text-emerald-400">{extractedData["Pax."] || '0'} Pax</p>
                                                     </div>
+                                                    {(extractedData.Com_Email_Contacto || extractedData.Com_Telefono_Contacto) && (
+                                                        <div className="text-left border-l border-slate-700 pl-8 max-w-[200px]">
+                                                            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">Contacto</p>
+                                                            <p className="text-[10px] font-bold text-indigo-300 truncate">{extractedData.Com_Email_Contacto || ''}</p>
+                                                            <p className="text-[10px] font-bold text-slate-300">{extractedData.Com_Telefono_Contacto || ''}</p>
+                                                        </div>
+                                                    )}
                                                     <div className="text-center border-l border-slate-700 pl-8">
                                                         <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">Total Estimado</p>
                                                         <p className="text-xl font-black text-amber-400 tracking-tight">{calculateTotal(extractedData).toLocaleString('es-ES')}€</p>

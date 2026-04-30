@@ -3887,7 +3887,7 @@
 
             const allKeys = new Set();
 
-            roomData.forEach((r) =>
+            dedupedRoomData.forEach((r) =>
 
               Object.keys(r).forEach((k) => {
 
@@ -11742,56 +11742,56 @@
 
                                 </div>
 
-                                <p className="text-slate-300 text-[10px] font-bold uppercase tracking-[0.15em] mt-1.5 flex items-center gap-2">
-
+                                <p className="text-slate-300 text-[10px] font-bold uppercase tracking-[0.15em] mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
                                   <span className="text-white/60">
-
-                                    {selectedGroupFicha.records[0]?.[
-
-                                      "Empresa/Agencia"
-
-                                    ] || "VENTA DIRECTA"}
-
+                                    {selectedGroupFicha.records[0]?.["Empresa/Agencia"] || "VENTA DIRECTA"}
                                   </span>
-
                                   <span className="opacity-30">•</span>
-
                                   <span className="bg-white/10 px-1.5 py-0.5 rounded text-white">
-
                                     {selectedGroupFicha.totalPax} PAX
-
                                   </span>
-
                                   <span className="opacity-30">•</span>
-
                                   <span className="text-white/40">
-
                                     REF:{" "}
-
                                     {
-
                                       selectedGroupFicha.records[0]?.[
-
                                       "Reserva"
-
                                       ]
-
                                     }
-
                                   </span>
+
+                                  {(selectedGroupFicha.records[0]?.["Com_Nombre_Contacto"] || selectedGroupFicha.records[0]?.["Com_Email_Contacto"] || selectedGroupFicha.records[0]?.["Com_Telefono_Contacto"]) && (
+                                    <>
+                                      <span className="opacity-30">•</span>
+                                      <span className="flex items-center gap-3 text-white/70">
+                                        {selectedGroupFicha.records[0]?.["Com_Nombre_Contacto"] && (
+                                          <span className="flex items-center gap-1.5 font-black text-white/90">
+                                            <IconUser size={12} className="opacity-60" />
+                                            {selectedGroupFicha.records[0]?.["Com_Nombre_Contacto"]}
+                                          </span>
+                                        )}
+                                        {selectedGroupFicha.records[0]?.["Com_Email_Contacto"] && (
+                                          <span className="flex items-center gap-1">
+                                            <IconMail size={12} className="opacity-60" />
+                                            {selectedGroupFicha.records[0]?.["Com_Email_Contacto"]}
+                                          </span>
+                                        )}
+                                        {selectedGroupFicha.records[0]?.["Com_Telefono_Contacto"] && (
+                                          <span className="flex items-center gap-1">
+                                            <IconPhone size={12} className="opacity-60" />
+                                            {selectedGroupFicha.records[0]?.["Com_Telefono_Contacto"]}
+                                          </span>
+                                        )}
+                                      </span>
+                                    </>
+                                  )}
 
                                   {(
-
                                     selectedGroupFicha.records[0]?.[
-
                                     "Reserva"
-
                                     ] || ""
-
                                   )
-
                                     .toString()
-
                                     .startsWith("PRES") && (
 
                                       <>

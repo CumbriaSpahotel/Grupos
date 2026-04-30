@@ -398,7 +398,14 @@
             <div class="header-info-container">
                 <div id="header-address-line" class="font-bold">C/ Guadiana, 36</div>
                 <div id="header-city-line">13002 - Ciudad Real (España)</div>
-                <div id="header-tel-line">Telf.: (+34) <span id="header-tel-val">926 22 33 13</span></div>
+                <div class="flex items-center justify-center gap-3 mt-1" style="font-size: 9.5px;">
+                    <div id="header-tel-line">Telf.: (+34) <span id="header-tel-val">926 22 33 13</span></div>
+                    <div class="w-px h-3 bg-slate-200"></div>
+                    <div id="header-email-line">Email: <span id="header-email-val">info@hotelguadiana.es</span></div>
+                    <div class="w-px h-3 bg-slate-200"></div>
+                    <div id="header-nif-line">NIF: <span id="header-nif-val">B87067302</span></div>
+                </div>
+                <div id="header-web-line" class="mt-1 font-bold text-slate-400" style="font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase;">www.hotelguadiana.es</div>
             </div>
 
             <div class="header-title-container">
@@ -516,7 +523,21 @@
                                 style="display:block;">&nbsp;</div>
                             <div class="editable uppercase" id="client-city" contenteditable="true"
                                 style="display:block;">&nbsp;</div>
-                            <div class="mt-4 font-bold text-black uppercase">
+                            <div class="mt-3 pt-3 border-t border-slate-200 space-y-1">
+                                <div class="flex items-center gap-2">
+                                    <span class="font-bold text-[8px] uppercase text-slate-400 w-16">Contacto:</span>
+                                    <span class="editable text-black font-bold uppercase" id="solicitante-nombre-2" contenteditable="true">&nbsp;</span>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <span class="font-bold text-[8px] uppercase text-slate-400 w-16">Email:</span>
+                                    <span class="editable text-slate-600" id="solicitante-email-2" contenteditable="true">&nbsp;</span>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <span class="font-bold text-[8px] uppercase text-slate-400 w-16">Teléfono:</span>
+                                    <span class="editable text-slate-600" id="solicitante-tel-2" contenteditable="true">&nbsp;</span>
+                                </div>
+                            </div>
+                            <div class="mt-3 font-bold text-black uppercase">
                                 N.I.F. / CIF: <span class="editable" id="client-nif"
                                     contenteditable="true">&nbsp;</span>
                             </div>
@@ -925,7 +946,7 @@
         function syncFields() {
             // Sync all fields EXCEPT reserva-id (proforma uses fixed "PROFORMA" text)
             const fields = [
-                'fecha-proforma', 'solicitante-org', 'solicitante-nombre', 'solicitante-email',
+                'fecha-proforma', 'solicitante-org', 'solicitante-nombre', 'solicitante-email', 'solicitante-tel',
                 'reserva-personas', 'reserva-entrada', 'reserva-salida',
                 'client-address', 'client-city', 'client-nif',
                 'f-pax-name', 'f-pax-count', 'f-date-in', 'f-date-out', 'f-room-summary', 'programa'
@@ -1516,9 +1537,15 @@
             const hAddr = document.getElementById('header-address-line');
             const hCity = document.getElementById('header-city-line');
             const hTel = document.getElementById('header-tel-val');
+            const hEmail = document.getElementById('header-email-val');
+            const hNif = document.getElementById('header-nif-val');
+            const hWeb = document.getElementById('header-web-val') || document.getElementById('header-web-line');
             if (hAddr) hAddr.innerText = h.address;
             if (hCity) hCity.innerText = `${h.cp} - ${h.city} (España)`;
             if (hTel) hTel.innerText = h.tel;
+            if (hEmail) hEmail.innerText = h.email;
+            if (hNif) hNif.innerText = h.nif;
+            if (hWeb) hWeb.innerText = h.web;
             const legalVertical = document.getElementById('global-vertical-legal');
             if (legalVertical) legalVertical.innerHTML = `<span class="italic">${h.company} &nbsp;&nbsp;&nbsp; ${h.address} &middot; ${h.cp} ${h.city} &nbsp;&nbsp;&nbsp; ${h.legal} ${h.irus ? `&nbsp;&nbsp;&nbsp; IRUS: ${h.irus}` : ''} &nbsp;&nbsp;&nbsp; N.I.F. ${h.nif}</span>`;
 

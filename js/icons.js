@@ -127,6 +127,7 @@
         IconFileInvoice: "file-text",
         IconCheckCircle: "circle-check",
         IconXCircle: "circle-x",
+        IconPhone: "phone",
         IconPhoneForwarded: "phone-forwarded",
         IconClipboardX: "clipboard-x",
         IconBuilding2: "building-2",
