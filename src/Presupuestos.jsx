@@ -1,0 +1,2161 @@
+
+    const { useState, useEffect, useMemo } = React;
+
+    // --- FIREBASE ---
+    const db = window.db;
+
+    // --- CONSTANTES ---
+    const ROOM_TYPES = {
+      "Sercotel Guadiana": ["DOBLE DE USO INDIVIDUAL", "DOBLE", "DOBLE + SUPLETORIA", "CUÁDRUPLE"],
+      "Cumbria Spa&Hotel": ["DOBLE DE USO INDIVIDUAL", "DOBLE", "DOBLE + SUPLETORIA"]
+    };
+
+    const BOARD_TYPES = [
+      "SA (Solo Alojamiento)",
+      "AD (Alojamiento y Desayuno)",
+      "MP (Media Pensión)",
+      "PC (Pensión Completa)"
+    ];
+
+    // Personas por tipo de habitación (auto-cálculo PAX)
+    const PAX_PER_ROOM = {
+      // Nuevos tipos oficiales
+      "DOBLE DE USO INDIVIDUAL": 1,
+      "DOBLE": 2,
+      "DOBLE + SUPLETORIA": 3,
+      "CUÁDRUPLE": 4,
+      // Retrocompatibilidad
+      "Doble Individual": 1,
+      "Doble de Uso Individual": 1,
+      "Doble 2 Camas": 2,
+      "Doble Matrimonial": 2,
+      "Doble": 2,
+      "Doble + Supletoria": 3,
+      "Triple": 3,
+      "Junior Suite": 2,
+      "Cuádruple": 4,
+    };
+
+    // --- UTILS (cargadas desde js/utils.js) ---
+    const generateDates = NexusUtils.generateDates;
+    const generateSeriesDates = NexusUtils.generateSeriesDates;
+    const formatDate = NexusUtils.formatDate;
+    const formatNum = NexusUtils.formatNum;
+    const getStatusColor = NexusUtils.getStatusColor;
+    const toInputDate = NexusUtils.toInputDate;
+
+    const DEFAULT_FORM_DATA = {
+      Hotel_Asignado: 'Sercotel Guadiana',
+      "Nombre del Grupo": '',
+      Com_Nombre_Contacto: '',
+      Com_Email_Contacto: '',
+      Com_Telefono_Contacto: '',
+      Entrada: '',
+      Salida: '',
+      DateRanges_JSON: [],
+      roomCounts: {},
+      dailyConfig: {},
+      Com_Notas: '',
+      Com_Estado_Interno: 'PRESUPUESTO',
+      clauses: [],
+      clauses_conf: []
+    };
+
+    const ROOM_MIGRATION_MAP = {
+      "doble individual": "DOBLE DE USO INDIVIDUAL",
+      "doble de uso individual": "DOBLE DE USO INDIVIDUAL",
+      "doble 2 camas": "DOBLE",
+      "doble matrimonial": "DOBLE",
+      "doble": "DOBLE",
+      "doble + supletoria": "DOBLE + SUPLETORIA",
+      "triple": "DOBLE + SUPLETORIA",
+      "junior suite": "DOBLE",
+      "cuádruple": "CUÁDRUPLE"
+    };
+
+    const BUDGET_DEFAULT_CLAUSES = [
+      { title: "Cupo y Disponibilidad", body: "La presente oferta es válida por 48 horas. Dado que se requiere el bloqueo total de instalaciones, la disponibilidad no se garantiza hasta el primer depósito." },
+      { title: "Confirmación y Depósito", body: "Bloqueo confirmado al recibir el 30% del total ({DEP_30}). El 70% restante deberá liquidarse 7 días antes de la entrada." },
+      { title: "Política de Cancelación", body: "Al ser un evento de carácter exclusivo con bloqueo de inventario, todos los depósitos entregados tienen carácter de NO REEMBOLSABLES." },
+      { title: "Rooming List", body: "La relación detallada de ocupantes deberá entregarse 5 días hábiles antes de la llegada del primer pasajero." }
+    ];
+
+    const CONF_DEFAULT_CLAUSES = [
+      { title: "Confirmación y Depósito", body: "Para garantizar la reserva definitiva, se requiere un primer depósito del 30% ({DEP_30}) en concepto de garantía. La reserva no se considerará confirmada hasta la recepción del mismo." },
+      { title: "Calendario de Pagos y Release", body: "Se establece un release de 30 días previos a la entrada ({RELEASE_30}), fecha en la cual el hotel deberá haber recibido el 50% del total ({DEP_50}). El pago final del 100% ({DEP_100}) deberá estar liquidado 7 días antes de la llegada ({RELEASE_7})." },
+      { title: "Reducciones y Cancelaciones", body: "Se permite una reducción de hasta el 10% del número de habitaciones contratadas sin gastos hasta 15 días antes de la llegada ({RELEASE_15}). Cancelaciones totales posteriores a esta fecha incurrirán en un 100% de gastos." },
+      { title: "Rooming List y Régimen", body: "La lista definitiva de ocupantes (Rooming List) deberá ser enviada antes del {RELEASE_7}. Cualquier cambio posterior queda sujeto a disponibilidad." }
+    ];
+
+    const normalizeGroupData = (groupData) => {
+      if (!groupData) return null;
+      const newData = { ...groupData };
+      
+      // Normalizar Hotel
+      newData.Hotel_Asignado = groupData.Hotel_Asignado || groupData.Hotel || "";
+      if (!newData.Hotel_Asignado) {
+        const lowerName = (newData["Nombre del Grupo"] || "").toLowerCase();
+        if (lowerName.includes("cumbria")) newData.Hotel_Asignado = "Cumbria Spa&Hotel";
+        else if (lowerName.includes("guadiana")) newData.Hotel_Asignado = "Sercotel Guadiana";
+      }
+
+      const newRoomCounts = {};
+      Object.entries(newData.roomCounts || {}).forEach(([oldType, count]) => {
+        const normOld = oldType.toLowerCase();
+        const newType = ROOM_MIGRATION_MAP[normOld] || oldType.toUpperCase();
+        newRoomCounts[newType] = (newRoomCounts[newType] || 0) + Number(count);
+      });
+      newData.roomCounts = newRoomCounts;
+
+      if (newData.dailyConfig) {
+        newData.dailyConfig = { ...newData.dailyConfig };
+        Object.entries(newData.dailyConfig).forEach(([date, dayConf]) => {
+          const newDayConf = { ...dayConf };
+
+          if (newDayConf.prices) {
+            const newPrices = {};
+            Object.entries(newDayConf.prices).forEach(([oldType, price]) => {
+              const normOld = oldType.toLowerCase();
+              const newType = ROOM_MIGRATION_MAP[normOld] || oldType.toUpperCase();
+              newPrices[newType] = price;
+            });
+            newDayConf.prices = newPrices;
+          }
+          // The other legacy configuration mode
+          Object.keys(newDayConf).forEach(oldType => {
+            if (oldType !== 'board' && oldType !== 'prices') {
+              const normOld = oldType.toLowerCase();
+              if (ROOM_MIGRATION_MAP[normOld] || ['doble', 'triple'].some(x => normOld.includes(x))) {
+                const newType = ROOM_MIGRATION_MAP[normOld] || oldType.toUpperCase();
+                if (oldType !== newType) {
+                  newDayConf[newType] = newDayConf[oldType];
+                  delete newDayConf[oldType];
+                }
+              }
+            }
+          });
+        });
+      }
+      newData.DateRanges_JSON = Array.isArray(groupData.DateRanges_JSON) ? groupData.DateRanges_JSON : [];
+      newData.tracking = Array.isArray(groupData.tracking) ? groupData.tracking : [];
+
+      // Sincronizar campos de contacto si faltan los comerciales
+      newData.Com_Nombre_Contacto = groupData.Com_Nombre_Contacto || groupData.Persona_Contacto || "";
+      newData.Com_Email_Contacto = groupData.Com_Email_Contacto || groupData.Email || "";
+      newData.Com_Telefono_Contacto = groupData.Com_Telefono_Contacto || groupData.Telefono || groupData.Teléfono || "";
+
+      return newData;
+    };
+
+    const calculateTotal = (rawGroupData) => {
+      const groupData = normalizeGroupData(rawGroupData);
+      if (!groupData) return 0;
+
+      let dates = [];
+      if (groupData.DateRanges_JSON && Array.isArray(groupData.DateRanges_JSON) && groupData.DateRanges_JSON.length > 0) {
+        dates = generateSeriesDates(groupData.DateRanges_JSON);
+      } else {
+        dates = generateDates(groupData.Entrada, groupData.Salida);
+      }
+      let total = 0;
+      dates.forEach(date => {
+        const config = groupData.dailyConfig?.[date] || {};
+        Object.entries(groupData.roomCounts || {}).forEach(([type, globalCount]) => {
+          let count = globalCount;
+          if (config.counts) {
+            const countKey = Object.keys(config.counts).find(k => k.toLowerCase() === type.toLowerCase());
+            if (countKey && config.counts[countKey] !== '' && config.counts[countKey] !== undefined) {
+              count = Number(config.counts[countKey]);
+            }
+          }
+          if (count > 0) {
+            let lineSubtotal = 0;
+            if (config.prices) {
+              const priceKey = Object.keys(config.prices).find(k => k.toLowerCase() === type.toLowerCase());
+              const p = priceKey ? parseFloat(config.prices[priceKey] || 0) : 0;
+              
+              const gratKey = config.gratuities ? Object.keys(config.gratuities).find(k => k.toLowerCase() === type.toLowerCase()) : null;
+              const grat = gratKey ? parseInt(config.gratuities[gratKey] || 0) : 0;
+              
+              const billableCount = Math.max(0, count - grat);
+              lineSubtotal = p * billableCount;
+            } else {
+              const typeKey = Object.keys(config).find(k => k.toLowerCase() === type.toLowerCase());
+              if (typeKey && config[typeKey]) {
+                const price = parseFloat(config[typeKey].price) || 0;
+                const discount = parseFloat(config[typeKey].discount) || 0;
+                const gratuities = parseInt(config[typeKey].gratuities) || 0;
+                const billableCount = Math.max(0, count - gratuities);
+                lineSubtotal = billableCount * price * (1 - discount / 100);
+              }
+            }
+            total += lineSubtotal;
+          }
+        });
+      });
+      // Suplementos y Descuentos Globales
+      const suplementos = parseFloat(groupData.Suplementos) || 0;
+      const descuentos = parseFloat(groupData.Descuentos) || 0;
+      total = total + suplementos - descuentos;
+
+      // Otros Cargos (Extras Dinámicos)
+      const extras = groupData.extraCharges || [];
+      extras.forEach(extra => {
+        const isGlobal = !extra.date;
+        const px = parseFloat(extra.price) || 0;
+        total += isGlobal ? (px * Math.max(1, dates.length)) : px;
+      });
+
+      // Si no hay configuración diaria pero hay un importe fijado (desde IA)
+      if (total === 0 && groupData["Importe(*)"]) {
+        const imp = parseFloat(String(groupData["Importe(*)"]).replace(',', '.'));
+        return isNaN(imp) ? 0 : imp;
+      }
+      return total > 0 ? total : 0;
+    };
+
+    function App() {
+      const [groups, setGroups] = useState([]);
+      const [loading, setLoading] = useState(true);
+      const [currentView, setCurrentView] = useState('dashboard');
+      const [selectedGroup, setSelectedGroup] = useState(null);
+      const [newNote, setNewNote] = useState('');
+      const [globalConfig, setGlobalConfig] = useState(null);
+      const [isEditingClauses, setIsEditingClauses] = useState(false);
+      const [tempClauses, setTempClauses] = useState([]);
+      const [tempClausesConf, setTempClausesConf] = useState([]);
+      const [isEditingClausesConf, setIsEditingClausesConf] = useState(false);
+      const [docMode, setDocMode] = useState('presupuesto'); // 'presupuesto' o 'confirmacion'
+      const [filterTab, setFilterTab] = useState('activos'); // 'activos', 'confirmados', 'desestimados'
+      const [searchTerm, setSearchTerm] = useState('');
+      const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
+      const [startDate, setStartDate] = useState('');
+      const [endDate, setEndDate] = useState('');
+
+      // Debounce search term
+      useEffect(() => {
+        const handler = setTimeout(() => {
+          setDebouncedSearchTerm(searchTerm);
+        }, 300);
+        return () => clearTimeout(handler);
+      }, [searchTerm]);
+
+      useEffect(() => {
+        const unsubscribe = db.collection("settings").doc("main").onSnapshot(doc => {
+          if (doc.exists) {
+            setGlobalConfig(doc.data());
+          }
+        });
+        return () => unsubscribe();
+      }, []);
+
+      const getCurrentStayDates = (data = formData) => {
+        if (data.DateRanges_JSON && Array.isArray(data.DateRanges_JSON) && data.DateRanges_JSON.length > 0) {
+          return generateSeriesDates(data.DateRanges_JSON);
+        }
+        return generateDates(data.Entrada, data.Salida);
+      };
+
+      const [formData, setFormData] = useState(DEFAULT_FORM_DATA);
+
+      // Cargar datos y manejar parámetros de URL
+      useEffect(() => {
+        const unsubscribe = db.collection("groups")
+          .onSnapshot((snapshot) => {
+            const docs = snapshot.docs.map(doc => ({
+              uid: doc.id,
+              ...doc.data()
+            })).filter(g => {
+              const est = (g.Estado || "").toUpperCase();
+              const intEst = (g.Com_Estado_Interno || "").toUpperCase();
+
+              const isBudget =
+                String(g.Reserva || "").startsWith("PRES-") ||
+                est.includes("PRESUPUESTO") ||
+                intEst.includes("PRESUPUESTO") ||
+                intEst.includes("ENVIADO") ||
+                intEst.includes("SEGUIMIENTO") ||
+                intEst.includes("PENDIENTE");
+
+              if (!isBudget) return false;
+
+              // En el cargador general de Presupuestos, permitimos todos los estados
+              // (la lógica de visualización se encarga de filtrar por la pestaña seleccionada)
+              return true;
+            });
+            setGroups(docs);
+            setLoading(false);
+
+            // Lógica de Deep-link (?id=XXXX)
+            const urlParams = new URLSearchParams(window.location.search);
+            const budgetId = urlParams.get('id');
+            const shouldEdit = urlParams.get('edit') === '1';
+
+            if (budgetId && docs.length > 0) {
+              const matched = docs.find(g => String(g.Reserva) === String(budgetId) || String(g.uid) === String(budgetId));
+              if (matched) {
+                const normMatched = normalizeGroupData(matched);
+                if (shouldEdit) {
+                  setFormData(normMatched);
+                  setCurrentView('create');
+                } else {
+                  handleOpenDetail(normMatched);
+                }
+                window.history.replaceState({}, document.title, window.location.pathname);
+              }
+            }
+          });
+        return () => unsubscribe();
+      }, []);
+
+      const processedGroups = useMemo(() => {
+        const todayStr = new Date().toISOString().split('T')[0];
+
+        return groups
+          .map(rawG => {
+            const g = normalizeGroupData(rawG);
+            const totalAmount = calculateTotal(g);
+            return { ...g, _totalAmount: totalAmount };
+          })
+          .filter(g => {
+            const intEst = (g.Com_Estado_Interno || "").toUpperCase();
+            const extEst = (g.Estado || "").toUpperCase();
+            const isCancelled = ["CANCEL", "ANUL", "GASTOS", "DESESTIMADO", "BAJA", "CADUCADO"].some(status => intEst.includes(status) || extEst.includes(status));
+            const isConfirmed = intEst.includes("CONFIRM") || extEst.includes("CONFIRM");
+            
+            const departureStr = g.Salida || g.Entrada || "";
+            const isPast = departureStr && departureStr < todayStr;
+
+            // Filtro por Pestaña
+            if (filterTab === 'confirmados' && !isConfirmed) return false;
+            if (filterTab === 'desestimados' && !isCancelled) return false;
+            if (filterTab === 'activos') {
+              const isActiveStatus = ["PRESUPUESTO", "PENDIENTE", "ENVIADO", "SEGUIMIENTO"].some(s => intEst.includes(s));
+              if (isCancelled || isConfirmed || (isPast && !isActiveStatus)) return false;
+            }
+
+            // Filtro de Búsqueda (usar debouncedSearchTerm)
+            if (debouncedSearchTerm) {
+              const term = debouncedSearchTerm.toLowerCase();
+              const groupName = (g["Nombre del Grupo"] || "").toLowerCase();
+              const agency = (g["Empresa/Agencia"] || "").toLowerCase();
+              const resId = String(g.Reserva || "").toLowerCase();
+              const fullId = (g.uid || "").toLowerCase();
+              if (!groupName.includes(term) && !agency.includes(term) && !resId.includes(term) && !fullId.includes(term)) return false;
+            }
+
+            // Filtro de Fecha (Rango Manual)
+            if (startDate || endDate) {
+              const entry = toInputDate(g.Entrada);
+              if (!entry) return false;
+              if (startDate && entry < startDate) return false;
+              if (endDate && entry > endDate) return false;
+            }
+
+            return true;
+          }).sort((a, b) => {
+            const dateA = a.createdAt?.seconds ? a.createdAt.seconds : (a.createdAt ? new Date(a.createdAt).getTime() / 1000 : 0);
+            const dateB = b.createdAt?.seconds ? b.createdAt.seconds : (b.createdAt ? new Date(b.createdAt).getTime() / 1000 : 0);
+            return dateB - dateA;
+          });
+      }, [groups, filterTab, debouncedSearchTerm, startDate, endDate]);
+
+
+      const handleHotelChange = (e) => {
+        setFormData({
+          ...formData,
+          Hotel_Asignado: e.target.value,
+          roomCounts: {},
+          dailyConfig: {}
+        });
+      };
+
+      const handleRoomCountChange = (type, value) => {
+        const newRoomCounts = { ...(formData.roomCounts || {}), [type]: Number(value) };
+        // Auto-calcular PAX total
+        const totalPax = Object.entries(newRoomCounts).reduce((sum, [roomType, count]) => {
+          return sum + (count || 0) * (PAX_PER_ROOM[roomType] || 2);
+        }, 0);
+        setFormData({
+          ...formData,
+          roomCounts: newRoomCounts,
+          "Pax.": totalPax
+        });
+      };
+
+      const handleDailyConfigChange = (date, field, value, roomType = null) => {
+        setFormData(prev => {
+          const newDailyConfig = { ...(prev.dailyConfig || {}) };
+          if (!newDailyConfig[date]) {
+            newDailyConfig[date] = { board: 'AD (Alojamiento y Desayuno)', prices: {}, counts: {}, gratuities: {} };
+          }
+          if (roomType) {
+            newDailyConfig[date][field] = { ...(newDailyConfig[date][field] || {}), [roomType]: value === '' ? '' : Number(value) };
+          } else {
+            newDailyConfig[date][field] = value;
+          }
+          return { ...prev, dailyConfig: newDailyConfig };
+        });
+      };
+
+      const handleCopyFirstDay = () => {
+        const stayDates = getCurrentStayDates(formData);
+        if (stayDates.length <= 1) return;
+        
+        const firstDate = stayDates[0];
+        const firstDayConfig = formData.dailyConfig?.[firstDate] || {};
+        
+        const newDailyConfig = { ...(formData.dailyConfig || {}) };
+        
+        for (let i = 1; i < stayDates.length; i++) {
+          const targetDate = stayDates[i];
+          newDailyConfig[targetDate] = JSON.parse(JSON.stringify(firstDayConfig));
+        }
+        
+        setFormData(prev => ({ ...prev, dailyConfig: newDailyConfig }));
+      };
+
+      const handleSave = async (e) => {
+        e.preventDefault();
+        const now = new Date();
+        const formattedDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+
+        // Validation: Mandatory Hotel
+        const hotelAsignado = formData.Hotel_Asignado || formData.Hotel || "";
+        if (!hotelAsignado || hotelAsignado.toLowerCase().includes("pend") || hotelAsignado.trim() === "") {
+          alert("⚠️ Error de Integridad: Debe asignar un hotel válido. No se permiten registros 'Pendientes'.");
+          return;
+        }
+
+        const reservaId = formData.Reserva || `PRES-${Math.floor(100000 + Math.random() * 900000)}`;
+        const isNew = !formData.uid;
+
+        const entrada = String(formData.Entrada || "");
+        let releaseDate = formData.Com_Vencimiento_Rel || "";
+        if (!releaseDate && entrada) {
+          const d = new Date(entrada);
+          if (!isNaN(d.getTime())) {
+            d.setDate(d.getDate() - 15);
+            releaseDate = d.toISOString().split("T")[0];
+          }
+        }
+
+        const groupData = {
+          ...formData,
+          Reserva: reservaId,
+          "Com_Vencimiento_Rel": releaseDate,
+          "Segment.": formData["Segment."] || "GRUPOS",
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+          "Importe(*)": formatNum(calculateTotal(formData))
+        };
+
+        try {
+          if (isNew) {
+            groupData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+            groupData.Estado = "Presupuesto";
+            groupData.tracking = [{ id: Date.now(), date: formattedDate, text: "Presupuesto registrado (Alta Manual)." }];
+            await db.collection("groups").doc(reservaId).set(groupData);
+          } else {
+            const uidToUpdate = groupData.uid;
+            const oldDoc = groups.find(g => g.uid === uidToUpdate);
+            
+            // History Tracking: Detect changes
+            const changes = [];
+            const fieldsToTrack = {
+              "Nombre del Grupo": "Nombre",
+              "Hotel_Asignado": "Hotel",
+              "Entrada": "Entrada",
+              "Salida": "Salida",
+              "Com_Estado_Interno": "Estado",
+              "Empresa/Agencia": "Empresa",
+              "Pax.": "Pax"
+            };
+            Object.entries(fieldsToTrack).forEach(([field, label]) => {
+              if (String(formData[field] || "") !== String(oldDoc[field] || "")) {
+                changes.push(`${label}: ${oldDoc[field] || 'vacío'} ➔ ${formData[field] || 'vacío'}`);
+              }
+            });
+
+            if (changes.length > 0) {
+              groupData.tracking = [{ id: Date.now(), date: formattedDate, text: "📝 " + changes.join(" | ") }, ...(Array.isArray(oldDoc.tracking) ? oldDoc.tracking : [])];
+            } else {
+              groupData.tracking = Array.isArray(oldDoc.tracking) ? oldDoc.tracking : [];
+            }
+
+            delete groupData.uid; // evitar guardarlo duplicado en document fields
+
+            const validUpdateData = {};
+            const fallbackData = {};
+
+            // Firebase update() no soporta ciertos caracteres en las keys.
+            // Extraemos esos campos para guardarlos con set({merge: true})
+            Object.keys(groupData).forEach(key => {
+              if (/[~*/\[\].]/.test(key)) {
+                fallbackData[key] = groupData[key];
+              } else {
+                validUpdateData[key] = groupData[key];
+              }
+            });
+
+            // Usar update en lugar de set({merge: true}) para que mapas
+            // enteros (roomCounts, dailyConfig) se REEMPLACEN, no se deep-mergen.
+            if (Object.keys(validUpdateData).length > 0) {
+              await db.collection("groups").doc(uidToUpdate).update(validUpdateData);
+            }
+            if (Object.keys(fallbackData).length > 0) {
+              await db.collection("groups").doc(uidToUpdate).set(fallbackData, { merge: true });
+            }
+          }
+          setCurrentView('dashboard');
+        } catch (error) {
+          console.error("Error saving budget:", error);
+          alert("Error al guardar.");
+        }
+      };
+
+      const handleOpenDetail = (g) => {
+        setSelectedGroup(g);
+        const intEst = (g.Com_Estado_Interno || "").toUpperCase();
+        const extEst = (g.Estado || "").toUpperCase();
+        if (intEst.includes("CONFIRM") || extEst.includes("CONFIRM")) {
+          setDocMode('confirmacion');
+        } else {
+          setDocMode('presupuesto');
+        }
+        setCurrentView('detail');
+      };
+
+      const handleTranslateClause = async (idx, type = 'budget') => {
+        const clauses = type === 'budget' ? [...tempClauses] : [...tempClausesConf];
+        const textToTranslate = clauses[idx].body.split('[EN]')[0].trim();
+        if (!textToTranslate) return;
+
+        try {
+          const prompt = `Traduce el siguiente texto de un presupuesto de hotel al inglés. Mantén un tono profesional y corporativo. Devuelve SOLO el texto traducido, sin comillas ni introducciones: "${textToTranslate}"`;
+          const translated = await window.callGemini(prompt);
+          if (translated && !translated.includes('ERROR')) {
+            clauses[idx].body = `${textToTranslate} [EN] ${translated.trim()}`;
+            if (type === 'budget') setTempClauses(clauses);
+            else setTempClausesConf(clauses);
+          } else {
+            alert("Error en la traducción: " + translated);
+          }
+        } catch (e) {
+          alert("Error al conectar con la IA.");
+        }
+      };
+
+      const renderClauseText = (text) => {
+        if (!text) return null;
+        const parts = text.split('[EN]');
+        if (parts.length > 1) {
+          return (
+            <>
+              {parts[0]}
+              <span className="block mt-1.5 text-slate-400 font-medium italic leading-relaxed border-l-2 border-slate-100 pl-3">
+                {parts[1]}
+              </span>
+            </>
+          );
+        }
+        return text;
+      };
+
+      const handleDelete = async (uid) => {
+        if (!confirm("¿Eliminar este presupuesto?")) return;
+        try {
+          await db.collection("groups").doc(uid).delete();
+        } catch (error) { console.error(error); }
+      };
+
+      const updateStatus = async (uid, newStatus) => {
+        try {
+          const now = new Date();
+          const formattedDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+          const budget = groups.find(g => g.uid === uid);
+          const newTracking = [{ id: Date.now(), date: formattedDate, text: `Estado -> ${newStatus}` }, ...(Array.isArray(budget.tracking) ? budget.tracking : [])];
+          await db.collection("groups").doc(uid).update({ Com_Estado_Interno: newStatus, tracking: newTracking });
+        } catch (error) { console.error(error); }
+      };
+
+      const addTrackingNote = async (e) => {
+        e.preventDefault();
+        if (!newNote.trim() || !selectedGroup) return;
+        try {
+          const now = new Date();
+          const formattedDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+          const newTracking = [{ id: Date.now(), date: formattedDate, text: newNote }, ...(Array.isArray(selectedGroup.tracking) ? selectedGroup.tracking : [])];
+          await db.collection("groups").doc(selectedGroup.uid).update({ tracking: newTracking });
+          setNewNote('');
+        } catch (error) { console.error(error); }
+      };
+
+      const addQuickNote = async (uid, note) => {
+        if (!note.trim()) return;
+        try {
+          const now = new Date();
+          const formattedDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+          const budget = groups.find(g => g.uid === uid);
+          const newTracking = [{ id: Date.now(), date: formattedDate, text: note }, ...(Array.isArray(budget.tracking) ? budget.tracking : [])];
+          await db.collection("groups").doc(uid).update({ tracking: newTracking });
+        } catch (error) { console.error(error); }
+      };
+
+      // --- VISTAS ---
+      const renderDashboard = () => (
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 hidden">
+          </div>
+
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+            <div className="p-6 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center bg-slate-50/50 gap-4">
+              <div className="flex flex-col">
+                <h2 className="text-xl font-black text-slate-800">Seguimiento de Cotizaciones</h2>
+                <div className="flex gap-4 mt-3">
+                  <button 
+                    onClick={() => setFilterTab('activos')}
+                    className={`text-[9px] font-black uppercase tracking-widest pb-2 border-b-2 transition-all ${filterTab === 'activos' ? 'text-indigo-600 border-indigo-600' : 'text-slate-400 border-transparent hover:text-slate-600'}`}
+                  >
+                    Activos
+                  </button>
+                  <button 
+                    onClick={() => setFilterTab('confirmados')}
+                    className={`text-[9px] font-black uppercase tracking-widest pb-2 border-b-2 transition-all ${filterTab === 'confirmados' ? 'text-emerald-600 border-emerald-600' : 'text-slate-400 border-transparent hover:text-slate-600'}`}
+                  >
+                    Confirmados
+                  </button>
+                  <button 
+                    onClick={() => setFilterTab('desestimados')}
+                    className={`text-[9px] font-black uppercase tracking-widest pb-2 border-b-2 transition-all ${filterTab === 'desestimados' ? 'text-rose-600 border-rose-600' : 'text-slate-400 border-transparent hover:text-slate-600'}`}
+                  >
+                    Desestimados
+                  </button>
+                </div>
+                {globalConfig?.lastImportDate && (
+                  <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mt-2">
+                    Última Importación: <span className="text-indigo-500">{new Date(globalConfig.lastImportDate).toLocaleString("es-ES")}</span>
+                  </p>
+                )}
+              </div>
+              <div className="flex gap-2 w-full sm:w-auto">
+                <button onClick={() => { setFormData(DEFAULT_FORM_DATA); setCurrentView('create'); }}
+                  className="flex-1 sm:flex-none px-5 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-600 font-bold text-sm hover:bg-slate-50 transition-all flex items-center justify-center gap-2">
+                  <i className="fas fa-pencil-alt"></i> Crear Manual
+                </button>
+                <button onClick={() => window.location.href = 'AltaEmail.html'}
+                  className="flex-1 sm:flex-none bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl transition-all text-sm font-bold shadow-lg shadow-indigo-200 flex items-center justify-center gap-2">
+                  <i className="fas fa-sparkles"></i> Alta con IA
+                </button>
+              </div>
+            </div>
+
+            {/* Barra de Filtros */}
+            <div className="px-6 py-4 border-b border-slate-100 flex flex-wrap gap-4 items-center bg-slate-50/30">
+              <div className="relative w-full sm:w-80">
+                <i className="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                <input 
+                  type="text" 
+                  placeholder="Buscar por grupo, agencia o ID..."
+                  className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-700 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all shadow-sm"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
+
+              <div className="flex items-center gap-3 bg-white border border-slate-200 rounded-xl px-4 py-2 shadow-sm">
+                <i className="fas fa-calendar-alt text-slate-400 text-xs"></i>
+                
+                <div className="flex items-center gap-2">
+                  <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Desde:</span>
+                  <input 
+                    type="date" 
+                    className="bg-slate-50 border border-slate-100 rounded-lg px-2 py-1 text-xs font-bold text-slate-700 outline-none w-[130px]"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                  />
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Hasta:</span>
+                  <input 
+                    type="date" 
+                    className="bg-slate-50 border border-slate-100 rounded-lg px-2 py-1 text-xs font-bold text-slate-700 outline-none w-[130px]"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                  />
+                </div>
+
+                {(startDate || endDate || searchTerm) && (
+                  <button 
+                    onClick={() => { setStartDate(''); setEndDate(''); setSearchTerm(''); }}
+                    className="ml-2 p-1.5 bg-rose-50 text-rose-500 rounded-lg border border-rose-100 hover:bg-rose-500 hover:text-white transition-all"
+                    title="Limpiar filtros"
+                  >
+                    <i className="fas fa-times-circle"></i>
+                  </button>
+                )}
+              </div>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse min-w-[1100px]">
+                <thead>
+                  <tr className="bg-slate-50/50 border-b border-slate-100">
+                    <th className="px-6 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest min-w-[320px]">Grupo / Hotel</th>
+                    <th className="px-6 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Entrada</th>
+                    <th className="px-6 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest text-center">Límite 7d</th>
+                    <th className="px-6 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Importe</th>
+                    <th className="px-6 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest text-center">Pax / Hab</th>
+                    <th className="px-6 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest min-w-[200px]">Gestión</th>
+                    <th className="px-6 py-4 text-[9px] font-black text-slate-500 uppercase tracking-widest text-center">Estado</th>
+                    <th className="px-6 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest text-right">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {processedGroups.map(g => {
+                    const totalAmount = g._totalAmount;
+                    
+                    let totalPaidFromPlan = 0;
+                    try {
+                      const plan = JSON.parse(g.PaymentPlan_JSON || "[]");
+                      totalPaidFromPlan = plan
+                        .filter(item => item.status === "Cobrado")
+                        .reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
+                    } catch(e) {}
+                    const manualPaid = parseFloat(g.Com_Pagado || 0);
+                    const totalPaid = Math.max(manualPaid, totalPaidFromPlan);
+                    const pendingAmount = Math.max(0, totalAmount - totalPaid);
+
+                    const hotelName = g.Hotel_Asignado || g.Hotel || "N/A";
+                    const isCumbria = hotelName.toLowerCase().includes("cumbria");
+
+                    const normalizedRooms = {};
+                    Object.entries(g.roomCounts || {}).forEach(([t, c]) => {
+                      if (c > 0) {
+                        const lower = t.toLowerCase();
+                        if (normalizedRooms[lower]) {
+                          normalizedRooms[lower].count += Number(c);
+                        } else {
+                          normalizedRooms[lower] = { type: t, count: Number(c) };
+                        }
+                      }
+                    });
+                    const paxCount = g["Pax."] || 0;
+                    const statusColor = getStatusColor(g.Com_Estado_Interno || g.Estado);
+
+                    return (
+                      <tr key={g.uid} className="hover:bg-slate-50/50 transition-colors group">
+                        {/* Grupo / Hotel */}
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-4">
+                            <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 bg-white border border-slate-100 overflow-hidden p-1 shadow-sm group-hover:scale-105 transition-transform">
+                              <img
+                                src={hotelName.toLowerCase().includes('cumbria') ? "Logos/Cumbria Spa&Hotel.jpg" : "Logos/Sercotel Guadiana.jpg"}
+                                className="w-full h-full object-contain"
+                                alt="Hotel"
+                              />
+                            </div>
+                            <div className="min-w-0">
+                              <h4 className="text-sm font-black text-slate-800 uppercase leading-tight truncate group-hover:text-indigo-600 transition-colors">
+                                {g["Nombre del Grupo"]}
+                                <button 
+                                  onClick={(e) => { 
+                                    e.stopPropagation(); 
+                                    const note = prompt("Añadir nota rápida de seguimiento:");
+                                    if(note) addQuickNote(g.uid, note);
+                                  }}
+                                  className="group relative inline-flex items-center align-middle"
+                                >
+                                  { (g.Com_Notas || (g.tracking && g.tracking.length > 0)) ? (
+                                    <i className="fas fa-comment-dots text-indigo-500 ml-2 text-xs" title={g.Com_Notas || "Ver seguimiento"}></i>
+                                  ) : (
+                                    <i className="far fa-comment text-slate-200 hover:text-indigo-400 ml-2 text-xs opacity-0 group-hover:opacity-100 transition-all" title="Añadir nota"></i>
+                                  )}
+                                </button>
+                              </h4>
+                              <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mt-0.5 opacity-60">
+                                {hotelName} • ID: {g.Reserva}
+                              </p>
+                            </div>
+                          </div>
+                        </td>
+
+                        {/* Entrada */}
+                        <td className="px-6 py-4">
+                          <div 
+                            onClick={() => window.location.href = `Gestión de Grupos.html?reserva=${g.Reserva}`}
+                            className="inline-flex flex-col cursor-pointer hover:bg-indigo-50 px-2 py-1 rounded-lg transition-all"
+                          >
+                            <span className="text-xs font-black text-slate-700">{formatDate(g.Entrada)}</span>
+                            <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">Click p/ Gestión</span>
+                          </div>
+                        </td>
+
+                        {/* Countdown 7d */}
+                        <td className="px-6 py-4 text-center">
+                          {(() => {
+                            const created = g.createdAt?.seconds ? new Date(g.createdAt.seconds * 1000) : (g.createdAt ? new Date(g.createdAt) : null);
+                            if (!created) return <span className="text-[10px] font-bold text-slate-300">N/A</span>;
+                            
+                            const diff = Math.floor((new Date() - created) / (1000 * 60 * 60 * 24));
+                            const daysLeft = 7 - diff;
+                            const color = daysLeft <= 1 ? "text-rose-600 bg-rose-50" : (daysLeft <= 3 ? "text-amber-600 bg-amber-50" : "text-emerald-600 bg-emerald-50");
+                            
+                            return (
+                              <div className={`inline-flex flex-col items-center px-2 py-1 rounded-lg ${color}`}>
+                                <span className="text-xs font-black">{daysLeft}d</span>
+                                <span className="text-[7px] font-bold uppercase tracking-tighter">Restantes</span>
+                              </div>
+                            );
+                          })()}
+                        </td>
+
+                        {/* Importe */}
+                        <td className="px-6 py-4">
+                          <div className="flex flex-col">
+                            <span className="text-sm font-black text-indigo-600 tracking-tight">{formatNum(totalAmount)}€</span>
+                            {totalPaid > 0 && (
+                              <div className="flex gap-2 mt-1">
+                                <span className="text-[8px] font-black text-emerald-600 uppercase">P: {formatNum(totalPaid)}</span>
+                                <span className="text-[8px] font-black text-rose-600 uppercase">D: {formatNum(pendingAmount)}</span>
+                              </div>
+                            )}
+                          </div>
+                        </td>
+
+                        {/* Pax / Hab */}
+                        <td className="px-6 py-4 text-center">
+                          <div className="flex flex-col items-center gap-1">
+                            <div className="flex items-center gap-1 text-slate-700">
+                              <i className="fas fa-users text-[10px]"></i>
+                              <span className="text-xs font-black">{paxCount}</span>
+                            </div>
+                            <div className="flex items-center gap-1 text-slate-400">
+                              <i className="fas fa-bed text-[10px]"></i>
+                              {(() => {
+                                const activeRooms = Object.values(normalizedRooms).map(v => [v.type, v.count]);
+                                const totalRoomsNumeric = activeRooms.reduce((a, [_, b]) => a + Number(b), 0);
+                                const roomsCountText = totalRoomsNumeric > 0 ? totalRoomsNumeric : (g["Cant. Habitaciones"] || g["Habitaciones"] || g["Cant."] || 0);
+                                return <span className="text-[10px] font-bold">{roomsCountText}</span>;
+                              })()}
+                            </div>
+                          </div>
+                        </td>
+
+                        {/* Gestión */}
+                        <td className="px-6 py-4">
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2 text-slate-400">
+                              <i className="fas fa-building text-[9px] w-3 text-center"></i>
+                              <span className="text-[9px] font-bold uppercase">
+                                {g["Empresa/Agencia"] || "Venta Directa"}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2 text-indigo-400">
+                              <i className="fas fa-user-tie text-[9px] w-3 text-center"></i>
+                              <span className="text-[9px] font-bold uppercase truncate max-w-[150px]" title="Comercial Asignado">
+                                {g["Com_Comercial"] && g["Com_Comercial"].trim() !== "" ? g["Com_Comercial"] : "SIN ASIGNAR"}
+                              </span>
+                            </div>
+                          </div>
+                        </td>
+
+                        {/* Estado */}
+                        <td className="px-6 py-4 text-center">
+                          <select 
+                            value={(g.Com_Estado_Interno || g.Estado || '').toUpperCase()}
+                            onChange={(e) => { e.stopPropagation(); updateStatus(g.uid, e.target.value); }}
+                            onClick={(e) => e.stopPropagation()}
+                            className={`${statusColor} px-2 py-1 rounded-lg text-[8px] font-black uppercase tracking-widest border-none outline-none cursor-pointer hover:ring-2 hover:ring-slate-200 transition-all block mx-auto w-fit appearance-none text-center`}
+                          >
+                            <option value="PRESUPUESTO">Presupuesto</option>
+                            <option value="ENVIADO">Enviado</option>
+                            <option value="SEGUIMIENTO">Seguimiento</option>
+                            <option value="CONFIRMADO">Confirmado</option>
+                            <option value="CANCELADO">Cancelado</option>
+                            <option value="DESESTIMADO">Desestimado</option>
+                            <option value="CADUCADO">Caducado</option>
+                          </select>
+                        </td>
+
+                        {/* Acciones */}
+                        <td className="px-6 py-4 text-right">
+                          <div className="flex justify-end gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button onClick={(e) => { e.stopPropagation(); updateStatus(g.uid, 'CONFIRMADO'); }}
+                              className="w-8 h-8 bg-emerald-500 text-white rounded-lg flex items-center justify-center hover:bg-emerald-600 transition-all"
+                              title="Confirmar Grupo">
+                              <i className="fas fa-check text-xs"></i>
+                            </button>
+                            <button onClick={() => { handleOpenDetail(normalizeGroupData(g)); }}
+                              className="w-8 h-8 bg-emerald-50 text-emerald-600 rounded-lg border border-emerald-100 flex items-center justify-center hover:bg-emerald-600 hover:text-white transition-all"
+                              title="Ver Ficha">
+                              <i className="fas fa-external-link-alt text-xs"></i>
+                            </button>
+                            <button onClick={(e) => { e.stopPropagation(); setFormData(normalizeGroupData(g)); setCurrentView('create'); }}
+                              className="w-8 h-8 bg-slate-50 text-slate-600 rounded-lg border border-slate-100 flex items-center justify-center hover:bg-indigo-600 hover:text-white transition-all"
+                              title="Editar">
+                              <i className="fas fa-edit text-xs"></i>
+                            </button>
+                            <button onClick={(e) => { e.stopPropagation(); handleDelete(g.uid); }}
+                              className="w-8 h-8 bg-rose-50 text-rose-500 rounded-lg border border-rose-100 flex items-center justify-center hover:bg-rose-600 hover:text-white transition-all"
+                              title="Eliminar">
+                              <i className="fas fa-trash-alt text-xs"></i>
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+              {processedGroups.length === 0 && !loading && (
+                <div className="py-20 text-center">
+                  <i className="fas fa-database text-slate-200 text-4xl mb-4"></i>
+                  <p className="text-slate-400 font-bold uppercase tracking-widest text-xs">No hay presupuestos para mostrar</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      );
+
+
+    const renderCreate = () => {
+        const stayDates = getCurrentStayDates(formData);
+        const currentRooms = ROOM_TYPES[formData.Hotel_Asignado] || [];
+
+        return (
+          <div className="max-w-5xl mx-auto space-y-8 animate-fade-in pb-20">
+            {/* Header Alta/Edición */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
+              <div className="flex items-center gap-4">
+                <button onClick={() => setCurrentView('dashboard')} className="w-10 h-10 flex items-center justify-center bg-slate-50 rounded-xl text-slate-400 hover:text-slate-800 transition-all border border-slate-100 flex-shrink-0">
+                  <i className="fas fa-arrow-left"></i>
+                </button>
+                <div>
+                  <h2 className="text-xl font-black text-slate-800 tracking-tight">{formData.uid ? 'Editar Presupuesto' : 'Nueva Cotización de Grupo'}</h2>
+                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Completa los campos para generar el documento</p>
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mr-2">Fase / Estado:</span>
+                  <select 
+                    value={formData.Com_Estado_Interno || 'PRESUPUESTO'} 
+                    onChange={e => setFormData({ ...formData, Com_Estado_Interno: e.target.value })}
+                    className="bg-amber-50 text-amber-700 border-none rounded-xl px-4 py-2 text-xs font-black outline-none ring-2 ring-amber-100 focus:ring-amber-300 transition-all cursor-pointer uppercase"
+                  >
+                    <option value="PRESUPUESTO">Presupuesto</option>
+                    <option value="ENVIADO">Enviado</option>
+                    <option value="SEGUIMIENTO">Seguimiento</option>
+                    <option value="CONFIRMADO">Confirmado</option>
+                    <option value="CANCELADO">Cancelado</option>
+                    <option value="DESESTIMADO">Desestimado</option>
+                    <option value="CADUCADO">Caducado</option>
+                  </select>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mr-2">Hotel:</span>
+                  <select 
+                    value={formData.Hotel_Asignado} 
+                    onChange={e => setFormData({ ...formData, Hotel_Asignado: e.target.value })}
+                    className="bg-indigo-50 text-indigo-700 border-none rounded-xl px-4 py-2 text-xs font-black outline-none ring-2 ring-indigo-100 focus:ring-indigo-300 transition-all cursor-pointer"
+                  >
+                    <option value="Sercotel Guadiana">Sercotel Guadiana</option>
+                    <option value="Cumbria Spa&Hotel">Cumbria Spa&Hotel</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-8">
+              {/* Bloque 1: Información Básica */}
+              <div className="bg-white rounded-3xl shadow-sm border border-slate-200/60 p-6 space-y-6">
+                <div className="flex items-center gap-3 border-b border-slate-50 pb-4">
+                  <div className="w-6 h-6 rounded-lg bg-indigo-50 text-indigo-500 flex items-center justify-center">
+                    <i className="fas fa-info-circle text-[10px]"></i>
+                  </div>
+                  <h3 className="text-[10px] font-black text-slate-800 uppercase tracking-widest">1. Información del Grupo y Cliente</h3>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Nombre del Grupo / Evento</label>
+                    <input 
+                      type="text" 
+                      value={formData["Nombre del Grupo"]} 
+                      onChange={e => setFormData({ ...formData, "Nombre del Grupo": e.target.value })}
+                      placeholder="Ej: Boda García-Pérez o Grupo Jubilados..."
+                      className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-xs font-black outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all text-slate-700"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Empresa / Agencia</label>
+                    <input 
+                      type="text" 
+                      value={formData["Empresa/Agencia"]} 
+                      onChange={e => setFormData({ ...formData, "Empresa/Agencia": e.target.value })}
+                      placeholder="Nombre de la agencia o empresa..."
+                      className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-xs font-black outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all text-slate-700"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Nombre de Contacto</label>
+                    <input 
+                      type="text" 
+                      value={formData.Com_Nombre_Contacto} 
+                      onChange={e => setFormData({ ...formData, Com_Nombre_Contacto: e.target.value })}
+                      placeholder="Persona de contacto..."
+                      className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-xs font-black outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all text-slate-700"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Email</label>
+                    <input 
+                      type="email" 
+                      value={formData.Com_Email_Contacto} 
+                      onChange={e => setFormData({ ...formData, Com_Email_Contacto: e.target.value })}
+                      placeholder="email@ejemplo.com"
+                      className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-xs font-black outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all text-slate-700"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Teléfono</label>
+                    <input 
+                      type="text" 
+                      value={formData.Com_Telefono_Contacto} 
+                      onChange={e => setFormData({ ...formData, Com_Telefono_Contacto: e.target.value })}
+                      placeholder="Número de teléfono..."
+                      className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-xs font-black outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all text-slate-700"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Fecha Entrada</label>
+                    <input 
+                      type="date" 
+                      value={toInputDate(formData.Entrada)} 
+                      onChange={e => setFormData({ ...formData, Entrada: e.target.value })}
+                      className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-xs font-black outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all text-slate-700"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Fecha Salida</label>
+                    <input 
+                      type="date" 
+                      value={toInputDate(formData.Salida)} 
+                      onChange={e => setFormData({ ...formData, Salida: e.target.value })}
+                      className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-xs font-black outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all text-slate-700"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Bloque 2: Tipología de Habitaciones */}
+              <div className="bg-white rounded-3xl shadow-sm border border-slate-200/60 p-6 space-y-6">
+                <div className="flex items-center gap-3">
+                  <div className="w-6 h-6 rounded-lg bg-emerald-50 text-emerald-500 flex items-center justify-center">
+                    <i className="fas fa-bed text-[10px]"></i>
+                  </div>
+                  <h3 className="text-[10px] font-black text-slate-800 uppercase tracking-widest">2. Tipología y Cupo de Habitaciones</h3>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                  {currentRooms.map(type => (
+                    <div key={type} className="bg-slate-50 p-4 rounded-2xl border border-slate-100 space-y-2 group hover:border-emerald-200 transition-all">
+                      <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block truncate" title={type}>{type}</label>
+                      <div className="relative">
+                        <input 
+                          type="number" 
+                          min="0"
+                          value={formData.roomCounts?.[type] || ''} 
+                          onChange={e => setFormData({ ...formData, roomCounts: { ...formData.roomCounts, [type]: e.target.value } })}
+                          placeholder="0"
+                          className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2 text-sm font-black outline-none focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 transition-all text-slate-700"
+                        />
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-slate-300 font-bold uppercase tracking-widest">Hab</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Bloque 3: Tarifas Detalladas (si hay fechas) */}
+              {stayDates.length > 0 && (
+                <div className="bg-white rounded-3xl shadow-sm border border-slate-200/60 p-6 space-y-6 animate-slide-up">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-6 h-6 rounded-lg bg-indigo-50 text-indigo-500 flex items-center justify-center">
+                        <i className="fas fa-calendar-day text-[10px]"></i>
+                      </div>
+                      <div>
+                        <h3 className="text-[10px] font-black text-slate-800 uppercase tracking-widest">3. Tarifas por Noche</h3>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button 
+                        onClick={handleCopyFirstDay}
+                        className="bg-indigo-50 hover:bg-indigo-100 text-indigo-600 px-3 py-1.5 rounded-lg border border-indigo-100 flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest transition-all focus:scale-95"
+                        title="Copiar precios y cupos del primer día a todos los siguientes"
+                      >
+                        <i className="fas fa-copy"></i> Copiar 1º Día a Todos
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    {stayDates.map(date => {
+                      const selectedTypes = currentRooms.filter(type => (formData.roomCounts || {})[type] > 0);
+                      return (
+                        <div key={date} className="group bg-slate-50/50 rounded-xl p-3 border border-slate-100 hover:border-indigo-200 transition-all flex flex-row flex-wrap gap-3 items-center">
+                          <div className="shrink-0 w-24 flex flex-col gap-1">
+                            <span className="bg-slate-800 text-white px-2 py-1 rounded text-[8px] font-black w-fit uppercase tracking-widest">{formatDate(date)}</span>
+                          </div>
+
+                          <div className="flex-1 flex flex-wrap gap-2 items-center">
+                            {selectedTypes.map(type => {
+                              const dailyCounts = formData.dailyConfig?.[date]?.counts || {};
+                              const countVal = dailyCounts[type] !== undefined ? dailyCounts[type] : (formData.roomCounts || {})[type] || '';
+                              return (
+                                <div key={type} className="flex flex-col gap-0.5 min-w-[120px]">
+                                  <label className="text-[7px] font-black text-slate-500 uppercase truncate px-1" title={type}>{type}</label>
+                                  <div className="relative group flex gap-1 items-center">
+                                    <input
+                                      type="number"
+                                      value={countVal}
+                                      onChange={e => handleDailyConfigChange(date, 'counts', e.target.value, type)}
+                                      className="w-10 px-1 py-1.5 bg-white border border-slate-200 rounded-md text-[10px] font-black text-center outline-none focus:ring-1 focus:ring-emerald-500/10 focus:border-emerald-500 transition-all [&::-webkit-inner-spin-button]:appearance-none"
+                                      placeholder="Cant."
+                                      title="Cantidad de habitaciones"
+                                    />
+                                    <span className="text-[10px] text-slate-400 font-bold mx-0.5">x</span>
+                                    <div className="relative group flex w-[68px]">
+                                      <input
+                                        type="number"
+                                        value={(formData.dailyConfig?.[date]?.prices || {})[type] || ''}
+                                        onChange={e => handleDailyConfigChange(date, 'prices', e.target.value, type)}
+                                        className="w-full pl-2 pr-4 py-1.5 bg-white border border-slate-200 rounded-md text-[10px] font-black text-center outline-none focus:ring-1 focus:ring-emerald-500/10 focus:border-emerald-500 transition-all [&::-webkit-inner-spin-button]:appearance-none"
+                                        placeholder="0"
+                                        title="Precio"
+                                      />
+                                      <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[9px] text-slate-400 font-black">€</span>
+                                    </div>
+                                    <div className="relative group flex w-12 ml-0.5 items-center border border-emerald-100 rounded-md bg-emerald-50 px-1 py-1" title="Gratuidades (Habitaciones Gratis)">
+                                      <span className="text-[7px] font-black leading-none text-emerald-500 mr-0.5 uppercase tracking-tighter">Grat.</span>
+                                      <input
+                                        type="number"
+                                        min="0"
+                                        value={(formData.dailyConfig?.[date]?.gratuities || {})[type] || ''}
+                                        onChange={e => handleDailyConfigChange(date, 'gratuities', e.target.value, type)}
+                                        className="w-full bg-transparent text-[10px] font-black text-center outline-none text-emerald-700 [&::-webkit-inner-spin-button]:appearance-none placeholder:text-emerald-300"
+                                        placeholder="0"
+                                      />
+                                    </div>
+                                  </div>
+                                </div>
+                              )
+                            })}
+                          </div>
+
+                          <div className="shrink-0 w-32 flex flex-col gap-0.5">
+                            <label className="text-[7px] font-black text-indigo-500 uppercase px-1">Régimen</label>
+                            <select
+                              value={formData.dailyConfig?.[date]?.board || 'AD (Alojamiento y Desayuno)'}
+                              onChange={e => handleDailyConfigChange(date, 'board', e.target.value)}
+                              className="w-full bg-indigo-50/30 border border-indigo-100 text-indigo-700 rounded-md px-2 py-1.5 text-[9px] font-black uppercase tracking-widest outline-none focus:ring-1 focus:ring-indigo-500/10 transition-all cursor-pointer"
+                            >
+                              {BOARD_TYPES.map(board => <option key={board} value={board}>{board.split(' ')[0]}</option>)}
+                            </select>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Bloque 4: Descuentos y Suplementos Globales */}
+              <div className="bg-white rounded-3xl shadow-sm border border-slate-200/60 p-6 space-y-4">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-6 h-6 rounded-lg bg-orange-50 text-orange-500 flex items-center justify-center">
+                      <i className="fas fa-tags text-[10px]"></i>
+                    </div>
+                    <div>
+                      <h3 className="text-[10px] font-black text-slate-800 uppercase tracking-widest">4. Descuentos y Suplementos</h3>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Suplementos Totales (€)</label>
+                    <div className="relative group">
+                      <input
+                        type="number"
+                        value={formData.Suplementos || ''}
+                        onChange={e => setFormData({ ...formData, Suplementos: e.target.value })}
+                        className="w-full pl-3 pr-8 py-2.5 bg-slate-50 border border-slate-100 rounded-xl text-xs font-black outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all text-indigo-600"
+                        placeholder="0"
+                      />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 font-black">€</span>
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Descuento Global (€)</label>
+                    <div className="relative group">
+                      <input
+                        type="number"
+                        value={formData.Descuentos || ''}
+                        onChange={e => setFormData({ ...formData, Descuentos: e.target.value })}
+                        className="w-full pl-3 pr-8 py-2.5 bg-slate-50 border border-slate-100 rounded-xl text-xs font-black outline-none focus:ring-2 focus:ring-rose-500/10 focus:border-rose-500 transition-all text-rose-600"
+                        placeholder="0"
+                      />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 font-black">€</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Bloque 4.5: Otros Cargos / Extras */}
+              <div className="bg-white rounded-3xl shadow-sm border border-slate-200/60 p-6 space-y-4">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-6 h-6 rounded-lg bg-teal-50 text-teal-500 flex items-center justify-center">
+                      <i className="fas fa-plus-circle text-[10px]"></i>
+                    </div>
+                    <div>
+                      <h3 className="text-[10px] font-black text-slate-800 uppercase tracking-widest">4.5 Otros Cargos / Extras</h3>
+                    </div>
+                  </div>
+                  <button 
+                    type="button"
+                    onClick={() => {
+                      const newExtras = [...(formData.extraCharges || []), { id: Date.now(), date: '', concept: '', units: 0, pax: 0, unitPrice: 0, price: 0 }];
+                      setFormData({ ...formData, extraCharges: newExtras });
+                    }}
+                    className="bg-teal-50 hover:bg-teal-100 text-teal-600 px-3 py-1.5 rounded-lg border border-teal-100 flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest transition-all"
+                  >
+                    <i className="fas fa-plus"></i> Añadir Cargo
+                  </button>
+                </div>
+
+                <div className="space-y-3">
+                  {(formData.extraCharges || []).map((extra, index) => (
+                    <div key={extra.id} className="flex gap-2 items-center group">
+                      <div className="w-[130px] relative">
+                        <select
+                          value={extra.date || ''}
+                          onChange={(e) => {
+                             const newExtras = [...formData.extraCharges];
+                             newExtras[index].date = e.target.value;
+                             setFormData({ ...formData, extraCharges: newExtras });
+                          }}
+                          className="w-full bg-slate-50 border border-slate-100 rounded-lg px-2 py-2 text-[11px] font-black outline-none focus:ring-2 focus:ring-teal-500/10 focus:border-teal-500 transition-all text-slate-700"
+                        >
+                          <option value="">Global / Todas</option>
+                          {stayDates.map(d => <option key={d} value={d}>{d}</option>)}
+                        </select>
+                      </div>
+                      <div className="flex-1 min-w-[150px] relative">
+                        <input 
+                          type="text" 
+                          value={extra.concept}
+                          onChange={(e) => {
+                             const newExtras = [...formData.extraCharges];
+                             newExtras[index].concept = e.target.value;
+                             setFormData({ ...formData, extraCharges: newExtras });
+                          }}
+                          placeholder="Concepto (ej: Almuerzo...)"
+                          className="w-full bg-slate-50 border border-slate-100 rounded-lg px-3 py-2 text-[11px] font-black outline-none focus:ring-2 focus:ring-teal-500/10 focus:border-teal-500 transition-all text-slate-700"
+                        />
+                      </div>
+                      {/* Uds */}
+                      <div className="w-14 relative">
+                        <input
+                          type="number"
+                          min="0"
+                          value={extra.units !== undefined ? extra.units : ''}
+                          onChange={(e) => {
+                             const newExtras = [...formData.extraCharges];
+                             const u = Number(e.target.value) || 0;
+                             newExtras[index].units = u;
+                             const up = newExtras[index].unitPrice || 0;
+                             newExtras[index].price = u * up;
+                             setFormData({ ...formData, extraCharges: newExtras });
+                          }}
+                          placeholder="Uds"
+                          className="w-full px-2 py-2 bg-slate-50 border border-slate-100 rounded-lg text-[11px] font-black outline-none transition-all text-center"
+                        />
+                      </div>
+                      {/* Unit Price */}
+                      <div className="w-20 md:w-24 relative">
+                        <input 
+                          type="number" 
+                          step="0.01"
+                          value={extra.unitPrice !== undefined ? extra.unitPrice : 0}
+                          onChange={(e) => {
+                             const newExtras = [...formData.extraCharges];
+                             const up = parseFloat(e.target.value) || 0;
+                             newExtras[index].unitPrice = up;
+                             const u = newExtras[index].units || 0;
+                             const pax = newExtras[index].pax || 0;
+                             const activeQty = u > 0 ? u : pax;
+                             newExtras[index].price = activeQty * up;
+                             setFormData({ ...formData, extraCharges: newExtras });
+                          }}
+                          placeholder="0.00"
+                          className="w-full pl-2 pr-5 py-2 bg-slate-50 border border-slate-100 rounded-lg text-[11px] font-black outline-none focus:ring-2 focus:ring-teal-500/10 focus:border-teal-500 transition-all text-slate-700 text-right"
+                        />
+                        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] text-slate-400 font-bold">€</span>
+                      </div>
+                      <div className="w-20 md:w-24 px-2 py-2 bg-teal-50/50 border border-teal-100 rounded-lg text-[11px] font-black text-teal-700 text-right">
+                        {formatNum((extra.units || extra.pax || 0) * (extra.unitPrice || 0))} €
+                      </div>
+                      <button 
+                        type="button"
+                        onClick={() => {
+                           const newExtras = formData.extraCharges.filter((_, i) => i !== index);
+                           setFormData({ ...formData, extraCharges: newExtras });
+                        }}
+                        className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-300 hover:text-rose-500 hover:bg-rose-50 transition-all flex-shrink-0"
+                      >
+                        <i className="fas fa-trash text-xs"></i>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Bloque 5: Cláusulas de Documentos (Presupuesto y Confirmación) */}
+              <div className="bg-white rounded-3xl shadow-sm border border-slate-200/60 p-6 space-y-6">
+                <div className="flex items-center gap-3">
+                  <div className="w-6 h-6 rounded-lg bg-indigo-50 text-indigo-500 flex items-center justify-center">
+                    <i className="fas fa-file-signature text-[10px]"></i>
+                  </div>
+                  <div>
+                    <h3 className="text-[10px] font-black text-slate-800 uppercase tracking-widest">5. Cláusulas de Documentos</h3>
+                    <p className="text-[8px] text-slate-400 font-bold uppercase tracking-tighter mt-0.5">Define las condiciones legales para este grupo</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  {/* Columna Presupuesto */}
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                       <h4 className="text-[9px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                         <i className="fas fa-file-invoice text-indigo-400"></i> Presupuesto
+                       </h4>
+                       <button 
+                         type="button"
+                         onClick={() => {
+                           const current = (Array.isArray(formData.clauses) && formData.clauses.length > 0) ? formData.clauses : BUDGET_DEFAULT_CLAUSES;
+                           setFormData({ ...formData, clauses: [...current, { title: "Nueva Cláusula", body: "" }] });
+                         }}
+                         className="text-[8px] font-black text-indigo-600 uppercase tracking-widest hover:underline"
+                       >
+                         + Añadir
+                       </button>
+                    </div>
+                    <div className="space-y-3">
+                      {(Array.isArray(formData.clauses) && formData.clauses.length > 0 ? formData.clauses : BUDGET_DEFAULT_CLAUSES).map((c, i) => (
+                        <div key={i} className="bg-slate-50 p-3 rounded-xl border border-slate-100 space-y-2 relative group">
+                          <input 
+                            type="text" 
+                            value={c.title} 
+                            onChange={e => {
+                               const n = [...((Array.isArray(formData.clauses) && formData.clauses.length > 0) ? formData.clauses : BUDGET_DEFAULT_CLAUSES)];
+                               n[i].title = e.target.value;
+                               setFormData({ ...formData, clauses: n });
+                            }}
+                            className="w-full bg-white border border-slate-200 rounded px-2 py-1 text-[9px] font-black text-slate-800 outline-none focus:border-indigo-400"
+                            placeholder="Título de la cláusula"
+                          />
+                          <textarea 
+                            value={c.body} 
+                            onChange={e => {
+                               const n = [...((Array.isArray(formData.clauses) && formData.clauses.length > 0) ? formData.clauses : BUDGET_DEFAULT_CLAUSES)];
+                               n[i].body = e.target.value;
+                               setFormData({ ...formData, clauses: n });
+                            }}
+                            rows="2" 
+                            className="w-full bg-white border border-slate-200 rounded px-2 py-1 text-[9px] text-slate-600 outline-none focus:border-indigo-400 resize-none font-medium"
+                            placeholder="Contenido..."
+                          />
+                          <button 
+                            type="button"
+                            onClick={() => {
+                               const n = ((Array.isArray(formData.clauses) && formData.clauses.length > 0) ? formData.clauses : BUDGET_DEFAULT_CLAUSES).filter((_, idx) => idx !== i);
+                               setFormData({ ...formData, clauses: n });
+                            }}
+                            className="absolute -top-2 -right-2 w-5 h-5 bg-white border border-slate-200 rounded-full flex items-center justify-center text-rose-500 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            <i className="fas fa-times text-[8px]"></i>
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Columna Confirmación */}
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                       <h4 className="text-[9px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                         <i className="fas fa-file-check text-emerald-500"></i> Confirmación
+                       </h4>
+                       <button 
+                         type="button"
+                         onClick={() => {
+                           const current = (Array.isArray(formData.clauses_conf) && formData.clauses_conf.length > 0) ? formData.clauses_conf : CONF_DEFAULT_CLAUSES;
+                           setFormData({ ...formData, clauses_conf: [...current, { title: "Nueva Cláusula Conf.", body: "" }] });
+                         }}
+                         className="text-[8px] font-black text-emerald-600 uppercase tracking-widest hover:underline"
+                       >
+                         + Añadir
+                       </button>
+                    </div>
+                    <div className="space-y-3">
+                      {(Array.isArray(formData.clauses_conf) && formData.clauses_conf.length > 0 ? formData.clauses_conf : CONF_DEFAULT_CLAUSES).map((c, i) => (
+                        <div key={i} className="bg-emerald-50/30 p-3 rounded-xl border border-emerald-100/50 space-y-2 relative group">
+                          <input 
+                            type="text" 
+                            value={c.title} 
+                            onChange={e => {
+                               const n = [...((Array.isArray(formData.clauses_conf) && formData.clauses_conf.length > 0) ? formData.clauses_conf : CONF_DEFAULT_CLAUSES)];
+                               n[i].title = e.target.value;
+                               setFormData({ ...formData, clauses_conf: n });
+                            }}
+                            className="w-full bg-white border border-slate-200 rounded px-2 py-1 text-[9px] font-black text-slate-800 outline-none focus:border-emerald-400"
+                            placeholder="Título de la cláusula"
+                          />
+                          <textarea 
+                            value={c.body} 
+                            onChange={e => {
+                               const n = [...((formData.clauses_conf && formData.clauses_conf.length > 0) ? formData.clauses_conf : CONF_DEFAULT_CLAUSES)];
+                               n[i].body = e.target.value;
+                               setFormData({ ...formData, clauses_conf: n });
+                            }}
+                            rows="2" 
+                            className="w-full bg-white border border-slate-200 rounded px-2 py-1 text-[9px] text-slate-600 outline-none focus:border-emerald-400 resize-none font-medium"
+                            placeholder="Contenido..."
+                          />
+                          <button 
+                            type="button"
+                            onClick={() => {
+                               const n = ((formData.clauses_conf && formData.clauses_conf.length > 0) ? formData.clauses_conf : CONF_DEFAULT_CLAUSES).filter((_, idx) => idx !== i);
+                               setFormData({ ...formData, clauses_conf: n });
+                            }}
+                            className="absolute -top-2 -right-2 w-5 h-5 bg-white border border-slate-200 rounded-full flex items-center justify-center text-rose-500 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            <i className="fas fa-times text-[8px]"></i>
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Bloque 6: Notas Internas */}
+              <div className="bg-white rounded-3xl shadow-sm border border-slate-200/60 p-6 space-y-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-6 h-6 rounded-lg bg-slate-50 text-slate-400 flex items-center justify-center">
+                    <i className="fas fa-notes-medical text-[10px]"></i>
+                  </div>
+                  <h3 className="text-[10px] font-black text-slate-800 uppercase tracking-widest">6. Notas Internas & Seguimiento</h3>
+                </div>
+                <textarea
+                  value={formData.Com_Notas}
+                  onChange={e => setFormData({ ...formData, Com_Notas: e.target.value })}
+                  placeholder="Añade detalles relevantes..."
+                  className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-xs font-medium text-slate-600 outline-none focus:border-indigo-500 min-h-[80px] resize-none transition-all shadow-sm"
+                />
+              </div>
+
+              <div className="flex gap-3 justify-end pt-2">
+                <button
+                  type="button"
+                  onClick={() => setCurrentView('dashboard')}
+                  className="px-6 py-3 rounded-xl font-black text-[9px] uppercase tracking-widest text-slate-400 hover:bg-slate-100 transition-all"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleSave}
+                  className="bg-indigo-600 text-white px-8 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-indigo-700 hover:scale-105 active:scale-95 transition-all shadow-md shadow-indigo-200/50"
+                >
+                  Guardar Cotización
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      };
+
+
+
+      const HOTEL_DEFAULTS = {
+        guadiana: {
+          address: 'C/ Guadiana, 36',
+          city: '13002 - Ciudad Real (España)',
+          phone: '926 22 33 13',
+          email: 'info@hotelguadiana.es',
+          web: 'www.hotelguadiana.es'
+        },
+        cumbria: {
+          address: 'Ctra. Toledo, 26',
+          city: '13005 - Ciudad Real (España)',
+          phone: '(+34) 926 25 04 04',
+          email: 'recepcion@hotelcumbria.es',
+          web: 'www.hotelcumbria.es'
+        }
+      };
+
+  const renderDetail = () => {
+        if (!selectedGroup) return null;
+        const g = normalizeGroupData(selectedGroup);
+
+        const mergedForTotal = { ...g, ...formData };
+        const calculatedTotal = calculateTotal(mergedForTotal);
+        const hotelName = g.Hotel_Asignado || g.Hotel || "N/A";
+        const isCumbria = hotelName.toLowerCase().includes("cumbria");
+        const hotelKey = isCumbria ? 'cumbria' : 'guadiana';
+        const modeKey = docMode === 'confirmacion' ? 'confirmationClauses' : 'clauses';
+        const groupKey = docMode === 'confirmacion' ? 'clauses_conf' : 'clauses';
+
+        // Lógica de Fallback Multinivel para Cláusulas
+        const getEffectiveClauses = () => {
+          if (Array.isArray(g[groupKey]) && g[groupKey].length > 0) return g[groupKey];
+          if (globalConfig && globalConfig[hotelKey] && Array.isArray(globalConfig[hotelKey][modeKey]) && globalConfig[hotelKey][modeKey].length > 0) return globalConfig[hotelKey][modeKey];
+          if (globalConfig && globalConfig.common && Array.isArray(globalConfig.common[modeKey]) && globalConfig.common[modeKey].length > 0) return globalConfig.common[modeKey];
+          return docMode === 'confirmacion' ? CONF_DEFAULT_CLAUSES : BUDGET_DEFAULT_CLAUSES;
+        };
+        const effectiveClauses = getEffectiveClauses();
+
+        // Función auxiliar para reemplazo de variables
+        const parseClauseVariables = (text) => {
+          if (!text) return "";
+          let parsed = text;
+          parsed = parsed.replace(/{DEP_30}/g, formatNum(calculatedTotal * 0.3) + '€');
+          parsed = parsed.replace(/{DEP_50}/g, formatNum(calculatedTotal * 0.5) + '€');
+          parsed = parsed.replace(/{DEP_100}/g, formatNum(calculatedTotal) + '€');
+          
+          const getRelDate = (days) => {
+            if (!g.Entrada) return "[FECHA]";
+            const d = new Date(g.Entrada);
+            d.setDate(d.getDate() - days);
+            return d.toLocaleDateString('es-ES');
+          };
+
+          parsed = parsed.replace(/{RELEASE_30}/g, getRelDate(30));
+          parsed = parsed.replace(/{RELEASE_15}/g, getRelDate(15));
+          parsed = parsed.replace(/{RELEASE_7}/g, getRelDate(7));
+          return parsed;
+        };
+
+        const activeRoomsMap = Object.entries(g.roomCounts || {}).reduce((acc, [type, count]) => {
+          if (count > 0) {
+            const lowerType = type.toLowerCase();
+            acc[lowerType] = {
+              original: acc[lowerType]?.original || type,
+              count: (acc[lowerType]?.count || 0) + Number(count)
+            }
+          }
+          return acc;
+        }, {});
+
+        const activeRooms = Object.values(activeRoomsMap).map(v => [v.original, v.count]);
+        const dates = getCurrentStayDates(g);
+        let calculatedPax = 0;
+        activeRooms.forEach(([type, c]) => {
+          const t = type.toUpperCase();
+          let multiplier = 2;
+          if (t.includes('INDIVIDUAL') || t.includes('DUI') || t.includes('SINGLE')) multiplier = 1;
+          else if (t.includes('TRIPLE')) multiplier = 3;
+          else if (t.includes('CUADRUPLE') || t.includes('CUÁDRUPLE') || t.includes('FAMILIAR')) multiplier = 4;
+          else if (t.includes('QUINTUPLE')) multiplier = 5;
+          calculatedPax += (multiplier * c);
+        });
+        const totalPax = calculatedPax > 0 ? calculatedPax : (g["Pax."] || 0);
+
+        return (
+          <div className="space-y-6 animate-fade-in max-w-7xl mx-auto pb-10">
+            {/* HEADER DETALLE */}
+            <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 print:hidden">
+              <div className="flex items-center gap-4">
+                <button onClick={() => setCurrentView('dashboard')} className="w-10 h-10 flex items-center justify-center bg-slate-50 rounded-xl text-slate-400 hover:text-slate-800 transition-all border border-slate-100 flex-shrink-0">
+                  <i className="fas fa-arrow-left"></i>
+                </button>
+                <div>
+                  <label className="text-[10px] font-black text-indigo-600 uppercase tracking-widest block mb-1">
+                    {hotelName} {g.Reserva ? `• ${g.Reserva}` : ''}
+                  </label>
+                  <h2 className="text-2xl font-black text-slate-800 tracking-tight leading-none">{g["Nombre del Grupo"]}</h2>
+                  <div className="mt-2 flex flex-col gap-1.5">
+                    <p className="text-xs text-slate-400 flex flex-wrap items-center gap-3">
+                      <span className="flex items-center gap-1.5"><i className="far fa-calendar text-slate-300"></i> {formatDate(g.Entrada)} a {formatDate(g.Salida)}</span>
+                      <span className="text-slate-200">|</span>
+                      <span className="flex items-center gap-1.5"><i className="fas fa-users text-slate-300"></i> {totalPax} pax</span>
+                      <span className="text-slate-200">|</span>
+                      <span className="text-indigo-600 font-bold">{formatNum(calculatedTotal)} €</span>
+                    </p>
+                    {(g.Com_Email_Contacto || g.Email || g.Com_Telefono_Contacto || g.Telefono || g.Teléfono || g.Com_Nombre_Contacto || g.Persona_Contacto) && (
+                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tight flex flex-wrap items-center gap-x-4 gap-y-1">
+                        {(g.Com_Nombre_Contacto || g.Persona_Contacto) && (
+                          <span className="flex items-center gap-1.5 text-slate-500">
+                            <i className="far fa-user text-slate-300"></i> {g.Com_Nombre_Contacto || g.Persona_Contacto}
+                          </span>
+                        )}
+                        {(g.Com_Email_Contacto || g.Email) && (
+                          <a href={`mailto:${g.Com_Email_Contacto || g.Email}`} className="flex items-center gap-1.5 hover:text-indigo-600 transition-colors">
+                            <i className="far fa-envelope text-slate-300"></i> {g.Com_Email_Contacto || g.Email}
+                          </a>
+                        )}
+                        {(g.Com_Telefono_Contacto || g.Telefono || g.Teléfono) && (
+                          <a href={`tel:${g.Com_Telefono_Contacto || g.Telefono || g.Teléfono}`} className="flex items-center gap-1.5 hover:text-indigo-600 transition-colors">
+                            <i className="fas fa-phone-alt text-slate-300 text-[8px]"></i> {g.Com_Telefono_Contacto || g.Telefono || g.Teléfono}
+                          </a>
+                        )}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center gap-3 w-full md:w-auto mt-4 md:mt-0 pt-4 md:pt-0 border-t md:border-t-0 border-slate-100">
+                <div className="flex items-center gap-2 bg-slate-50 p-2 rounded-2xl border border-slate-100">
+                  <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-2">Fase Actual:</span>
+                  <select 
+                    value={(g.Com_Estado_Interno || g.Estado || '').toUpperCase()} 
+                    onChange={e => { 
+                      const newStatus = e.target.value;
+                      updateStatus(g.uid, newStatus);
+                      setSelectedGroup({...g, Com_Estado_Interno: newStatus});
+                    }}
+                    className="bg-white text-indigo-700 border border-slate-200 rounded-xl px-4 py-2 text-[10px] font-black outline-none focus:ring-2 focus:ring-indigo-100 transition-all cursor-pointer uppercase"
+                  >
+                    <option value="PRESUPUESTO">Presupuesto</option>
+                    <option value="ENVIADO">Enviado</option>
+                    <option value="SEGUIMIENTO">Seguimiento</option>
+                    <option value="CONFIRMADO">Confirmado</option>
+                    <option value="CANCELADO">Cancelado</option>
+                    <option value="DESESTIMADO">Desestimado</option>
+                    <option value="CADUCADO">Caducado</option>
+                  </select>
+                </div>
+
+                <button 
+                  onClick={() => { setFormData(g); setCurrentView('create'); }}
+                  className="flex-1 md:flex-none px-6 py-3 bg-white hover:bg-slate-50 text-slate-600 rounded-2xl font-black text-[10px] uppercase tracking-widest border border-slate-200 transition-all active:scale-95 shadow-sm flex items-center justify-center gap-2"
+                >
+                  <i className="fas fa-edit"></i> Editar Datos
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+              {/* SIDEBAR: CLIENTE Y CRM */}
+              <div className="lg:col-span-4 space-y-6 print:hidden">
+                <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 space-y-6">
+                  <div className="flex items-center gap-3 border-b border-slate-100 pb-4">
+                    <div className="w-8 h-8 bg-slate-100 rounded-lg flex items-center justify-center text-slate-400">
+                      <i className="fas fa-users text-sm"></i>
+                    </div>
+                    <h3 className="text-[10px] font-black text-slate-800 uppercase tracking-widest">Datos de Contacto</h3>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100/50">
+                      <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">Empresa / Agencia</p>
+                      <p className="text-sm font-black text-slate-800 uppercase">{g["Empresa/Agencia"] || "Venta Directa"}</p>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-4">
+                      <div>
+                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Contacto</p>
+                        <div className="flex items-center gap-3 bg-white border border-slate-100 p-3 rounded-xl">
+                          <i className="far fa-user text-indigo-400"></i>
+                          <span className="text-xs font-bold text-slate-600">{g.Com_Nombre_Contacto || g.Persona_Contacto || "No indicado"}</span>
+                        </div>
+                      </div>
+                      <div>
+                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Email</p>
+                        <div className="flex items-center gap-3 bg-white border border-slate-100 p-3 rounded-xl overflow-hidden">
+                          <i className="far fa-envelope text-indigo-400"></i>
+                          <span className="text-xs font-bold text-slate-600 truncate">{g.Com_Email_Contacto || g.Email || "No indicado"}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* SEGUIMIENTO & CHAT-STYLE NOTES */}
+                <div className="bg-slate-900 rounded-3xl p-6 shadow-xl shadow-slate-200/50 flex flex-col h-full max-h-[600px]">
+                   <div className="flex items-center justify-between mb-6">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 bg-indigo-500/20 rounded-lg flex items-center justify-center text-indigo-400">
+                          <i className="fas fa-history text-sm"></i>
+                        </div>
+                        <h3 className="text-[10px] font-black text-white uppercase tracking-widest">Muro de Seguimiento</h3>
+                      </div>
+                      <span className="text-[8px] font-black text-slate-500 uppercase">{(Array.isArray(g.tracking) ? g.tracking : []).length} Entradas</span>
+                   </div>
+                   
+                   {/* Formulario Nueva Nota */}
+                   <form onSubmit={addTrackingNote} className="mb-6">
+                      <div className="relative group">
+                        <textarea
+                          value={newNote}
+                          onChange={(e) => setNewNote(e.target.value)}
+                          placeholder="Añadir nota de seguimiento..."
+                          className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 pr-12 text-xs text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all resize-none min-h-[80px] custom-scrollbar"
+                        />
+                        <button 
+                          type="submit"
+                          disabled={!newNote.trim()}
+                          className="absolute right-3 bottom-3 w-8 h-8 bg-indigo-600 text-white rounded-xl flex items-center justify-center hover:bg-indigo-500 transition-all disabled:opacity-30 disabled:hover:bg-indigo-600"
+                        >
+                          <i className="fas fa-paper-plane text-[10px]"></i>
+                        </button>
+                      </div>
+                   </form>
+
+                   <div className="space-y-4 overflow-y-auto pr-2 custom-scrollbar flex-1">
+                     {g.Com_Notas && (
+                       <div className="relative pl-6 border-l-2 border-amber-500/30 pb-4">
+                         <div className="absolute left-[-5px] top-0 w-2 h-2 rounded-full bg-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.5)]"></div>
+                         <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-4">
+                           <div className="flex justify-between items-start mb-1">
+                             <span className="text-[8px] font-black text-amber-500 uppercase tracking-widest">Nota Principal</span>
+                           </div>
+                           <p className="text-xs text-amber-200/80 leading-relaxed whitespace-pre-wrap italic">{g.Com_Notas}</p>
+                         </div>
+                       </div>
+                     )}
+
+                     {!Array.isArray(g.tracking) || (g.tracking.length === 0 && !g.Com_Notas) ? (
+                       <div className="py-10 text-center opacity-30">
+                         <i className="fas fa-comments text-2xl mb-2 text-slate-400"></i>
+                         <p className="text-[9px] font-black text-slate-500 uppercase">Sin historial aún</p>
+                       </div>
+                     ) : (
+                       (Array.isArray(g.tracking) ? g.tracking : []).map((t, i) => (
+                         <div key={t?.id || i} className="relative pl-6 border-l-2 border-white/5 pb-4 last:pb-0">
+                           <div className="absolute left-[-5px] top-0 w-2 h-2 rounded-full bg-indigo-500 shadow-[0_0_10px_rgba(99,102,241,0.5)]"></div>
+                           <div className="bg-white/5 border border-white/10 rounded-2xl p-4 hover:bg-white/10 transition-all group">
+                             <div className="flex justify-between items-start mb-1">
+                               <span className="text-[8px] font-black text-indigo-400 uppercase tracking-widest">{t?.date || 'N/A'}</span>
+                             </div>
+                             <p className="text-xs text-slate-300 leading-relaxed whitespace-pre-wrap">{t?.text || ''}</p>
+                           </div>
+                         </div>
+                       ))
+                     )}
+                   </div>
+                </div>
+              </div>
+
+              {/* DOCUMENTO DE PROPUESTA */}
+              <div className="lg:col-span-8 print:col-span-12">
+                <div className="bg-white rounded-3xl shadow-xl border border-slate-200 overflow-hidden text-slate-800 print:shadow-none print:border-none print:overflow-visible">
+                  <div className="p-8 md:p-10 print:p-8" id="quote-document">
+                    <div className={`flex items-center justify-between gap-6 border-b-2 pb-4 mb-8 print:mb-4 print:pb-3 ${isCumbria ? 'border-blue-900' : 'border-orange-600'}`}>
+                      <img
+                        src={isCumbria ? "Logos/Cumbria Spa&Hotel.jpg" : "Logos/Sercotel Guadiana.jpg"}
+                        alt={hotelName}
+                        className="max-h-20 print:max-h-14 w-auto object-contain flex-shrink-0"
+                      />
+                      <div className="text-right">
+                        <h1 className={`text-xl md:text-2xl print:text-lg font-black uppercase tracking-tighter ${isCumbria ? 'text-blue-900' : 'text-orange-800'}`}>
+                          {docMode === 'confirmacion' ? 'Confirmación de Grupo' : 'Propuesta de Alojamiento'}
+                        </h1>
+                        <p className="text-[10px] print:text-[8px] font-black text-slate-400 uppercase tracking-[0.2em] mt-1">Ref: {g.Reserva}</p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8 print:mb-6">
+                      <div className="space-y-0.5">
+                        <span className="text-[9px] print:text-[7px] font-black text-slate-400 uppercase tracking-widest">Cliente / Grupo</span>
+                        <p className="text-xs print:text-[10px] font-bold text-slate-800 uppercase">{g["Nombre del Grupo"]}</p>
+                      </div>
+                      <div className="space-y-0.5">
+                        <span className="text-[9px] print:text-[7px] font-black text-slate-400 uppercase tracking-widest">Estancia</span>
+                        <p className="text-xs print:text-[10px] font-bold text-slate-800">{formatDate(g.Entrada)} - {formatDate(g.Salida)}</p>
+                      </div>
+                      <div className="space-y-0.5">
+                        <span className="text-[9px] print:text-[7px] font-black text-slate-400 uppercase tracking-widest">Pax Estimados</span>
+                        <p className="text-xs print:text-[10px] font-bold text-slate-800">{totalPax} personas</p>
+                      </div>
+                      <div className="space-y-0.5">
+                        <span className="text-[9px] print:text-[7px] font-black text-slate-400 uppercase tracking-widest">Reserva ID</span>
+                        <p className="text-xs print:text-[10px] font-bold text-slate-800">#{g.Reserva}</p>
+                      </div>
+                    </div>
+
+                    {(g.Com_Nombre_Contacto || g.Persona_Contacto || g.Com_Email_Contacto || g.Email || g.Com_Telefono_Contacto || g.Telefono || g.Teléfono) && (
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8 print:mb-6 border-t border-slate-50 pt-4">
+                        {(g.Com_Nombre_Contacto || g.Persona_Contacto) && (
+                          <div className="space-y-0.5">
+                            <span className="text-[9px] print:text-[7px] font-black text-slate-400 uppercase tracking-widest">Contacto</span>
+                            <p className="text-xs print:text-[10px] font-bold text-slate-800 uppercase">{g.Com_Nombre_Contacto || g.Persona_Contacto}</p>
+                          </div>
+                        )}
+                        {(g.Com_Email_Contacto || g.Email) && (
+                          <div className="space-y-0.5">
+                            <span className="text-[9px] print:text-[7px] font-black text-slate-400 uppercase tracking-widest">Email</span>
+                            <p className="text-xs print:text-[10px] font-bold text-slate-800">{g.Com_Email_Contacto || g.Email}</p>
+                          </div>
+                        )}
+                        {(g.Com_Telefono_Contacto || g.Telefono || g.Teléfono) && (
+                          <div className="space-y-0.5">
+                            <span className="text-[9px] print:text-[7px] font-black text-slate-400 uppercase tracking-widest">Teléfono</span>
+                            <p className="text-xs print:text-[10px] font-bold text-slate-800">{g.Com_Telefono_Contacto || g.Telefono || g.Teléfono}</p>
+                          </div>
+                        )}
+                        {g["Empresa/Agencia"] && g["Empresa/Agencia"] !== "Venta Directa" && (
+                          <div className="space-y-0.5">
+                            <span className="text-[9px] print:text-[7px] font-black text-slate-400 uppercase tracking-widest">Empresa / Agencia</span>
+                            <p className="text-xs print:text-[10px] font-bold text-slate-800 uppercase">{g["Empresa/Agencia"]}</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    <div className="space-y-8 print:space-y-4">
+                      <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest border-l-4 border-indigo-500 pl-3">Itinerario y Condiciones Económicas</h3>
+                      {dates.length > 0 ? (
+                        <div className="overflow-hidden print:overflow-visible rounded-2xl border border-slate-100 text-xs print:text-[10px]">
+                          <table className="w-full text-left border-collapse">
+                            <thead>
+                              <tr className="bg-slate-50 text-slate-500 font-black text-[10px] print:text-[8px] uppercase tracking-widest border-b border-slate-100">
+                                <th className="p-4 print:py-1.5 print:px-2">Fecha (Servicio)</th>
+                                <th className="p-4 print:py-1.5 print:px-2">Régimen</th>
+                                <th className="p-4 print:py-1.5 print:px-2">Tipología Alojamiento</th>
+                                <th className="p-4 print:py-1.5 print:px-2 text-right">Subtotal</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                              {dates.flatMap((date, idx) => {
+                                 let subtotalDate = 0;
+                                 const config = g.dailyConfig?.[date] || {};
+                                 const boardTitle = config.board || g.Regimen || '';
+
+                                 const roomRow = (
+                                   <tr key={`${date}-base`} className="group hover:bg-slate-50/50">
+                                     <td className="p-4 print:py-1.5 print:px-2 align-top font-bold text-slate-800">{formatDate(date)}</td>
+                                     <td className="p-4 print:py-1.5 print:px-2 align-top font-bold text-indigo-600">{boardTitle}</td>
+                                     <td className="p-4 print:py-1.5 print:px-2">
+                                       <ul className="text-[11px] print:text-[9px]">
+                                         {activeRooms.map(([type, count]) => {
+                                           const typeKey = type.toUpperCase();
+                                           let price = 0;
+                                           let gratuities = 0;
+                                           let lineSubtotal = 0;
+                                           let roomBoard = '';
+
+                                           if (config.prices && config.prices[typeKey] !== undefined) {
+                                              price = Number(config.prices[typeKey] || 0);
+                                              roomBoard = config[typeKey]?.board || '';
+                                              gratuities = parseInt(config[typeKey]?.gratuities || 0);
+                                              lineSubtotal = Math.max(0, count - gratuities) * price;
+                                           }
+                                           if (price === 0 && lineSubtotal === 0 && gratuities === 0) return null;
+
+                                           subtotalDate += lineSubtotal;
+                                           return (
+                                             <li key={type} className="text-slate-500 mb-1 print:mb-0">
+                                               <div className="flex justify-between">
+                                                 <span>{count}x {type} {roomBoard && roomBoard !== boardTitle ? `(${roomBoard})` : ''} ({formatNum(price)}€)</span>
+                                               </div>
+                                               {gratuities > 0 && <div className="text-emerald-500 font-bold text-[9px] uppercase tracking-wider mt-0.5 print:mt-0">[-{gratuities}] Gratuidad</div>}
+                                             </li>
+                                           );
+                                         })}
+                                       </ul>
+                                     </td>
+                                     <td className="p-4 print:py-1.5 print:px-2 align-bottom text-right font-black text-slate-800 tabular-nums">{formatNum(subtotalDate)} €</td>
+                                   </tr>
+                                 );
+
+                                 const dailyExtrasRows = (g.extraCharges || []).filter(ext => ext.date === date).map((ext, extIdx) => {
+                                    const u = ext.units || 0;
+                                    const pax = ext.pax || 0;
+                                    const up = ext.unitPrice !== undefined ? ext.unitPrice : Number(ext.price || 0);
+                                    const px = (u > 0 ? u : pax) * up;
+                                    return (
+                                       <tr key={`ext-${date}-${extIdx}`} className="bg-slate-50 border-t border-slate-100">
+                                         <td className="p-4 print:py-1.5 print:px-2 align-top font-bold text-slate-800">{formatDate(date)}</td>
+                                         <td className="p-4 print:py-1.5 print:px-2 align-top text-slate-500 font-black uppercase text-[9px] tracking-widest italic opacity-60">Cargo Extra</td>
+                                         <td className="p-4 print:py-1.5 print:px-2 text-slate-600 font-bold italic">{ext.description || ext.concept} ({u > 0 ? u : pax} x {formatNum(up)}€)</td>
+                                         <td className="p-4 print:py-1.5 print:px-2 align-bottom text-right font-black text-slate-800 tabular-nums">{formatNum(px)} €</td>
+                                       </tr>
+                                    );
+                                 });
+
+                                 return [roomRow, ...dailyExtrasRows];
+                              })}
+
+                              {(g.extraCharges || []).filter(ext => !ext.date || ext.date === '' || ext.date === 'Todas' || !dates.includes(ext.date)).map((ext, idx) => {
+                                const px = (ext.units || ext.pax || 0) * (ext.unitPrice !== undefined ? ext.unitPrice : parseFloat(ext.price || 0));
+                                return (
+                                  <tr key={`ext-global-${idx}`} className="bg-indigo-50/30 border-t border-indigo-100/50 italic">
+                                    <td className="p-4 print:py-1.5 print:px-2 align-top font-bold text-indigo-900">General</td>
+                                    <td className="p-4 print:py-1.5 print:px-2 align-top text-indigo-400 font-black uppercase text-[9px] tracking-widest">Extra Global</td>
+                                    <td className="p-4 print:py-1.5 print:px-2 text-indigo-800 font-bold">{ext.description || ext.concept} ({ext.units || ext.pax || 0} x {formatNum(ext.unitPrice || ext.price || 0)}€)</td>
+                                    <td className="p-4 print:py-1.5 print:px-2 align-bottom text-right font-black text-indigo-900 tabular-nums">{formatNum(px)} €</td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                            <tfoot className="bg-slate-900 text-white font-black">
+                               {parseFloat(g.Suplementos || 0) > 0 || parseFloat(g.Descuentos || 0) > 0 ? (
+                                 <>
+                                   <tr className="border-b border-slate-700/50 text-slate-300">
+                                     <td colSpan="3" className="px-6 py-4 print:py-2 print:px-3 text-right uppercase tracking-widest text-[10px] print:text-[8px]">Subtotal Estancia:</td>
+                                     <td className="px-6 py-4 print:py-2 print:px-3 text-right tabular-nums whitespace-nowrap">{formatNum((calculatedTotal > 0 ? calculatedTotal : 0) - (parseFloat(g.Suplementos || 0)) + (parseFloat(g.Descuentos || 0)))} €</td>
+                                   </tr>
+                                   {parseFloat(g.Suplementos || 0) > 0 && (
+                                     <tr className="border-b border-slate-700/50 text-indigo-300">
+                                       <td colSpan="3" className="px-6 py-3 print:py-1.5 print:px-3 text-right uppercase tracking-widest text-[10px] print:text-[8px]">+ Suplementos:</td>
+                                       <td className="px-6 py-3 print:py-1.5 print:px-3 text-right tabular-nums whitespace-nowrap">{formatNum(parseFloat(g.Suplementos))} €</td>
+                                     </tr>
+                                   )}
+                                   {parseFloat(g.Descuentos || 0) > 0 && (
+                                     <tr className="border-b border-slate-700/50 text-rose-300">
+                                       <td colSpan="3" className="px-6 py-3 print:py-1.5 print:px-3 text-right uppercase tracking-widest text-[10px] print:text-[8px]">- Descuentos aplicados:</td>
+                                       <td className="px-6 py-3 print:py-1.5 print:px-3 text-right tabular-nums whitespace-nowrap">-{formatNum(parseFloat(g.Descuentos))} €</td>
+                                     </tr>
+                                   )}
+                                   <tr style={{backgroundColor:'#0f172a', color:'white', WebkitPrintColorAdjust:'exact', printColorAdjust:'exact'}}>
+                                     <td colSpan="3" className="px-6 py-5 print:py-3 print:px-3 text-right uppercase tracking-[0.2em] text-xs print:text-[10px] font-black">Total Neto Documento:</td>
+                                     <td className="px-6 py-5 print:py-3 print:px-3 text-right text-xl print:text-lg tabular-nums whitespace-nowrap" style={{color:'white', fontWeight:900}}>{formatNum(calculatedTotal)} €</td>
+                                   </tr>
+                                 </>
+                               ) : (
+                                 <tr style={{backgroundColor:'#0f172a', color:'white', WebkitPrintColorAdjust:'exact', printColorAdjust:'exact'}}>
+                                   <td colSpan="3" className="px-6 py-5 print:py-3 print:px-3 text-right uppercase tracking-[0.2em] text-xs print:text-[10px] font-black">Total Neto Documento:</td>
+                                   <td className="px-6 py-5 print:py-3 print:px-3 text-right text-xl print:text-lg tabular-nums whitespace-nowrap" style={{color:'white', fontWeight:900}}>{formatNum(calculatedTotal)} €</td>
+                                 </tr>
+                               )}
+                            </tfoot>
+                          </table>
+                        </div>
+                      ) : (
+                        <div className="bg-slate-50 p-8 rounded-2xl text-center border border-slate-200">
+                          <p className="text-lg font-black text-indigo-700">{formatNum(calculatedTotal)} € (Total Estimado)</p>
+                          <p className="text-xs text-slate-400 mt-2">Detalle de noches no configurado aún.</p>
+                        </div>
+                      )}
+
+                      <div className="space-y-8 print:space-y-4">
+                        <div className="flex items-center justify-between no-print mb-4 bg-slate-50 p-2 rounded-2xl border border-slate-100">
+                          <div className="flex gap-1">
+                            <button onClick={() => setDocMode('presupuesto')} className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${docMode === 'presupuesto' ? 'bg-indigo-600 text-white shadow-lg' : 'bg-white text-slate-400 hover:text-slate-600'}`}>Vista Presupuesto</button>
+                            <button onClick={() => setDocMode('confirmacion')} className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${docMode === 'confirmacion' ? 'bg-emerald-600 text-white shadow-lg' : 'bg-white text-slate-400 hover:text-slate-600'}`}>Vista Confirmación</button>
+                          </div>
+                        </div>
+
+                        <div className="space-y-16 print:space-y-6 print-break-before">
+                          {docMode === 'presupuesto' && (
+                            <div className="relative group">
+                              <div className="flex items-center justify-between mb-5">
+                                <div className="flex items-center gap-3">
+                                  <div className={`h-4 w-1 rounded-full ${isCumbria ? 'bg-blue-800' : 'bg-orange-600'}`}></div>
+                                  <h4 className="text-[9px] font-black text-slate-400 uppercase tracking-[0.3em]">Cláusulas de Presupuesto</h4>
+                                </div>
+                                <button onClick={() => {
+                                    if (!isEditingClauses) {
+                                      const current = effectiveClauses;
+                                      setTempClauses(JSON.parse(JSON.stringify(current)));
+                                  } else {
+                                    db.collection("groups").doc(g.uid).update({ clauses: tempClauses }).then(() => alert("Cláusulas presupuesto guardadas."));
+                                  }
+                                  setIsEditingClauses(!isEditingClauses);
+                                }} className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${isEditingClauses ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'}`}>
+                                  {isEditingClauses ? 'Guardar' : 'Editar'}
+                                </button>
+                              </div>
+
+                              <div className="grid grid-cols-1 md:grid-cols-2 print:grid-cols-2 gap-x-8 gap-y-6 print:gap-x-4 print:gap-y-2">
+                                {(() => {
+                                  const cls = isEditingClauses ? tempClauses : effectiveClauses;
+                                  return cls.map((c, i) => {
+                                    if (isEditingClauses) {
+                                      return (
+                                        <div key={i} className="border-l-2 border-slate-200 pl-3 py-1 bg-slate-50/50 rounded-r-xl">
+                                          <div className="flex justify-between mb-2 gap-2">
+                                            <input type="text" value={c.title} onChange={e => { const n = [...tempClauses]; n[i].title = e.target.value; setTempClauses(n); }} className="flex-1 bg-white border border-slate-200 rounded px-2 py-1 text-[10px] font-black text-slate-800" />
+                                            <button onClick={() => handleTranslateClause(i, 'budget')} className="px-2 py-1 bg-indigo-50 text-indigo-600 rounded text-[9px] font-black hover:bg-indigo-600 hover:text-white"><i className="fas fa-language"></i></button>
+                                            <button onClick={() => setTempClauses(tempClauses.filter((_, idx) => idx !== i))} className="text-rose-500"><i className="fas fa-trash-alt text-[10px]"></i></button>
+                                          </div>
+                                          <textarea value={c.body} onChange={e => { const n = [...tempClauses]; n[i].body = e.target.value; setTempClauses(n); }} rows="3" className="w-full bg-white border border-slate-200 rounded px-2 py-1 text-[10px] text-slate-600 resize-none font-medium"></textarea>
+                                        </div>
+                                      );
+                                    }
+                                    return (
+                                      <div key={i} className={`border-l-2 ${isCumbria ? 'border-blue-200' : 'border-orange-100'} pl-3 print:pl-2 py-1`}>
+                                        <p className="text-[10px] print:text-[7.5px] font-black uppercase tracking-wider mb-0.5 text-slate-800">
+                                          <span className="text-slate-400 mr-1">{i + 1}.</span>{c.title}
+                                        </p>
+                                        <div className="text-[9.5px] print:text-[7px] text-slate-500 leading-snug">{renderClauseText(parseClauseVariables(c.body))}</div>
+                                      </div>
+                                    );
+                                  });
+                                })()}
+                                {isEditingClauses && (
+                                  <button onClick={() => setTempClauses([...tempClauses, { title: "Nueva Cláusula", body: "" }])} className="border-2 border-dashed border-slate-200 rounded-xl p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest hover:border-indigo-400 hover:text-indigo-400 transition-all flex items-center justify-center gap-2">
+                                    <i className="fas fa-plus"></i> Añadir Cláusula
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          )}
+
+                          {docMode === 'confirmacion' && (
+                            <div className="relative group">
+                              <div className="flex items-center justify-between mb-5">
+                                <div className="flex items-center gap-3">
+                                  <div className="h-4 w-1 rounded-full bg-emerald-500"></div>
+                                  <h4 className="text-[9px] font-black text-slate-400 uppercase tracking-[0.3em]">Cláusulas de Confirmación</h4>
+                                </div>
+                                <button onClick={() => {
+                                  if (!isEditingClausesConf) {
+                                    const current = effectiveClauses;
+                                    setTempClausesConf(JSON.parse(JSON.stringify(current)));
+                                  } else {
+                                    db.collection("groups").doc(g.uid).update({ clauses_conf: tempClausesConf }).then(() => alert("Cláusulas confirmación guardadas."));
+                                  }
+                                  setIsEditingClausesConf(!isEditingClausesConf);
+                                }} className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${isEditingClausesConf ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'}`}>
+                                  {isEditingClausesConf ? 'Guardar' : 'Editar'}
+                                </button>
+                              </div>
+
+                              <div className="grid grid-cols-1 md:grid-cols-2 print:grid-cols-2 gap-x-8 gap-y-6 print:gap-x-4 print:gap-y-2">
+                                {(() => {
+                                  const cls = isEditingClausesConf ? tempClausesConf : effectiveClauses;
+                                  return cls.map((c, i) => {
+                                    if (isEditingClausesConf) {
+                                      return (
+                                        <div key={i} className="border-l-2 border-emerald-100 pl-3 py-1 bg-slate-50/50 rounded-r-xl">
+                                          <div className="flex justify-between mb-2 gap-2">
+                                            <input type="text" value={c.title} onChange={e => { const n = [...tempClausesConf]; n[i].title = e.target.value; setTempClausesConf(n); }} className="flex-1 bg-white border border-slate-200 rounded px-2 py-1 text-[10px] font-black text-slate-800" />
+                                            <button onClick={() => handleTranslateClause(i, 'confirmation')} className="px-2 py-1 bg-emerald-50 text-emerald-600 rounded text-[9px] font-black hover:bg-emerald-600 hover:text-white"><i className="fas fa-language"></i></button>
+                                            <button onClick={() => setTempClausesConf(tempClausesConf.filter((_, idx) => idx !== i))} className="text-rose-500"><i className="fas fa-trash-alt text-[10px]"></i></button>
+                                          </div>
+                                          <textarea value={c.body} onChange={e => { const n = [...tempClausesConf]; n[i].body = e.target.value; setTempClausesConf(n); }} rows="3" className="w-full bg-white border border-slate-200 rounded px-2 py-1 text-[10px] text-slate-600 resize-none font-medium"></textarea>
+                                        </div>
+                                      );
+                                    }
+                                    return (
+                                      <div key={i} className="border-l-2 border-emerald-100 pl-3 print:pl-2 py-1">
+                                        <p className="text-[10px] print:text-[7.5px] font-black uppercase tracking-wider mb-0.5 text-emerald-900">
+                                          <span className="text-emerald-700 mr-1">{i + 1}.</span>{c.title}
+                                        </p>
+                                        <div className="text-[9.5px] print:text-[7px] text-slate-500 leading-snug">{renderClauseText(parseClauseVariables(c.body))}</div>
+                                      </div>
+                                    );
+                                  });
+                                })()}
+                                {isEditingClausesConf && (
+                                  <button onClick={() => setTempClausesConf([...tempClausesConf, { title: "Nueva Cláusula Conf.", body: "" }])} className="border-2 border-dashed border-emerald-100 rounded-xl p-4 text-[10px] font-black text-emerald-400 uppercase tracking-widest hover:border-emerald-400 hover:text-emerald-500 transition-all flex items-center justify-center gap-2">
+                                    <i className="fas fa-plus"></i> Añadir Cláusula de Confirmación
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className={`pt-5 print:pt-3 border-t-2 ${isCumbria ? 'border-blue-900' : 'border-orange-600'} print:border-t flex items-end justify-between`}>
+                        <div className="print:pl-2">
+                          <p className="text-[9px] print:text-[7px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">Generado por</p>
+                          <p className={`text-sm print:text-[10px] font-black ${isCumbria ? 'text-blue-900' : 'text-orange-800'}`}>{isCumbria ? "Dpto. Eventos Cumbria" : "Dpto. Grupos Sercotel Guadiana"}</p>
+                          <p className="text-[9px] print:text-[7px] text-slate-400 italic mt-0.5">Este documento no tiene validez como factura</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-[9px] print:text-[7px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">Fecha del Documento</p>
+                          <p className={`text-lg print:text-sm font-black ${isCumbria ? 'text-blue-900' : 'text-orange-800'}`}>{new Date().toLocaleDateString('es-ES', { day: '2-digit', month: 'long', year: 'numeric' })}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-6 flex justify-end no-print">
+                  <button onClick={() => {
+                      const originalTitle = document.title;
+                      const reserva = g.Reserva || '';
+                      const grupo = g['Nombre del Grupo'] || '';
+                      document.title = (reserva && grupo) ? `${reserva} - ${grupo}` : (grupo || reserva || 'Propuesta');
+                      window.print();
+                      setTimeout(() => { document.title = originalTitle; }, 500);
+                    }} className="bg-slate-900 hover:bg-black text-white px-8 py-3 rounded-2xl font-black transition-all shadow-xl flex items-center gap-3">
+                    <i className="fas fa-print"></i> IMPRIMIR PDF
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      };
+
+      return (
+        <div className="flex flex-col min-h-screen">
+          {/* NAV BAR */}
+          <nav className="bg-white border-b border-slate-200 z-50 no-print">
+            <div className="max-w-7xl mx-auto px-6 h-18 flex items-center justify-between">
+              <div className="flex items-center gap-4 cursor-pointer py-4" onClick={() => setCurrentView('dashboard')}>
+                <div className="w-9 h-9 bg-slate-900 rounded-xl flex items-center justify-center shadow-lg">
+                  <i className="fas fa-layer-group text-white text-sm"></i>
+                </div>
+                <div>
+                  <h1 className="text-base font-black tracking-tight leading-none mb-1">Nexus Presupuestos</h1>
+                  <p className="text-[9px] text-slate-400 font-bold uppercase tracking-[0.2em]">Sales Hub</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-6">
+                <a href="Proformas.html" className="text-[10px] font-black text-slate-400 hover:text-slate-900 transition-colors uppercase tracking-widest flex items-center gap-2 mr-4">
+                  <i className="fas fa-file-invoice"></i> Fac Proforma
+                </a>
+                <a href="https://nataliogc.github.io/menus-eventos/admin.html" target="_blank" rel="noopener noreferrer" className="text-[10px] font-black text-slate-400 hover:text-slate-900 transition-colors uppercase tracking-widest flex items-center gap-2 mr-4">
+                  <i className="fas fa-utensils"></i> Menús Eventos
+                </a>
+                <a href="https://nataliogc.github.io/Menus-Turisticos/" target="_blank" rel="noopener noreferrer" className="text-[10px] font-black text-slate-400 hover:text-slate-900 transition-colors uppercase tracking-widest flex items-center gap-2 mr-4">
+                  <i className="fas fa-map"></i> Menús Turísticos
+                </a>
+                <a href="https://nataliogc.github.io/menus-cocteles/" target="_blank" rel="noopener noreferrer" className="text-[10px] font-black text-slate-400 hover:text-slate-900 transition-colors uppercase tracking-widest flex items-center gap-2 mr-4">
+                  <i className="fas fa-glass-martini-alt"></i> Menús Cócteles
+                </a>
+                <a href="Gestión de Grupos.html" className="text-[10px] font-black text-slate-400 hover:text-slate-900 transition-colors uppercase tracking-widest flex items-center gap-2">
+                  <i className="fas fa-arrow-left"></i> Volver a Grupos
+                </a>
+              </div>
+            </div>
+          </nav>
+
+          <main className="flex-grow p-4 md:p-8">
+            {loading ? (
+              <div className="h-64 flex flex-col items-center justify-center space-y-4">
+                <div className="w-10 h-10 border-4 border-slate-100 border-t-indigo-500 rounded-full animate-spin"></div>
+                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Conectando...</p>
+              </div>
+            ) : (
+              <>
+                {currentView === 'dashboard' && renderDashboard()}
+                {currentView === 'create' && renderCreate()}
+                {currentView === 'detail' && renderDetail()}
+              </>
+            )}
+          </main>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  

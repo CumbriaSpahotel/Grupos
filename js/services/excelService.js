@@ -317,7 +317,7 @@
 
             const NUMERIC_KEYS = new Set(["Importe(*)", "Pax.", "Noches", "Pernoct.", "Cant. Habitaciones"]);
             const DATE_KEYS = new Set(["Entrada", "Salida"]);
-            const relevantKeys = ["Estado", "Entrada", "Salida", "Pax.", "Importe(*)", "Régimen", "Segment.", "Nombre del Grupo", "Noches", "Pernoct.", "Empresa/Agencia", "Cant. Habitaciones"];
+            const relevantKeys = ["Entrada", "Salida", "Pax.", "Importe(*)", "Régimen", "Segment.", "Nombre del Grupo", "Noches", "Pernoct.", "Empresa/Agencia", "Cant. Habitaciones"];
 
             relevantKeys.forEach((key) => {
                 const rawOld = existingRow[key];
