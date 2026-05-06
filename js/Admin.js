@@ -1,4 +1,4 @@
-"use strict";
+﻿"use strict";
 
 function _regenerator() { /*! regenerator-runtime -- Copyright (c) 2014-present, Facebook, Inc. -- license (MIT): https://github.com/babel/babel/blob/main/packages/babel-helpers/LICENSE */ var e, t, r = "function" == typeof Symbol ? Symbol : {}, n = r.iterator || "@@iterator", o = r.toStringTag || "@@toStringTag"; function i(r, n, o, i) { var c = n && n.prototype instanceof Generator ? n : Generator, u = Object.create(c.prototype); return _regeneratorDefine2(u, "_invoke", function (r, n, o) { var i, c, u, f = 0, p = o || [], y = !1, G = { p: 0, n: 0, v: e, a: d, f: d.bind(e, 4), d: function d(t, r) { return i = t, c = 0, u = e, G.n = r, a; } }; function d(r, n) { for (c = r, u = n, t = 0; !y && f && !o && t < p.length; t++) { var o, i = p[t], d = G.p, l = i[2]; r > 3 ? (o = l === n) && (u = i[(c = i[4]) ? 5 : (c = 3, 3)], i[4] = i[5] = e) : i[0] <= d && ((o = r < 2 && d < i[1]) ? (c = 0, G.v = n, G.n = i[1]) : d < l && (o = r < 3 || i[0] > n || n > l) && (i[4] = r, i[5] = n, G.n = l, c = 0)); } if (o || r > 1) return a; throw y = !0, n; } return function (o, p, l) { if (f > 1) throw TypeError("Generator is already running"); for (y && 1 === p && d(p, l), c = p, u = l; (t = c < 2 ? e : u) || !y;) { i || (c ? c < 3 ? (c > 1 && (G.n = -1), d(c, u)) : G.n = u : G.v = u); try { if (f = 2, i) { if (c || (o = "next"), t = i[o]) { if (!(t = t.call(i, u))) throw TypeError("iterator result is not an object"); if (!t.done) return t; u = t.value, c < 2 && (c = 0); } else 1 === c && (t = i.return) && t.call(i), c < 2 && (u = TypeError("The iterator does not provide a '" + o + "' method"), c = 1); i = e; } else if ((t = (y = G.n < 0) ? u : r.call(n, G)) !== a) break; } catch (t) { i = e, c = 1, u = t; } finally { f = 1; } } return { value: t, done: y }; }; }(r, o, i), !0), u; } var a = {}; function Generator() {} function GeneratorFunction() {} function GeneratorFunctionPrototype() {} t = Object.getPrototypeOf; var c = [][n] ? t(t([][n]())) : (_regeneratorDefine2(t = {}, n, function () { return this; }), t), u = GeneratorFunctionPrototype.prototype = Generator.prototype = Object.create(c); function f(e) { return Object.setPrototypeOf ? Object.setPrototypeOf(e, GeneratorFunctionPrototype) : (e.__proto__ = GeneratorFunctionPrototype, _regeneratorDefine2(e, o, "GeneratorFunction")), e.prototype = Object.create(u), e; } return GeneratorFunction.prototype = GeneratorFunctionPrototype, _regeneratorDefine2(u, "constructor", GeneratorFunctionPrototype), _regeneratorDefine2(GeneratorFunctionPrototype, "constructor", GeneratorFunction), GeneratorFunction.displayName = "GeneratorFunction", _regeneratorDefine2(GeneratorFunctionPrototype, o, "GeneratorFunction"), _regeneratorDefine2(u), _regeneratorDefine2(u, o, "Generator"), _regeneratorDefine2(u, n, function () { return this; }), _regeneratorDefine2(u, "toString", function () { return "[object Generator]"; }), (_regenerator = function _regenerator() { return { w: i, m: f }; })(); }
 function _regeneratorDefine2(e, r, n, t) { var i = Object.defineProperty; try { i({}, "", {}); } catch (e) { i = 0; } _regeneratorDefine2 = function _regeneratorDefine(e, r, n, t) { function o(r, n) { _regeneratorDefine2(e, r, function (e) { return this._invoke(r, n, e); }); } r ? i ? i(e, r, { value: n, enumerable: !t, configurable: !t, writable: !t }) : e[r] = n : (o("next", 0), o("throw", 1), o("return", 2)); }, _regeneratorDefine2(e, r, n, t); }
@@ -41,8 +41,8 @@ var safeParseAmount = NexusUtils.parseNum;
 var fmt = NexusUtils.formatCurrency;
 var formatDate = NexusUtils.formatDate;
 
-// --- MÓDULO IA (CONEXIÓN SEGURA) ---
-// --- MÓDULO IA ESTRATÉGICA (CONEXIÓN POR PARÁMETROS) ---
+// --- MÃ“DULO IA (CONEXIÃ“N SEGURA) ---
+// --- MÃ“DULO IA ESTRATÉGICA (CONEXIÃ“N POR PARÃMETROS) ---
 function analizarGrupos(_x) {
   return _analizarGrupos.apply(this, arguments);
 }
@@ -116,7 +116,7 @@ function _analizarGrupos() {
             _context4.n = 10;
             break;
           }
-          throw new Error("⚠️ SEGURIDAD: Tu API Key ha sido desactivada por filtración pública (leaked). Por favor, genera una nueva clave privada en Google AI Studio.");
+          throw new Error("âš ï¸ SEGURIDAD: Tu API Key ha sido desactivada por filtración pública (leaked). Por favor, genera una nueva clave privada en Google AI Studio.");
         case 10:
           throw new Error("Error en API Gemini: ".concat(msg || JSON.stringify(error)));
         case 11:
@@ -209,7 +209,7 @@ var Sidebar = function Sidebar(_ref) {
     return /*#__PURE__*/React.createElement("button", {
       key: item.id,
       onClick: function onClick() {
-        if (item.id === "groups") window.location.href = "Gestión de Grupos.html";else if (item.id === "budgets") window.location.href = "Presupuestos.html";else if (item.id === "alta-email") window.location.href = "AltaEmail.html";else if (item.id === "invoices") {
+        if (item.id === "groups") window.location.href = "Gestion-de-Grupos.html";else if (item.id === "budgets") window.location.href = "Presupuestos.html";else if (item.id === "alta-email") window.location.href = "AltaEmail.html";else if (item.id === "invoices") {
           window.location.href = "Proformas.html";
         } else if (item.id === "menus") window.open("https://nataliogc.github.io/menus-eventos/admin.html", "_blank");else if (item.id === "turisticos") window.open("https://nataliogc.github.io/Menus-Turisticos/", "_blank");else if (item.id === "cocteles") window.open("https://nataliogc.github.io/menus-cocteles/", "_blank");else if (item.id === "settings") window.location.href = "Configuracion.html";else setActiveTab(item.id);
       },
@@ -440,7 +440,7 @@ var Dashboard = function Dashboard(_ref2) {
     color: "emerald"
   }, {
     label: "Ocupación Media",
-    val: financials.totalGroups > 0 ? (financials.totalPax / Math.max(financials.totalGroups, 1) * 1.2).toFixed(1) + "%" : "–",
+    val: financials.totalGroups > 0 ? (financials.totalPax / Math.max(financials.totalGroups, 1) * 1.2).toFixed(1) + "%" : "â€“",
     sub: "Estimada por grupo",
     icon: "Percent",
     color: "blue"
@@ -449,7 +449,7 @@ var Dashboard = function Dashboard(_ref2) {
     val: financials.confirmed > 0 ? (financials.totalRevenue / financials.confirmed).toLocaleString("es-ES", {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2
-    }) + "€" : "–",
+    }) + "â‚¬" : "â€“",
     sub: "Por reserva confirmada",
     icon: "Target",
     color: "amber"
@@ -936,7 +936,7 @@ var GroupsManager = function GroupsManager(_ref9) {
     }
   })), /*#__PURE__*/React.createElement("button", {
     onClick: function onClick() {
-      return window.location.href = "Gestión de Grupos.html";
+      return window.location.href = "Gestion-de-Grupos.html";
     },
     className: "bg-[#2d5a43] text-white px-6 py-3 rounded-2xl font-bold flex items-center gap-2 hover:bg-[#1e3a2c] transition-all text-sm shrink-0"
   }, /*#__PURE__*/React.createElement(LucideIcon, {
@@ -1056,7 +1056,7 @@ var GroupsManager = function GroupsManager(_ref9) {
       className: "w-3 h-3"
     }), "Proforma"), /*#__PURE__*/React.createElement("button", {
       onClick: function onClick() {
-        return window.location.href = "Gestión de Grupos.html";
+        return window.location.href = "Gestion-de-Grupos.html";
       },
       className: "p-1.5 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-all flex items-center justify-center"
     }, /*#__PURE__*/React.createElement(LucideIcon, {
@@ -1267,7 +1267,7 @@ var BudgetManager = function BudgetManager(_ref0) {
       className: "flex gap-2 pt-4 border-t border-slate-50"
     }, /*#__PURE__*/React.createElement("button", {
       onClick: function onClick() {
-        window.location.href = "Gestión de Grupos.html?reserva=" + budget.Reserva;
+        window.location.href = "Gestion-de-Grupos.html?reserva=" + budget.Reserva;
       },
       className: "px-4 py-2.5 bg-emerald-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-700 transition-all flex items-center justify-center shadow-lg shadow-emerald-100",
       title: "Abrir en Panel de Gesti\xF3n"
@@ -1328,7 +1328,7 @@ var App = function App() {
     timeRange = _useState8[0],
     setTimeRange = _useState8[1];
   var _useState9 = useState({
-      revenue: "0€",
+      revenue: "0â‚¬",
       groups: 0,
       pending: 0,
       pax: 0
@@ -1927,7 +1927,7 @@ var App = function App() {
     className: "text-slate-500 mb-8 max-w-sm"
   }, "Esta secci\xF3n utiliza las herramientas din\xE1micas del gestor. Redirigiendo..."), /*#__PURE__*/React.createElement("button", {
     onClick: function onClick() {
-      return window.location.href = activeTab === "invoices" ? "Fac Prof.html" : "Gestión de Grupos.html";
+      return window.location.href = activeTab === "invoices" ? "Fac Prof.html" : "Gestion-de-Grupos.html";
     },
     className: "bg-slate-900 px-8 py-4 rounded-2xl text-white font-bold hover:bg-slate-800 transition-all shadow-xl"
   }, "Abrir", " ", activeTab === "invoices" ? "Módulo de Facturación" : "Gestor de Grupos"))), isAiModalOpen && /*#__PURE__*/React.createElement("div", {

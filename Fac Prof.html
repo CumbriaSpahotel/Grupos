@@ -303,6 +303,32 @@
             overflow-wrap: anywhere;
             line-height: 1.25;
         }
+
+        .clause-body {
+            text-align: justify !important;
+            text-justify: inter-word;
+            hyphens: auto;
+            -webkit-hyphens: auto;
+            overflow-wrap: break-word;
+            word-break: normal;
+            line-height: 1.55;
+            margin-top: 4px;
+            color: #475569;
+        }
+
+        /* Plan de pagos y cláusulas: evitar cortes al imprimir */
+        #footer-totals > div,
+        #tpl-policies {
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+        }
+
+        /* Cada cláusula individual no se corta */
+        .clause-item {
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+            display: block;
+        }
     </style>
 </head>
 
@@ -398,10 +424,15 @@
                 <option value="it">Italiano</option>
                 <option value="pt">Portugues</option>
             </select>
-            <button onclick="translateAndPrintDoc()"
+            <button onclick="translateDocumentOnly()"
                 class="flex items-center gap-2 px-3 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-600 text-white text-[9px] font-black uppercase tracking-wider shadow-lg transition-all whitespace-nowrap">
                 <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 8h14"/><path d="M5 16h9"/><path d="M14 20l6-12"/><path d="M17 14l3 6"/></svg>
-                Traducir + PDF
+                Traducir
+            </button>
+            <button onclick="translateClausesOnly()"
+                class="flex items-center gap-2 px-3 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-[9px] font-black uppercase tracking-wider shadow-lg transition-all whitespace-nowrap">
+                <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16"/><path d="M4 12h10"/><path d="M4 19h7"/></svg>
+                Traducir clausulas
             </button>
 
             <!-- Desestimar -->
@@ -413,7 +444,7 @@
     </div>
 
 
-    <!-- CONTENEDOR DE LA PÁGINA -->
+    <!-- CONTENEDOR DE LA PÃGINA -->
     <div id="capture-area" class="page-container flex flex-col shadow-2xl border border-gray-300">
 
         <!-- Sidebar Legal Vertical Global -->
@@ -448,13 +479,13 @@
                 <div id="doc-type-title" style="display:inline-block; background:#1e293b; color:white; font-size:8px; font-weight:900; letter-spacing:0.2em; text-transform:uppercase; padding:3px 10px; border-radius:4px; margin-bottom:6px; -webkit-print-color-adjust:exact; print-color-adjust:exact;">
                     Confirmación
                 </div>
-                <!-- Nº Reserva — visible solo en confirmacion, oculto en proforma -->
+                <!-- NÂº Reserva â€” visible solo en confirmacion, oculto en proforma -->
                 <div id="header-reserva-block" style="display:flex; flex-direction:column; gap:1px; margin-bottom:4px;">
-                    <span id="doc-type-label" style="font-size:7px; font-weight:900; letter-spacing:0.15em; text-transform:uppercase; color:#94a3b8;">Nº Reserva</span>
+                    <span id="doc-type-label" style="font-size:7px; font-weight:900; letter-spacing:0.15em; text-transform:uppercase; color:#94a3b8;">NÂº Reserva</span>
                     <span id="reserva-id-universal" class="editable" contenteditable="true"
                         style="font-size:13px; font-weight:900; color:#0f172a; letter-spacing:0.03em; font-family:'Courier Prime', monospace;">---</span>
                 </div>
-                <!-- Fecha — visible solo en confirmacion -->
+                <!-- Fecha â€” visible solo en confirmacion -->
                 <div id="header-fecha-block" style="display:flex; flex-direction:column; gap:1px;">
                     <span style="font-size:7px; font-weight:900; letter-spacing:0.15em; text-transform:uppercase; color:#94a3b8;">Fecha</span>
                     <span id="fecha-universal" class="editable" contenteditable="true"
@@ -464,7 +495,7 @@
 
         </div>
 
-        <!-- MODELO 1: CONFIRMACIÓN (Estilo Moderno) -->
+        <!-- MODELO 1: CONFIRMACIÃ“N (Estilo Moderno) -->
         <div id="tpl-confirmacion" class="template-content font-sans">
             <!-- Header removed and moved to universal container -->
 
@@ -535,7 +566,7 @@
                         <table style="border-collapse:collapse; border:1px solid #000; width:280px; margin:0 auto; font-size:10px;" id="proforma-ref-table">
                             <thead>
                                 <tr style="background:#f1f5f9;">
-                                    <th style="border:1px solid #000; padding:3px 8px; text-align:center; font-weight:900; width:40%;" id="proforma-header-label">Nº Factura</th>
+                                    <th style="border:1px solid #000; padding:3px 8px; text-align:center; font-weight:900; width:40%;" id="proforma-header-label">NÂº Factura</th>
                                     <th style="border:1px solid #000; padding:3px 8px; text-align:center; font-weight:900; width:40%;">Fecha</th>
                                     <th style="border:1px solid #000; padding:3px 8px; text-align:center; font-weight:900; width:20%;">Pág.</th>
                                 </tr>
@@ -595,7 +626,7 @@
                     class="no-print absolute -top-3 -right-3 bg-emerald-500 text-white rounded-full w-5 h-5 text-[9px] font-bold shadow hover:bg-emerald-600 transition hidden"
                     id="ocupante-restore"
                     onclick="document.querySelectorAll('.ocupante-row').forEach(r=>r.classList.remove('hidden'));this.classList.add('hidden');"
-                    title="Restaurar campos ocultos">↺</button>
+                    title="Restaurar campos ocultos">â†º</button>
 
                 <div class="flex-1">
                     <div class="mb-1 ocupante-row flex items-center gap-1">
@@ -603,14 +634,14 @@
                                 id="f-pax-name">---</span></span>
                         <button class="no-print text-red-300 hover:text-red-600 text-[10px] ml-auto"
                             onclick="this.parentElement.classList.add('hidden');document.getElementById('ocupante-restore').classList.remove('hidden');"
-                            title="Ocultar">✕</button>
+                            title="Ocultar">✖</button>
                     </div>
                     <div class="ocupante-row flex items-center gap-1">
                         <span class="w-24"><strong>Cantidad :</strong></span>
                         <span class="editable flex-1" contenteditable="true" id="f-room-summary">---</span>
                         <button class="no-print text-red-300 hover:text-red-600 text-[10px]"
                             onclick="this.parentElement.classList.add('hidden');document.getElementById('ocupante-restore').classList.remove('hidden');"
-                            title="Ocultar">✕</button>
+                            title="Ocultar">✖</button>
                     </div>
                     <div class="grid grid-cols-2 gap-x-4">
                         <div class="ocupante-row flex items-center gap-1">
@@ -618,28 +649,28 @@
                             <span class="editable" contenteditable="true" id="f-pax-count">62</span>
                             <button class="no-print text-red-300 hover:text-red-600 text-[10px] ml-auto"
                                 onclick="this.parentElement.classList.add('hidden');document.getElementById('ocupante-restore').classList.remove('hidden');"
-                                title="Ocultar">✕</button>
+                                title="Ocultar">✖</button>
                         </div>
                         <div class="ocupante-row flex items-center gap-1">
-                            <span class="w-24"><strong>Nº Bono :</strong></span>
+                            <span class="w-24"><strong>NÂº Bono :</strong></span>
                             <span class="editable" contenteditable="true" id="f-voucher">---</span>
                             <button class="no-print text-red-300 hover:text-red-600 text-[10px] ml-auto"
                                 onclick="this.parentElement.classList.add('hidden');document.getElementById('ocupante-restore').classList.remove('hidden');"
-                                title="Ocultar">✕</button>
+                                title="Ocultar">✖</button>
                         </div>
                         <div class="ocupante-row flex items-center gap-1">
                             <span class="w-24"><strong>Entrada :</strong></span>
                             <span class="editable" contenteditable="true" id="f-date-in">22-04-2026</span>
                             <button class="no-print text-red-300 hover:text-red-600 text-[10px] ml-auto"
                                 onclick="this.parentElement.classList.add('hidden');document.getElementById('ocupante-restore').classList.remove('hidden');"
-                                title="Ocultar">✕</button>
+                                title="Ocultar">✖</button>
                         </div>
                         <div class="ocupante-row flex items-center gap-1">
                             <span class="w-24"><strong>Salida :</strong></span>
                             <span class="editable" contenteditable="true" id="f-date-out">24-04-2026</span>
                             <button class="no-print text-red-300 hover:text-red-600 text-[10px] ml-auto"
                                 onclick="this.parentElement.classList.add('hidden');document.getElementById('ocupante-restore').classList.remove('hidden');"
-                                title="Ocultar">✕</button>
+                                title="Ocultar">✖</button>
                         </div>
                     </div>
                     <div
@@ -649,7 +680,7 @@
                     </div>
                 </div>
 
-                <!-- Espacio para Desglose (Eliminado de aquí para moverlo bajo el total) -->
+                <!-- Espacio para Desglose (Eliminado de aquííííí para moverlo bajo el total) -->
                 <div id="iva-summary-proforma" class="hidden"></div>
             </div>
 
@@ -661,7 +692,7 @@
                         <th width="8%" class="text-center py-1.5">CANTIDAD</th>
                         <th width="30%" class="text-left py-1.5">CONCEPTO</th>
                         <th width="8%" class="text-center py-1.5">REG.</th>
-                        <th width="8%" class="text-center py-1.5">DÍAS</th>
+                        <th width="8%" class="text-center py-1.5">DÃAS</th>
                         <th width="10%" class="text-right py-1.5">PRECIO/U</th>
                         <th width="12%" class="text-right py-1.5">TOTAL</th>
                         <th width="12%" class="text-right py-1.5">ACUMULADO</th>
@@ -678,13 +709,13 @@
             <!-- Notas y Comentarios Especiales (oculto por defecto) -->
             <button id="btn-proforma-notas" class="no-print mt-4 text-[9px] font-bold text-slate-400 uppercase tracking-widest hover:text-slate-600 transition flex items-center gap-1"
                 onclick="document.getElementById('proforma-notas-block').style.display='block'; this.style.display='none';">
-                ＋ Añadir Notas / Comentarios
+                ï¼‹ Añadir Notas / Comentarios
             </button>
             <div id="proforma-notas-block" class="mt-4 pt-4 border-t border-slate-100 mb-4" style="display:none;">
                 <div class="flex items-center justify-between mb-2">
                     <h4 class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Notas y Comentarios Especiales</h4>
                     <button class="no-print text-[9px] text-red-300 hover:text-red-500 font-bold"
-                        onclick="document.getElementById('proforma-notas-block').style.display='none'; document.getElementById('btn-proforma-notas').style.display='flex';">✕ Quitar</button>
+                        onclick="document.getElementById('proforma-notas-block').style.display='none'; document.getElementById('btn-proforma-notas').style.display='flex';">✖ Quitar</button>
                 </div>
                 <div class="p-4 rounded-xl bg-slate-50 border border-slate-100 italic text-[10px] text-slate-600 leading-relaxed min-h-[50px] editable"
                     contenteditable="true" id="proforma-notas">
@@ -793,7 +824,7 @@
         <!-- TOTALES Y FOOTER -->
         <div>
         <!-- Totales Dinámicos (Confirmación / Propuesta) -->
-        <div id="footer-totals" class="w-full"></div>
+        <div id="footer-totals" style="padding-bottom: 20px;" class="w-full"></div>
         
         <!-- Bloque Resumen Proforma (Total + IVA) -->
         <div id="proforma-summary" class="w-full flex flex-col items-end gap-1 mt-2"></div>
@@ -804,7 +835,7 @@
         <!-- BLOQUE DE PAGO QR ESTATICO - el <a> es DOM real, Chrome lo convierte en annotacion PDF clicable -->
         <div id="payment-qr-block" style="display:none; margin-top:10px; margin-bottom:4px; -webkit-print-color-adjust:exact; print-color-adjust:exact; position:relative;">
             <!-- Botón cerrar (no imprime) -->
-            <button class="no-print" onclick="document.getElementById('payment-qr-block').style.display='none'; sessionStorage.setItem('proforma_qr_hidden','1'); document.getElementById('qr-show-btn').style.display='flex';" style="position:absolute; top:8px; right:8px; background:rgba(255,255,255,0.15); border:1px solid rgba(255,255,255,0.3); border-radius:4px; padding:2px 6px; font-size:10px; cursor:pointer; color:white; line-height:1; z-index:20;" title="Ocultar pasarela de pago">✕</button>
+            <button class="no-print" onclick="document.getElementById('payment-qr-block').style.display='none'; sessionStorage.setItem('proforma_qr_hidden','1'); document.getElementById('qr-show-btn').style.display='flex';" style="position:absolute; top:8px; right:8px; background:rgba(255,255,255,0.15); border:1px solid rgba(255,255,255,0.3); border-radius:4px; padding:2px 6px; font-size:10px; cursor:pointer; color:white; line-height:1; z-index:20;" title="Ocultar pasarela de pago">✖</button>
 
             <div style="display:flex; align-items:stretch; background:linear-gradient(135deg,#064e3b,#065f46); border-radius:14px; -webkit-print-color-adjust:exact; print-color-adjust:exact;">
                 <div style="padding:12px 10px 12px 14px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:5px; flex-shrink:0;">
@@ -838,7 +869,7 @@
             </div>
         </div>
         <!-- Botón para mostrar qr de nuevo (no imprime) -->
-        <button id="qr-show-btn" class="no-print" onclick="document.getElementById('payment-qr-block').style.display='block'; sessionStorage.setItem('proforma_qr_hidden','0'); this.style.display='none';" style="display:none; margin-top:6px; align-items:center; gap:4px; background:#f1f5f9; border:1px solid #e2e8f0; border-radius:6px; padding:3px 10px; font-size:8px; cursor:pointer; color:#475569; font-weight:700; letter-spacing:0.05em;">＋ Incluir pasarela de pago (QR)</button>
+        <button id="qr-show-btn" class="no-print" onclick="document.getElementById('payment-qr-block').style.display='block'; sessionStorage.setItem('proforma_qr_hidden','0'); this.style.display='none';" style="display:none; margin-top:6px; align-items:center; gap:4px; background:#f1f5f9; border:1px solid #e2e8f0; border-radius:6px; padding:3px 10px; font-size:8px; cursor:pointer; color:#475569; font-weight:700; letter-spacing:0.05em;">ï¼‹ Incluir pasarela de pago (QR)</button>
 
         <!-- FIN BLOQUE PAGO QR -->
 
@@ -851,9 +882,9 @@
         </div>
         </div>
     </div>
-    <!-- FIN CAPTURE-AREA (PÁGINA 1) -->
+    <!-- FIN CAPTURE-AREA (PÃGINA 1) -->
 
-    <!-- Políticas de Reserva (PÁGINA 2) -->
+    <!-- Políticas de Reserva (PÃGINA 2) -->
     <div id="tpl-policies" class="page-container shadow-2xl border border-gray-300 mt-8 hidden" style="break-before: page;">
         <!-- Sidebar Legal Vertical (Página 2) -->
         <div class="static-legal-sidebar">
@@ -869,7 +900,7 @@
             class="bg-white p-6 rounded-xl shadow-2xl max-w-2xl w-full mx-4 max-h-[80vh] overflow-hidden flex flex-col">
             <div class="flex justify-between items-center mb-4">
                 <h3 id="ai-modal-title" class="text-xl font-bold text-[#2d5a43] flex items-center gap-2"></h3>
-                <button onclick="closeAIModal()" class="text-gray-400 hover:text-gray-600">✕</button>
+                <button onclick="closeAIModal()" class="text-gray-400 hover:text-gray-600">✖</button>
             </div>
             <div id="ai-content" class="text-sm text-gray-700 whitespace-pre-wrap overflow-y-auto mb-6 pr-2">
                 Generando respuesta...
@@ -941,11 +972,11 @@
                 bank: "Caixabank",
                 iban: "ES19 3081 0601 0850 0004 8966",
                 paymentGateway: "",
-                legal: "Inscrito en el tomo 699 de libro 0 folio 2 hoja CR-32491 inscripción 2ª"
+                legal: "Inscrito en el tomo 699 de libro 0 folio 2 hoja CR-32491 inscripción 2Âª"
             }
         };
 
-        // --- CARGAR CONFIGURACIÓN DESDE CLOUD ---
+        // --- CARGAR CONFIGURACIÃ“N DESDE CLOUD ---
         async function refreshConfigFromCloud() {
             try {
                 if (typeof db === 'undefined') return;
@@ -959,7 +990,7 @@
                     updateHotel(currentHotel);
                 }
             } catch (e) {
-                console.warn("⚠️ Error cargando config cloud:", e);
+                console.warn("âš ï¸ Error cargando config cloud:", e);
             }
         }
 
@@ -1100,7 +1131,7 @@
                     const btn = document.querySelector('button[onclick="saveProforma()"]');
                     if (btn) {
                         const originalText = btn.innerHTML;
-                        btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> ¡Guardado!';
+                        btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> ¡¡¡Guardado!';
                         btn.classList.add('bg-emerald-600');
                         setTimeout(() => {
                             btn.innerHTML = originalText;
@@ -1119,7 +1150,7 @@
             const saved = localStorage.getItem('selectedGroup');
             let isIndependent = false;
             let reservaId = "";
-            let targetFile = "Gestión de Grupos.html";
+            let targetFile = "/Gestion-de-Grupos.html";
 
             if (saved) {
                 try {
@@ -1130,7 +1161,7 @@
             }
 
             if (isIndependent) {
-                window.location.href = "Proformas.html";
+                window.location.href = "/Proformas.html";
                 return;
             }
 
@@ -1138,7 +1169,7 @@
                 localStorage.setItem('nexus_return_reserva', reservaId);
             }
 
-            const url = encodeURI(targetFile) + (reservaId ? '?reserva=' + encodeURIComponent(reservaId) : '');
+            const url = targetFile + (reservaId ? '?reserva=' + encodeURIComponent(reservaId) : '');
             window.location.href = url;
         }
 
@@ -1151,7 +1182,7 @@
         }
 
         async function generateAIEmail() {
-            showAIModal("✨ Redactando Email Profesional");
+            showAIModal("âœ¨ Redactando Email Profesional");
             
             let grandTotal = 0;
             const resumenServicios = items.map(item => {
@@ -1166,7 +1197,7 @@
                 text += `${item.cant ? item.cant + 'x ' : ''}`;
                 text += `${item.concepto || item.roomType || 'Servicio'} `;
                 if(item.regimen) text += `(${item.regimen}) `;
-                text += `-> ${sub}€`;
+                text += `-> ${sub} EUR`;
                 return text;
             }).join("\\n            ");
 
@@ -1190,13 +1221,13 @@
             SERVICIOS INCLUIDOS EN EL PRESUPUESTO:
             ${resumenServicios}
             
-            - Total Presupuesto: ${formatNum(grandTotal)} €
+            - Total Presupuesto: ${formatNum(grandTotal)}  EUR
             
             INSTRUCCIONES ESTRICTAS:
             1. El tono debe ser muy profesional, formal y elegante (administrativo claro si es proforma/confirmación, o persuasivo y cortés si es propuesta).
             2. Analiza el presupuesto y menciona en el correo de forma resumida los puntos clave acordados (número de habitaciones principales, régimen, total a pagar). No enlistes todo como un robot, hazlo natural.
             3. Invita cortésmente al cliente a revisar el ${context} en formato PDF adjunto.
-            4. DEVUELVE ÚNICAMENTE el Asunto en la primera línea (ej: **Asunto:** ...) y el cuerpo del correo. NO INCLUYAS frases introductorias tuyas como "Claro, aquí tienes una propuesta...". Empieza directamente con el Asunto.`;
+            4. DEVUELVE ÃšNICAMENTE el Asunto en la primera línea (ej: **Asunto:** ...) y el cuerpo del correo. NO INCLUYAS frases introductorias tuyas como "Claro, aquííííí tienes una propuesta...". Empieza directamente con el Asunto.`;
 
             const result = await callGeminiHotel(prompt);
             document.getElementById('ai-content').innerText = result;
@@ -1227,7 +1258,7 @@
         }
 
         async function generateAIPlan() {
-            showAIModal("✨ Sugerencia de Plan para el Grupo");
+            showAIModal("âœ¨ Sugerencia de Plan para el Grupo");
             const personas = document.getElementById('reserva-personas-1').innerText;
             const prompt = `Sugiere un plan de ocio en Ciudad Real para ${personas} personas.`;
             const result = await callGemini(prompt);
@@ -1416,7 +1447,7 @@
                             newRow.innerHTML = `
                                 <span class="w-24"><strong><span class="editable" contenteditable="true">${row.key}</span> :</strong></span>
                                 <span class="editable flex-1" contenteditable="true" style="min-width: 100px;">${row.value}</span>
-                                <button class="no-print text-red-200 hover:text-red-500 text-[10px] ml-auto" onclick="this.parentElement.remove()">✕</button>
+                                <button class="no-print text-red-200 hover:text-red-500 text-[10px] ml-auto" onclick="this.parentElement.remove()">✖</button>
                             `;
                             if (footer) container.insertBefore(newRow, footer);
                             else container.appendChild(newRow);
@@ -1627,7 +1658,7 @@
                         <td class="p-1 text-right text-[10px]"><span class="editable" contenteditable="true" onblur="updateItem(${index}, 'precio', this.innerText)">${formatNum(item.precio)}</span></td>
                         <td class="p-1 text-right font-black text-gray-900 text-[11px]">${formatNum(sub)}</td>
                         <td class="p-1 text-right text-gray-300 font-medium text-[10px]">${formatNum(runningTotal)}</td>
-                        <td class="p-1 no-print text-center"><button onclick="removeItem(${index})" class="text-gray-300 hover:text-red-500">✕</button></td>
+                        <td class="p-1 no-print text-center"><button onclick="removeItem(${index})" class="text-gray-300 hover:text-red-500">✖</button></td>
                     </tr>` : `
                     <tr class="h-7 border-b border-gray-100">
                         <td class="py-1"><input type="date" value="${toInputDate(item.fecha)}" onchange="updateItem(${index}, 'fecha', this.value)" class="bg-transparent w-20 outline-none text-[9px] text-gray-500"></td>
@@ -1638,7 +1669,7 @@
                         <td class="text-right text-gray-600 text-[10px]"><span class="editable" contenteditable="true" onblur="updateItem(${index}, 'precio', this.innerText)">${formatNum(item.precio)}</span></td>
                         <td class="text-right font-black text-gray-900 text-[11px]">${formatNum(sub)}</td>
                         <td class="text-right text-gray-300 font-medium text-[10px]">${formatNum(runningTotal)}</td>
-                        <td class="no-print text-center py-1"><button onclick="removeItem(${index})" class="text-gray-300 hover:text-red-500">✕</button></td>
+                        <td class="no-print text-center py-1"><button onclick="removeItem(${index})" class="text-gray-300 hover:text-red-500">✖</button></td>
                     </tr>`;
                 containers.forEach(c => c.insertAdjacentHTML('beforeend', row));
             });
@@ -1666,7 +1697,7 @@
                 }
 
                 footer.innerHTML = `
-                    <div class="mt-4 font-pro" style="page-break-inside: avoid;">
+                    <div class="mt-4 font-pro" style="page-break-inside: avoid; break-inside: avoid;">
                         <div class="flex items-center gap-4 mb-4">
                             <div class="flex-1 h-px" style="background: linear-gradient(to right, transparent, #cbd5e1 40%, #cbd5e1 60%, transparent);"></div>
                             <span class="text-[8px] font-black text-slate-400 uppercase tracking-[0.25em]">Condiciones de Pago</span>
@@ -1675,8 +1706,8 @@
                         <div class="mb-4 rounded-2xl bg-white shadow-sm border border-slate-200 overflow-hidden flex relative">
                             <div class="w-1.5" style="background: linear-gradient(to bottom, ${currentHotel === 'cumbria' ? '#0f172a, #334155' : '#16a34a, #14532d'});"></div>
                             <div class="flex-1 px-8 py-4 flex justify-between items-center bg-gradient-to-r from-slate-50/40 to-white">
-                                <div><span class="text-[8px] font-black uppercase tracking-[0.25em] text-slate-400 block mb-1">Total Presupuestado</span><div class="flex items-baseline gap-1"><span class="tabular-nums" style="font-size: 20px; font-weight: 900; color: #0f172a;">${formatNum(totalNetoPagar)}</span><span class="font-bold text-slate-400" style="font-size: 11px;">€</span></div></div>
-                                ${totalPaid >= Math.abs(totalNetoPagar) - 0.01 ? `<div class="text-right flex flex-col items-end gap-1.5 border-l border-slate-100 pl-8"><span class="px-3 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-[0.15em] flex items-center gap-1.5 shadow-sm" style="background-color: #ecfdf5; color: #059669; border: 1px solid #a7f3d0;">Pagado Total</span></div>` : `<div class="text-right border-l border-slate-200/60 pl-8 flex flex-col justify-center"><span class="text-[7.5px] font-black uppercase tracking-[0.25em] block mb-1" style="color: ${currentHotel === 'cumbria' ? '#475569' : '#15803d'};">Pendiente a Pagar</span><div class="flex items-baseline justify-end gap-1"><span class="tabular-nums" style="font-size: 20px; font-weight: 900;">${formatNum(totalPending)}</span><span class="font-bold" style="font-size: 11px; color: ${currentHotel === 'cumbria' ? '#64748b' : '#22c55e'};">€</span></div></div>`}
+                                <div><span class="text-[8px] font-black uppercase tracking-[0.25em] text-slate-400 block mb-1">Total Presupuestado</span><div class="flex items-baseline gap-1"><span class="tabular-nums" style="font-size: 20px; font-weight: 900; color: #0f172a;">${formatNum(totalNetoPagar)}</span><span class="font-bold text-slate-400" style="font-size: 11px;"> EUR</span></div></div>
+                                ${totalPaid >= Math.abs(totalNetoPagar) - 0.01 ? `<div class="text-right flex flex-col items-end gap-1.5 border-l border-slate-100 pl-8"><span class="px-3 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-[0.15em] flex items-center gap-1.5 shadow-sm" style="background-color: #ecfdf5; color: #059669; border: 1px solid #a7f3d0;">Pagado Total</span></div>` : `<div class="text-right border-l border-slate-200/60 pl-8 flex flex-col justify-center"><span class="text-[7.5px] font-black uppercase tracking-[0.25em] block mb-1" style="color: ${currentHotel === 'cumbria' ? '#475569' : '#15803d'};">Pendiente a Pagar</span><div class="flex items-baseline justify-end gap-1"><span class="tabular-nums" style="font-size: 20px; font-weight: 900;">${formatNum(totalPending)}</span><span class="font-bold" style="font-size: 11px; color: ${currentHotel === 'cumbria' ? '#64748b' : '#22c55e'};"> EUR</span></div></div>`}
                             </div>
                         </div>
                         <div class="space-y-4">
@@ -1689,21 +1720,21 @@
                                  </div>
                             </div>` : ''}
                             <div>
-                                <div class="flex items-center justify-between mb-2"><h5 class="text-[7.5px] font-black text-slate-400 uppercase tracking-[0.2em]">Plan de Garantía y Pagos</h5><button onclick="addPayment()" class="no-print px-2 py-1 bg-emerald-50 text-emerald-600 rounded-lg text-[8px] font-black uppercase">+ Añadir Anticipo</button></div>
-                                <div class="grid grid-cols-2 gap-3 mb-3">
+                                <div class="flex items-center justify-between mb-2"><h5 class="text-[9.5px] font-black text-slate-400 uppercase tracking-[0.1em]">Plan de Garantía y Pagos</h5><button onclick="addPayment()" class="no-print px-2 py-1 bg-emerald-50 text-emerald-600 rounded-lg text-[8px] font-black uppercase">+ Añadir Anticipo</button></div>
+                                <div class="grid grid-cols-2 gap-4 mb-4">
                                     ${paymentPlan.map((dep, idx) => {
                                         const isPaid = dep.status === "Cobrado";
-                                        return `<div class="rounded-xl relative overflow-hidden group/dep" style="border: 1.5px solid ${isPaid ? '#a7f3d0' : '#e2e8f0'}; background-color: ${isPaid ? '#ecfdf5' : '#ffffff'};">
+                                        return `<div class="rounded-xl relative group/dep" style="border: 1.5px solid ${isPaid ? '#a7f3d0' : '#e2e8f0'}; background-color: ${isPaid ? '#ecfdf5' : '#ffffff'};">
                                             <div class="w-full" style="height: 3px; background: ${isPaid ? 'linear-gradient(to right, #059669, #34d399)' : `linear-gradient(to right, ${currentHotel === 'cumbria' ? '#0f172a' : '#214732'}, ${currentHotel === 'cumbria' ? '#475569' : '#2d5a43'})`}; opacity: ${isPaid ? '1' : '0.4'};"></div>
-                                            <button onclick="removePayment(${idx})" class="no-print absolute top-1 right-1 w-5 h-5 bg-rose-50 text-rose-500 rounded-md flex items-center justify-center opacity-0 group-hover/dep:opacity-100 transition-all z-20">✕</button>
-                                            <div class="p-2 relative z-10 flex flex-col h-full justify-between">
+                                            <button onclick="removePayment(${idx})" class="no-print absolute top-1 right-1 w-5 h-5 bg-rose-50 text-rose-500 rounded-md flex items-center justify-center opacity-0 group-hover/dep:opacity-100 transition-all z-20">✖</button>
+                                            <div class="p-3 relative z-10 flex flex-col h-full justify-between" style="min-height: 80px;">
                                                 <div class="flex justify-between items-start mb-2 border-b border-slate-100 pb-1">
-                                                    <span class="text-[7.5px] font-bold ${isPaid ? 'text-emerald-700' : 'text-slate-500'} uppercase editable" contenteditable="true" onblur="updatePayment(${idx}, 'label', this.innerText)">${dep.label}</span>
+                                                    <span class="text-[9px] font-bold ${isPaid ? 'text-emerald-700' : 'text-slate-500'} uppercase editable" contenteditable="true" onblur="updatePayment(${idx}, 'label', this.innerText)">${dep.label}</span>
                                                     <div class="flex items-center gap-1"><span class="text-[7px] font-black tabular-nums editable" contenteditable="true" onblur="updatePayment(${idx}, 'percent', this.innerText)" style="color: ${isPaid ? '#059669' : '#94a3b8'};">${dep.percent}</span><span class="text-[7px] font-black" style="color: ${isPaid ? '#059669' : '#94a3b8'};">%</span><select onchange="updatePayment(${idx}, 'status', this.value)" class="no-print ml-2 bg-transparent text-[7px] font-bold border rounded px-1"><option value="Pendiente" ${dep.status === 'Pendiente' ? 'selected' : ''}>Pendiente</option><option value="Cobrado" ${dep.status === 'Cobrado' ? 'selected' : ''}>Cobrado</option></select></div>
                                                 </div>
                                                 <div class="flex justify-between items-end mt-1">
                                                     <div><p class="text-[8px] ${isPaid ? 'text-emerald-500' : 'text-rose-600'} font-black uppercase tracking-wider mb-0.5">${isPaid ? 'Cobrado' : 'Fecha Límite'}</p><input type="date" value="${toInputDate(dep.date)}" onchange="updatePayment(${idx}, 'date', this.value)" class="text-[10px] font-bold ${isPaid ? 'text-slate-600' : 'text-slate-800'} bg-transparent outline-none"></div>
-                                                    <div class="text-right"><p class="tabular-nums flex items-baseline justify-end gap-0.5" style="font-size: 11px; font-weight: 900; ${isPaid ? 'color: #047857;' : 'color: #1e293b;'}"><span class="editable" contenteditable="true" onblur="updatePayment(${idx}, 'amount', toNum(this.innerText))">${formatNum(dep.amount)}</span><span style="font-size: 8px; opacity: 0.6;">€</span></p></div>
+                                                    <div class="text-right"><p class="tabular-nums flex items-baseline justify-end gap-0.5" style="font-size: 11px; font-weight: 900; ${isPaid ? 'color: #047857;' : 'color: #1e293b;'}"><span class="editable" contenteditable="true" onblur="updatePayment(${idx}, 'amount', toNum(this.innerText))">${formatNum(dep.amount)}</span><span style="font-size: 8px; opacity: 0.6;"> EUR</span></p></div>
                                                 </div>
                                             </div>
                                         </div>`;
@@ -1716,10 +1747,10 @@
             } else if (currentTemplate === 'proforma') {
                 const netTotal = (total - totalComision) + parseFloat(groupData.Suplementos || 0) - parseFloat(groupData.Descuentos || 0);
                 let ivaRows = '';
-                if (base10 > 0) ivaRows += `<tr><td class="text-left px-3 py-1.5 text-slate-500">Base Imponible (10%)</td><td class="text-right px-3 py-1.5 tabular-nums">${formatNum(base10)} €</td></tr><tr><td class="text-left px-3 py-1.5 text-slate-500">IVA (10%)</td><td class="text-right px-3 py-1.5 tabular-nums font-bold">${formatNum(iva10)} €</td></tr>`;
-                if (base21 > 0) ivaRows += `<tr><td class="text-left px-3 py-1.5 text-slate-500">Base Imponible (21%)</td><td class="text-right px-3 py-1.5 tabular-nums">${formatNum(base21)} €</td></tr><tr><td class="text-left px-3 py-1.5 text-slate-500">IVA (21%)</td><td class="text-right px-3 py-1.5 tabular-nums font-bold">${formatNum(iva21)} €</td></tr>`;
-                if (pSummary) pSummary.innerHTML = `<div class="flex flex-col items-end gap-3 w-full"><div class="proforma-total-box w-[240px] shadow-lg"><span class="text-[9px] font-bold uppercase tracking-widest mr-4">Total:</span><span class="text-lg tabular-nums font-black">${formatNum(netTotal)} €</span></div>${ivaRows ? `<table class="text-[9px] w-[300px] border-collapse border border-gray-200 rounded-lg overflow-hidden"><thead><tr class="bg-gray-50"><td colspan="2" class="text-[8px] font-black text-slate-400 uppercase tracking-widest px-3 py-2">Desglose Fiscal</td></tr></thead><tbody class="font-mono text-[9px]">${ivaRows}</tbody></table>` : ''}</div>`;
-                if (pBank) pBank.innerHTML = `<div class="mt-3 w-full h-px bg-slate-200"></div><div style="margin-top:8px; display:flex; align-items:stretch; border:1px solid #e2e8f0; border-radius:8px; overflow:hidden; background:white;"><div style="width:4px; background:#1e293b;"></div><div style="padding:8px 14px; flex:1;"><div style="font-size:5px; font-weight:700; text-transform:uppercase; color:#cbd5e1;">Transferencia Bancaria</div><div style="font-size:14px; font-weight:900; letter-spacing:0.08em; color:#0f172a; font-family:'Courier Prime', monospace;">${h.iban}</div><div style="font-size:6px; color:#94a3b8;">${h.bank} · Beneficiario: <strong>${h.company}</strong></div></div></div>`;
+                if (base10 > 0) ivaRows += `<tr><td class="text-left px-3 py-1.5 text-slate-500">Base Imponible (10%)</td><td class="text-right px-3 py-1.5 tabular-nums">${formatNum(base10)}  EUR</td></tr><tr><td class="text-left px-3 py-1.5 text-slate-500">IVA (10%)</td><td class="text-right px-3 py-1.5 tabular-nums font-bold">${formatNum(iva10)}  EUR</td></tr>`;
+                if (base21 > 0) ivaRows += `<tr><td class="text-left px-3 py-1.5 text-slate-500">Base Imponible (21%)</td><td class="text-right px-3 py-1.5 tabular-nums">${formatNum(base21)}  EUR</td></tr><tr><td class="text-left px-3 py-1.5 text-slate-500">IVA (21%)</td><td class="text-right px-3 py-1.5 tabular-nums font-bold">${formatNum(iva21)}  EUR</td></tr>`;
+                if (pSummary) pSummary.innerHTML = `<div class="flex flex-col items-end gap-3 w-full"><div class="proforma-total-box w-[240px] shadow-lg"><span class="text-[9px] font-bold uppercase tracking-widest mr-4">Total:</span><span class="text-lg tabular-nums font-black">${formatNum(netTotal)}  EUR</span></div>${ivaRows ? `<table class="text-[9px] w-[300px] border-collapse border border-gray-200 rounded-lg overflow-hidden"><thead><tr class="bg-gray-50"><td colspan="2" class="text-[8px] font-black text-slate-400 uppercase tracking-widest px-3 py-2">Desglose Fiscal</td></tr></thead><tbody class="font-mono text-[9px]">${ivaRows}</tbody></table>` : ''}</div>`;
+                if (pBank) pBank.innerHTML = `<div class="mt-3 w-full h-px bg-slate-200"></div><div style="margin-top:8px; display:flex; align-items:stretch; border:1px solid #e2e8f0; border-radius:8px; overflow:hidden; background:white;"><div style="width:4px; background:#1e293b;"></div><div style="padding:8px 14px; flex:1;"><div style="font-size:5px; font-weight:700; text-transform:uppercase; color:#cbd5e1;">Transferencia Bancaria</div><div style="font-size:14px; font-weight:900; letter-spacing:0.08em; color:#0f172a; font-family:'Courier Prime', monospace;">${h.iban}</div><div style="font-size:6px; color:#94a3b8;">${h.bank} Â· Beneficiario: <strong>${h.company}</strong></div></div></div>`;
             }
             updatePaymentLink();
         }
@@ -1745,42 +1776,42 @@
                 if (allC.length > 0) {
                     const totalNeto = total - totalComision;
                     polDiv.innerHTML = `
-                        <!-- Sidebar Legal Vertical (Página 2) -->
+                        <!-- Sidebar Legal Vertical -->
                         <div class="static-legal-sidebar">
                             <div id="global-vertical-legal-2" class="vertical-legal-text italic opacity-20"></div>
                         </div>
                         
-                        <div class="pl-8 pt-6">
-                            <div class="flex items-center gap-4 mb-10">
-                                <div class="flex-1 h-px bg-slate-100"></div>
-                                <h4 class="text-[14px] font-black uppercase tracking-[0.5em] text-slate-800">Cláusulas de Confirmación</h4>
-                                <div class="flex-1 h-px bg-slate-100"></div>
+                        <div style="padding-left:32px; padding-top:20px;">
+                            <div style="display:flex; align-items:center; gap:16px; margin-bottom:22px;">
+                                <div style="flex:1; height:1px; background:linear-gradient(to right, transparent, #cbd5e1);"></div>
+                                <h4 style="font-size:10px; font-weight:900; letter-spacing:0.42em; text-transform:uppercase; color:#1e293b; white-space:nowrap; margin:0; font-family:'Montserrat',sans-serif;">CL&#193;USULAS DE CONFIRMACI&#211;N</h4>
+                                <div style="flex:1; height:1px; background:linear-gradient(to left, transparent, #cbd5e1);"></div>
                             </div>
-                            
-                            <div class="grid grid-cols-2 gap-x-12 gap-y-10">
-                                ${allC.map((c, i) => `
-                                    <div class="space-y-3">
-                                        <div class="flex items-baseline gap-2 border-b-2 border-slate-100 pb-1.5">
-                                            <span class="text-[12px] font-black text-slate-200">${String(i + 1).padStart(2, '0')}</span>
-                                            <p class="text-[10px] font-black uppercase text-slate-500 tracking-widest editable-clause" contenteditable="true">${c.title}</p>
+                            <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px 28px;">
+                                ${allC.map((c, i) => {
+                                    const accentColor = currentHotel === 'cumbria' ? '#0f172a' : '#2d5a43';
+                                    const numColor = currentHotel === 'cumbria' ? '#e2e8f0' : '#d1fae5';
+                                    return `<div style="border-left:3px solid ${accentColor}; padding-left:10px; padding-bottom:10px; page-break-inside:avoid; break-inside:avoid; display:block;">
+                                        <div style="display:flex; align-items:baseline; gap:6px; padding-bottom:5px; margin-bottom:5px; border-bottom:1px solid #f1f5f9;">
+                                            <span style="font-size:14px; font-weight:900; color:${numColor}; line-height:1; font-family:'Courier Prime',monospace; flex-shrink:0; -webkit-print-color-adjust:exact; print-color-adjust:exact;">${String(i + 1).padStart(2, '0')}</span>
+                                            <p class="editable-clause" contenteditable="true" style="font-size:8px; font-weight:800; text-transform:uppercase; color:${accentColor}; letter-spacing:0.12em; margin:0; line-height:1.3; font-family:'Montserrat',sans-serif;">${c.title}</p>
                                         </div>
-                                        <p class="text-[9.5px] text-slate-600 leading-relaxed font-medium text-justify editable-clause" contenteditable="true">
-                                            ${(c.body || '').replace(/{DEP_30}/g, formatNum(totalNeto * 0.3) + '€')}
+                                        <p class="clause-body editable-clause" contenteditable="true" style="font-size:8.5px; font-weight:500; margin:0; color:#475569; text-align:justify; hyphens:auto; line-height:1.55; font-family:'Montserrat',sans-serif;">
+                                            ${(c.body || '').replace(/{DEP_30}/g, formatNum(totalNeto * 0.3) + ' EUR')}
                                         </p>
-                                    </div>
-                                `).join('')}
+                                    </div>`;
+                                }).join('')}
                             </div>
                         </div>
                         
-                        <!-- Pie de página en página 2 -->
-                        <div class="mt-auto pt-8 border-t-2 border-slate-50 flex justify-between items-end opacity-60 pb-2">
-                            <div class="flex flex-col gap-1">
-                                <div class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Documentación Oficial</div>
-                                <div class="text-[7px] font-bold text-slate-300 uppercase tracking-widest">Hoja 2 de 2</div>
+                        <div style="margin-top:auto; padding-top:16px; border-top:1px solid #f8fafc; display:flex; justify-content:space-between; align-items:flex-end; opacity:0.55; padding-bottom:4px; page-break-inside:avoid; break-inside:avoid;">
+                            <div style="display:flex; flex-direction:column; gap:2px;">
+                                <div style="font-size:8px; font-weight:800; color:#94a3b8; text-transform:uppercase; letter-spacing:0.2em;">Documentaci&#243;n Oficial</div>
+                                <div style="font-size:6.5px; font-weight:700; color:#cbd5e1; text-transform:uppercase; letter-spacing:0.2em;">Hoja 2 de 2</div>
                             </div>
-                            <div class="text-right">
-                                <div class="text-[9px] font-black text-slate-800 uppercase tracking-widest">${h.name} ${h.subname}</div>
-                                <div class="text-[7px] font-bold text-slate-300 uppercase tracking-widest">Términos y Condiciones de Reserva</div>
+                            <div style="text-align:right;">
+                                <div style="font-size:8px; font-weight:800; color:#1e293b; text-transform:uppercase; letter-spacing:0.2em;">${h.name} ${h.subname}</div>
+                                <div style="font-size:6.5px; font-weight:700; color:#cbd5e1; text-transform:uppercase; letter-spacing:0.15em;">T&#233;rminos y Condiciones de Reserva</div>
                             </div>
                         </div>
                     `;
@@ -1812,10 +1843,10 @@
         function cleanWeirdChars(s) {
             if (!s) return '';
             return String(s)
-                .replace(/â‚¬/g, 'EUR')
-                .replace(/Ã¡/g, 'a').replace(/Ã©/g, 'e').replace(/Ã­/g, 'i').replace(/Ã³/g, 'o').replace(/Ãº/g, 'u')
-                .replace(/Ã±/g, 'n')
-                .replace(/Â¿/g, '?').replace(/Â¡/g, '!')
+                .replace(/ EUR/g, 'EUR')
+                .replace(/Ãƒ¡/g, 'a').replace(/ÃƒÂ©/g, 'e').replace(/ÃƒÂ­/g, 'i').replace(/ÃƒÂ³/g, 'o').replace(/ÃƒÂº/g, 'u')
+                .replace(/ÃƒÂ±/g, 'n')
+                .replace(/á¿/g, '?').replace(/á¡/g, '!')
                 .replace(/[^\x20-\x7E\n\r\t]/g, ' ')
                 .replace(/\s{2,}/g, ' ')
                 .trim();
@@ -1826,10 +1857,90 @@
             return map[code] || '';
         }
 
-        async function translateAndPrintDoc() {
+        async function callGeminiWithTimeout(prompt, timeoutMs = 12000) {
+            if (!window.callGemini) throw new Error('gemini_unavailable');
+            return await Promise.race([
+                window.callGemini(prompt),
+                new Promise((_, reject) => setTimeout(() => reject(new Error('gemini_timeout')), timeoutMs))
+            ]);
+        }
+
+        async function translateElements(elements, targetLang) {
+            const jobs = [];
+            elements.forEach((el) => {
+                if (!el || el.children.length > 0) return;
+                const t = (el.textContent || '').trim();
+                if (!t || t === '---') return;
+                if (/^\d+[\/\-\.\d]*$/.test(t)) return;
+                jobs.push({ el, original: t });
+            });
+
+            if (jobs.length === 0) return { translatedCount: 0, rollback: [] };
+
+            const translatedMap = {};
+            const chunkSize = 20;
+            for (let start = 0; start < jobs.length; start += chunkSize) {
+                const slice = jobs.slice(start, start + chunkSize);
+                const payload = slice.map((j, i) => `${i + 1}|||${j.original}`).join('\n');
+                const prompt = `Translate each line to ${targetLang}. Keep numbering and separator exactly as "N|||". Keep names, codes, urls and amounts unchanged. Return only translated lines.\n\n${payload}`;
+                let raw = '';
+                try {
+                    raw = await callGeminiWithTimeout(prompt, 10000);
+                } catch (_) {
+                    continue;
+                }
+                const lines = String(raw || '').split('\n').map(x => x.trim()).filter(Boolean);
+                lines.forEach((line) => {
+                    const m = line.match(/^(\d+)\|\|\|(.*)$/);
+                    if (!m) return;
+                    const localId = parseInt(m[1], 10);
+                    translatedMap[start + localId] = cleanWeirdChars(m[2] || '');
+                });
+            }
+
+            const rollback = [];
+            let translatedCount = 0;
+            jobs.forEach((j, idx) => {
+                const translated = translatedMap[idx + 1];
+                if (!translated) return;
+                rollback.push({ el: j.el, text: j.el.textContent });
+                j.el.textContent = translated;
+                translatedCount++;
+            });
+            return { translatedCount, rollback };
+        }
+
+        async function translateClausesOnly() {
             const langCode = document.getElementById('print-lang-select')?.value || '';
             if (!langCode) {
-                printDoc();
+                alert('Selecciona un idioma primero.');
+                return;
+            }
+            const targetLang = getTargetLangLabel(langCode);
+            if (!targetLang || !window.callGemini) {
+                alert('No hay servicio de traduccion disponible.');
+                return;
+            }
+
+            updatePaymentLink();
+            const policies = document.getElementById('tpl-policies');
+            if (!policies) {
+                alert('No hay bloque de clausulas disponible.');
+                return;
+            }
+            const clauseEls = Array.from(policies.querySelectorAll('.editable-clause'));
+            const result = await translateElements(clauseEls, targetLang);
+            if (result.translatedCount === 0) {
+                alert('No se pudo traducir las clausulas.');
+                return;
+            }
+            alert(`Clausulas traducidas: ${result.translatedCount}`);
+        }
+
+        async function translateDocumentOnly() {
+            const langCode = document.getElementById('print-lang-select')?.value || '';
+            if (!langCode) {
+                alert('Selecciona un idioma primero.');
                 return;
             }
             if (!window.callGemini) {
@@ -1839,7 +1950,7 @@
 
             const targetLang = getTargetLangLabel(langCode);
             if (!targetLang) {
-                printDoc();
+                alert('Idioma no valido.');
                 return;
             }
 
@@ -1848,7 +1959,7 @@
             const capture = document.getElementById('capture-area');
             const policies = document.getElementById('tpl-policies');
             if (!capture && !policies) {
-                printDoc();
+                alert('No hay contenido para traducir.');
                 return;
             }
 
@@ -1857,51 +1968,20 @@
                 .filter(el => el && el.offsetParent !== null)
                 .filter(el => !el.closest('.no-print'));
 
-            const jobs = [];
-            candidates.forEach((el) => {
-                if (el.children.length > 0) return;
-                const t = (el.textContent || '').trim();
-                if (!t || t === '---') return;
-                if (/^\d+[\/\-\.\d]*$/.test(t)) return;
-                jobs.push({ el, original: t });
-            });
-
-            if (jobs.length === 0) {
-                printDoc();
-                return;
-            }
-
             try {
-                const payload = jobs.map((j, i) => `${i + 1}|||${j.original}`).join('\n');
-                const prompt = `Translate each line to ${targetLang}. Keep numbering and separator exactly as "N|||". Keep names, codes, urls and amounts unchanged. Return only translated lines.\n\n${payload}`;
-                const raw = await window.callGemini(prompt);
-                const lines = String(raw || '').split('\n').map(x => x.trim()).filter(Boolean);
-                const translatedMap = {};
-                lines.forEach((line) => {
-                    const m = line.match(/^(\d+)\|\|\|(.*)$/);
-                    if (!m) return;
-                    translatedMap[parseInt(m[1], 10)] = cleanWeirdChars(m[2] || '');
-                });
-
-                const rollback = [];
-                jobs.forEach((j, idx) => {
-                    const translated = translatedMap[idx + 1];
-                    if (!translated) return;
-                    rollback.push({ el: j.el, text: j.el.textContent });
-                    j.el.textContent = translated;
-                });
-
-                printDoc();
-
-                setTimeout(() => {
-                    rollback.forEach((r) => { r.el.textContent = r.text; });
-                }, 900);
+                const { translatedCount } = await translateElements(candidates, targetLang);
+                if (translatedCount === 0) {
+                    alert('No se pudo traducir contenido.');
+                    return;
+                }
+                alert(`Documento traducido: ${translatedCount} textos.`);
             } catch (e) {
-                console.error('translateAndPrintDoc error:', e);
-                alert('No se pudo traducir. Se imprimira el documento original.');
-                printDoc();
+                console.error('translateDocumentOnly error:', e);
+                alert('No se pudo traducir el documento.');
             }
         }
     </script>
 </body>
 </html>
+
+

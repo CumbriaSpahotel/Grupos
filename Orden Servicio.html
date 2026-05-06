@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
@@ -109,12 +109,12 @@
             &larr; Volver a la Reserva
         </button>
         <div class="flex items-center gap-3">
-            <span id="save-status" class="text-xs text-emerald-600 font-bold opacity-0 transition-opacity">Autoguardado ✓</span>
+            <span id="save-status" class="text-xs text-emerald-600 font-bold opacity-0 transition-opacity">Autoguardado âœ“</span>
             <button onclick="clearReservaCache()" class="px-3 py-2 bg-rose-100 hover:bg-rose-200 text-rose-700 font-bold rounded-lg transition-colors text-xs shadow border border-rose-200 cursor-pointer" title="Reiniciar informe a parámetros de fábrica">
                 Restaurar Datos
             </button>
             <button onclick="window.print()" class="px-6 py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-lg transition-colors text-sm shadow cursor-pointer">
-                🖨️ Imprimir / PDF
+                ðŸ–¨ï¸ Imprimir / PDF
             </button>
         </div>
     </div>
@@ -124,7 +124,7 @@
         
         <!-- HEADER -->
         <div class="flex justify-between items-start mb-6 border-b-2 border-slate-900 pb-4">
-            <h1 class="editable" contenteditable="true" id="informe-title" oninput="triggerSave()" style="margin-bottom: 0;">ORDEN DE SERVICIO — <span id="title-reserva">---</span></h1>
+            <h1 class="editable" contenteditable="true" id="informe-title" oninput="triggerSave()" style="margin-bottom: 0;">ORDEN DE SERVICIO â€” <span id="title-reserva">---</span></h1>
             <!-- Logo area at the top right -->
             <div id="logo-top" style="text-align: right; display: flex; flex-direction: column; justify-content: flex-end;">
                 <div id="logo-top-title" style="font-size: 18px; font-family: 'Times New Roman', serif; font-weight: bold; letter-spacing: 3px; color: #1e293b;"></div>
@@ -149,10 +149,10 @@
         <table id="table-plan">
             <thead>
                 <tr>
-                    <th style="width: 15%">DÍA</th>
+                    <th style="width: 15%">DÃA</th>
                     <th style="width: 15%">SERVICIO</th>
                     <th style="width: 8%">PAX</th>
-                    <th style="width: 47%">MENÚ</th>
+                    <th style="width: 47%">MENÃš</th>
                     <th style="width: 10%">HORA</th>
                     <th class="no-print" style="width: 5%"></th>
                 </tr>
@@ -166,12 +166,12 @@
         </div>
 
         <!-- INCIDENCIAS -->
-        <div class="section-title mt-8">MENÚS ESPECIALES / INCIDENCIAS</div>
+        <div class="section-title mt-8">MENÃšS ESPECIALES / INCIDENCIAS</div>
         <table id="table-incidencias">
             <thead>
                 <tr>
                     <th style="width: 15%">TIPO</th>
-                    <th style="width: 10%">Nº PAX</th>
+                    <th style="width: 10%">NÂº PAX</th>
                     <th style="width: 40%">DETALLE</th>
                     <th style="width: 30%">SERVICIOS AFECTADOS</th>
                     <th class="no-print" style="width: 5%"></th>
@@ -215,7 +215,7 @@
         function goBackToReserva() {
             // Guardamos la referencia para que Gestion de Grupos sepa qué ficha abrir
             localStorage.setItem('nexus_return_reserva', currentReservaId);
-            window.location.href = 'Gestión de Grupos.html';
+            window.location.href = 'Gestion-de-Grupos.html';
         }
         let saveTimeout = null;
 
@@ -252,7 +252,7 @@
             const btnTd = document.createElement('td');
             btnTd.className = 'no-print text-right';
             const btn = document.createElement('button');
-            btn.innerHTML = '✕';
+            btn.innerHTML = 'âœ•';
             btn.className = 'text-red-400 font-black hover:text-red-600 px-1';
             btn.onclick = () => { tr.remove(); triggerSave(); };
             btnTd.appendChild(btn);
@@ -274,7 +274,7 @@
             const btnTd = document.createElement('td');
             btnTd.className = 'no-print text-right';
             const btn = document.createElement('button');
-            btn.innerHTML = '✕';
+            btn.innerHTML = 'âœ•';
             btn.className = 'text-red-400 font-black hover:text-red-600 px-1';
             btn.onclick = () => { tr.remove(); triggerSave(); };
             btnTd.appendChild(btn);
@@ -376,17 +376,17 @@
                 topTitle.innerText = "SERCOTEL GUADIANA";
                 topSub.innerText = "HOTELES";
                 footerTitle.innerText = "SERCOTEL GUADIANA";
-                footerSub.innerHTML = "C/ Guadiana, 36 | 13002 Ciudad Real | ESPAÑA<br>Telf.-926 22 33 13 info@hotelguadiana.es";
+                footerSub.innerHTML = "C/ Guadiana, 36 | 13002 Ciudad Real | ESPAÃ‘A<br>Telf.-926 22 33 13 info@hotelguadiana.es";
                 textBanner.style.backgroundColor = '#1e293b'; 
             } else if (hotelName.includes('cumbria')) {
                 topTitle.innerText = "HOTEL CUMBRIA";
                 topSub.innerText = "CIUDAD REAL";
                 footerTitle.innerText = "C U M B R I A";
-                footerSub.innerHTML = "Ctra. de Toledo, 26 | 13005 Ciudad Real | ESPAÑA<br>Telf.-926 25 04 04 www.encumbria.es";
+                footerSub.innerHTML = "Ctra. de Toledo, 26 | 13005 Ciudad Real | ESPAÃ‘A<br>Telf.-926 25 04 04 www.encumbria.es";
                 textBanner.style.backgroundColor = '#7f7f70';
             } else {
                 topTitle.innerText = "NEXUS GROUPS";
-                topSub.innerText = "GESTIÓN DE GRUPOS";
+                topSub.innerText = "GESTIÃ“N DE GRUPOS";
                 footerTitle.innerText = "NEXUS GROUPS";
                 footerSub.innerHTML = "Departamento de Operaciones | Gestión Centralizada de Grupos";
                 textBanner.style.backgroundColor = '#0f172a';
@@ -396,7 +396,7 @@
             if (savedStateStr) {
                 // LOAD FROM CACHE
                 const s = JSON.parse(savedStateStr);
-                document.getElementById('informe-title').innerText = s.title || `ORDEN DE SERVICIO — ${currentReservaId}`;
+                document.getElementById('informe-title').innerText = s.title || `ORDEN DE SERVICIO â€” ${currentReservaId}`;
                 document.getElementById('ref-val').innerText = s.ref;
                 document.getElementById('grupo-val').innerText = s.grupo;
                 document.getElementById('agencia-val').innerText = s.agencia;
@@ -414,10 +414,10 @@
                 }
             }
             
-            // ═══════════════════════════════════════════════
+            // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
             // CREATE NEW FROM GROUP DATA + RoomingList_JSON
             // (Used if no cache found OR if cache was empty)
-            // ═══════════════════════════════════════════════
+            // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
                 
     
     const gName = rec['Nombre del Grupo'] || group.name || '---';
@@ -431,7 +431,7 @@
     document.getElementById('pax-val').innerText = gPax;
     document.getElementById('comercial-val').innerText = gCom;
 
-                // ── Parse RoomingList_JSON for real per-day regime data ──
+                // â”€â”€ Parse RoomingList_JSON for real per-day regime data â”€â”€
                 let roomingList = [];
                 try {
                     roomingList = JSON.parse(rec['RoomingList_JSON'] || '[]');
@@ -459,7 +459,7 @@
                     return new Date(s);
                 }
 
-                // ── Regime → Services mapping ──
+                // â”€â”€ Regime â†’ Services mapping â”€â”€
                 // SA = Solo Alojamiento (no meals)
                 // AD = Alojamiento y Desayuno (Desayuno only)
                 // MP/HD = Media Pension (Desayuno + Cena)
@@ -475,10 +475,10 @@
                     return [];
                 }
 
-                // ── Build a day-by-day map from RoomingList entries ──
+                // â”€â”€ Build a day-by-day map from RoomingList entries â”€â”€
                 // Each RoomingList item: { dateIn, dateOut, regime, qty, pax, hotel, ... }
                 // qty = number of rooms, pax = persons per room
-                // Real persons = qty × pax
+                // Real persons = qty Ã— pax
                 const dayMap = new Map(); // key = ISO date string, value = { regimePax: Map<regime, persons>, explicitServices: Map<serviceName, persons> }
 
                 if (roomingList.length > 0) {
@@ -499,7 +499,7 @@
                         const paxPerRoom = parseInt(item.pax) || (typeUpper.includes('IND') ? 1 : 2);
                         const realPersons = qty * paxPerRoom;
 
-                        const isMealsOrService = ['DESAYUNO', 'ALMUERZO', 'CENA', 'COCTEL', 'COFFEE', 'BUFFET', 'MENÚ', 'MENU', 'BREAK'].some(w => typeUpper.includes(w));
+                        const isMealsOrService = ['DESAYUNO', 'ALMUERZO', 'CENA', 'COCTEL', 'COFFEE', 'BUFFET', 'MENÃš', 'MENU', 'BREAK'].some(w => typeUpper.includes(w));
 
                         if (dIn && !isNaN(dIn)) {
                             for (let i = 0; i < nights; i++) {
@@ -544,7 +544,7 @@
                 
                 document.getElementById('regimen-val').innerText = globalRegime;
 
-                        // ── Generate service rows from dayMap ──
+                        // â”€â”€ Generate service rows from dayMap â”€â”€
                         if (dayMap.size > 0) {
                             const servicePaxMap = new Map(); // key = dateKey, value = Map<ServiceName, Pax>
 
@@ -624,7 +624,7 @@
                                 });
                             });
                         } else {
-                    // ── Fallback: no RoomingList, use basic record dates ──
+                    // â”€â”€ Fallback: no RoomingList, use basic record dates â”€â”€
                     const inDate = rec['Entrada'] || group.arrival || rec['Fecha Entrada'];
                     const outDate = rec['Salida'] || group.departure || rec['Fecha Salida'];
                     const regFallback = topRegime || rec['Régimen'] || 'MP';
@@ -669,7 +669,7 @@
                             });
                         }
                     } else {
-                        addRowPlan('DÍA 1', 'Cena', String(gPax), '', '');
+                        addRowPlan('DÃA 1', 'Cena', String(gPax), '', '');
                     }
                 }
 
@@ -715,3 +715,4 @@
     </script>
 </body>
 </html>
+
