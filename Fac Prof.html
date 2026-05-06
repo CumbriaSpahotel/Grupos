@@ -368,6 +368,20 @@
                 <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
                 Imprimir / PDF
             </button>
+            <select id="print-lang-select"
+                class="px-3 py-2 rounded-xl bg-white/10 border border-white/20 text-white text-[10px] font-bold uppercase tracking-wider">
+                <option value="">Sin traducir</option>
+                <option value="en">Ingles</option>
+                <option value="fr">Frances</option>
+                <option value="de">Aleman</option>
+                <option value="it">Italiano</option>
+                <option value="pt">Portugues</option>
+            </select>
+            <button onclick="translateAndPrintDoc()"
+                class="flex items-center gap-2 px-4 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-600 text-white text-[10px] font-black uppercase tracking-wider shadow-lg transition-all">
+                <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 8h14"/><path d="M5 16h9"/><path d="M14 20l6-12"/><path d="M17 14l3 6"/></svg>
+                Traducir y PDF
+            </button>
 
             <!-- Desestimar -->
             <button onclick="desestimarGrupo()" title="Desestimar / Borrar"
@@ -1727,9 +1741,9 @@
                                     <div class="space-y-3">
                                         <div class="flex items-baseline gap-2 border-b-2 border-slate-100 pb-1.5">
                                             <span class="text-[12px] font-black text-slate-200">${String(i + 1).padStart(2, '0')}</span>
-                                            <p class="text-[10px] font-black uppercase text-slate-500 tracking-widest">${c.title}</p>
+                                            <p class="text-[10px] font-black uppercase text-slate-500 tracking-widest editable-clause" contenteditable="true">${c.title}</p>
                                         </div>
-                                        <p class="text-[9.5px] text-slate-600 leading-relaxed font-medium text-justify">
+                                        <p class="text-[9.5px] text-slate-600 leading-relaxed font-medium text-justify editable-clause" contenteditable="true">
                                             ${(c.body || '').replace(/{DEP_30}/g, formatNum(totalNeto * 0.3) + '€')}
                                         </p>
                                     </div>
@@ -1767,7 +1781,101 @@
             const oldTitle = document.title;
             const groupData = JSON.parse(localStorage.getItem('selectedGroup') || '{}');
             document.title = (groupData["Reserva"] || groupData["id"] || '') + ' - ' + (groupData["Nombre del Grupo"] || '');
-            setTimeout(() => { window.print(); document.title = oldTitle; noPrints.forEach(el => { el.style.display = el._savedDisplay || ''; delete el._savedDisplay; }); }, 80);
+            setTimeout(() => {
+                window.print();
+                document.title = oldTitle;
+                noPrints.forEach(el => { el.style.display = el._savedDisplay || ''; delete el._savedDisplay; });
+            }, 80);
+        }
+
+        function cleanWeirdChars(s) {
+            if (!s) return '';
+            return String(s)
+                .replace(/â‚¬/g, 'EUR')
+                .replace(/Ã¡/g, 'a').replace(/Ã©/g, 'e').replace(/Ã­/g, 'i').replace(/Ã³/g, 'o').replace(/Ãº/g, 'u')
+                .replace(/Ã±/g, 'n')
+                .replace(/Â¿/g, '?').replace(/Â¡/g, '!')
+                .replace(/[^\x20-\x7E\n\r\t]/g, ' ')
+                .replace(/\s{2,}/g, ' ')
+                .trim();
+        }
+
+        function getTargetLangLabel(code) {
+            const map = { en: 'English', fr: 'French', de: 'German', it: 'Italian', pt: 'Portuguese' };
+            return map[code] || '';
+        }
+
+        async function translateAndPrintDoc() {
+            const langCode = document.getElementById('print-lang-select')?.value || '';
+            if (!langCode) {
+                printDoc();
+                return;
+            }
+            if (!window.callGemini) {
+                alert('No hay servicio de traduccion disponible.');
+                return;
+            }
+
+            const targetLang = getTargetLangLabel(langCode);
+            if (!targetLang) {
+                printDoc();
+                return;
+            }
+
+            const capture = document.getElementById('capture-area');
+            if (!capture) {
+                printDoc();
+                return;
+            }
+
+            const candidates = Array.from(capture.querySelectorAll('h1,h2,h3,h4,h5,h6,p,span,td,th,li,a,strong,em,.editable,.editable-clause'))
+                .filter(el => el && el.offsetParent !== null)
+                .filter(el => !el.closest('.no-print'));
+
+            const jobs = [];
+            candidates.forEach((el) => {
+                if (el.children.length > 0) return;
+                const t = (el.textContent || '').trim();
+                if (!t || t === '---') return;
+                if (/^\d+[\/\-\.\d]*$/.test(t)) return;
+                jobs.push({ el, original: t });
+            });
+
+            if (jobs.length === 0) {
+                printDoc();
+                return;
+            }
+
+            try {
+                const payload = jobs.map((j, i) => `${i + 1}|||${j.original}`).join('\n');
+                const prompt = `Translate each line to ${targetLang}. Keep numbering and separator exactly as "N|||". Keep names, codes, urls and amounts unchanged. Return only translated lines.\n\n${payload}`;
+                const raw = await window.callGemini(prompt);
+                const lines = String(raw || '').split('\n').map(x => x.trim()).filter(Boolean);
+                const translatedMap = {};
+                lines.forEach((line) => {
+                    const m = line.match(/^(\d+)\|\|\|(.*)$/);
+                    if (!m) return;
+                    translatedMap[parseInt(m[1], 10)] = cleanWeirdChars(m[2] || '');
+                });
+
+                const rollback = [];
+                jobs.forEach((j, idx) => {
+                    const translated = translatedMap[idx + 1];
+                    if (!translated) return;
+                    rollback.push({ el: j.el, text: j.el.textContent });
+                    j.el.textContent = translated;
+                });
+
+                printDoc();
+
+                setTimeout(() => {
+                    rollback.forEach((r) => { r.el.textContent = r.text; });
+                }, 900);
+            } catch (e) {
+                console.error('translateAndPrintDoc error:', e);
+                alert('No se pudo traducir. Se imprimira el documento original.');
+                printDoc();
+            }
         }
     </script>
 </body>
