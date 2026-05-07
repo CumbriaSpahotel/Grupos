@@ -417,12 +417,12 @@
             </button>
             <select id="print-lang-select"
                 class="px-3 py-2 rounded-xl bg-white/10 border border-white/20 text-white text-[10px] font-bold uppercase tracking-wider">
-                <option value="">Sin traducir</option>
-                <option value="en">Ingles</option>
-                <option value="fr">Frances</option>
-                <option value="de">Aleman</option>
-                <option value="it">Italiano</option>
-                <option value="pt">Portugues</option>
+                <option value="" class="text-slate-900 bg-white">Sin traducir</option>
+                <option value="en" class="text-slate-900 bg-white">Ingles</option>
+                <option value="fr" class="text-slate-900 bg-white">Frances</option>
+                <option value="de" class="text-slate-900 bg-white">Aleman</option>
+                <option value="it" class="text-slate-900 bg-white">Italiano</option>
+                <option value="pt" class="text-slate-900 bg-white">Portugues</option>
             </select>
             <button onclick="translateDocumentOnly()"
                 class="flex items-center gap-2 px-3 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-600 text-white text-[9px] font-black uppercase tracking-wider shadow-lg transition-all whitespace-nowrap">
@@ -444,7 +444,7 @@
     </div>
 
 
-    <!-- CONTENEDOR DE LA PÃGINA -->
+    <!-- CONTENEDOR DE LA PÁGINA -->
     <div id="capture-area" class="page-container flex flex-col shadow-2xl border border-gray-300">
 
         <!-- Sidebar Legal Vertical Global -->
@@ -461,17 +461,20 @@
                     alt="Logo">
             </div>
 
-            <div class="header-info-container">
-                <div id="header-address-line" class="font-bold">C/ Guadiana, 36</div>
-                <div id="header-city-line">13002 - Ciudad Real (España)</div>
-                <div class="flex items-center justify-center gap-3 mt-1" style="font-size: 9.5px;">
-                    <div id="header-tel-line">Telf.: (+34) <span id="header-tel-val">926 22 33 13</span></div>
-                    <div class="w-px h-3 bg-slate-200"></div>
-                    <div id="header-email-line">Email: <span id="header-email-val">info@hotelguadiana.es</span></div>
-                    <div class="w-px h-3 bg-slate-200"></div>
-                    <div id="header-nif-line">NIF: <span id="header-nif-val">B87067302</span></div>
+            <div class="header-info-container flex flex-col items-center justify-center text-center">
+                <div id="header-address-line" class="font-bold text-slate-800 text-[11px]">C/ Guadiana, 36</div>
+                <div id="header-city-line" class="text-slate-500 text-[10px] mb-1">13002 - Ciudad Real (España)</div>
+                <div class="flex items-center justify-center gap-4 py-1 border-y border-slate-100 w-full max-w-[450px]" style="font-size: 10px;">
+                    <div id="header-tel-line" class="flex items-center gap-1 whitespace-nowrap">
+                        <span class="text-slate-400 font-bold uppercase tracking-tighter">Tel:</span> 
+                        <span id="header-tel-val" class="font-semibold text-slate-700">(+34) 926 22 33 13</span>
+                    </div>
+                    <div class="w-1 h-1 bg-slate-300 rounded-full"></div>
+                    <div id="header-email-line" class="flex items-center gap-1 whitespace-nowrap">
+                        <span class="text-slate-400 font-bold uppercase tracking-tighter">Email:</span> 
+                        <span id="header-email-val" class="font-semibold text-slate-700">info@hotelguadiana.es</span>
+                    </div>
                 </div>
-                <div id="header-web-line" class="mt-1 font-bold text-slate-400" style="font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase;">www.hotelguadiana.es</div>
             </div>
 
             <div class="header-title-container">
@@ -479,13 +482,13 @@
                 <div id="doc-type-title" style="display:inline-block; background:#1e293b; color:white; font-size:8px; font-weight:900; letter-spacing:0.2em; text-transform:uppercase; padding:3px 10px; border-radius:4px; margin-bottom:6px; -webkit-print-color-adjust:exact; print-color-adjust:exact;">
                     Confirmación
                 </div>
-                <!-- NÂº Reserva â€” visible solo en confirmacion, oculto en proforma -->
+                <!-- Nº Reserva - visible solo en confirmacion, oculto en proforma -->
                 <div id="header-reserva-block" style="display:flex; flex-direction:column; gap:1px; margin-bottom:4px;">
-                    <span id="doc-type-label" style="font-size:7px; font-weight:900; letter-spacing:0.15em; text-transform:uppercase; color:#94a3b8;">NÂº Reserva</span>
+                    <span id="doc-type-label" style="font-size:7px; font-weight:900; letter-spacing:0.15em; text-transform:uppercase; color:#94a3b8;">Nº Reserva</span>
                     <span id="reserva-id-universal" class="editable" contenteditable="true"
                         style="font-size:13px; font-weight:900; color:#0f172a; letter-spacing:0.03em; font-family:'Courier Prime', monospace;">---</span>
                 </div>
-                <!-- Fecha â€” visible solo en confirmacion -->
+                <!-- Fecha - visible solo en confirmacion -->
                 <div id="header-fecha-block" style="display:flex; flex-direction:column; gap:1px;">
                     <span style="font-size:7px; font-weight:900; letter-spacing:0.15em; text-transform:uppercase; color:#94a3b8;">Fecha</span>
                     <span id="fecha-universal" class="editable" contenteditable="true"
@@ -566,7 +569,7 @@
                         <table style="border-collapse:collapse; border:1px solid #000; width:280px; margin:0 auto; font-size:10px;" id="proforma-ref-table">
                             <thead>
                                 <tr style="background:#f1f5f9;">
-                                    <th style="border:1px solid #000; padding:3px 8px; text-align:center; font-weight:900; width:40%;" id="proforma-header-label">NÂº Factura</th>
+                                    <th style="border:1px solid #000; padding:3px 8px; text-align:center; font-weight:900; width:40%;" id="proforma-header-label">Nº Factura</th>
                                     <th style="border:1px solid #000; padding:3px 8px; text-align:center; font-weight:900; width:40%;">Fecha</th>
                                     <th style="border:1px solid #000; padding:3px 8px; text-align:center; font-weight:900; width:20%;">Pág.</th>
                                 </tr>
@@ -626,7 +629,7 @@
                     class="no-print absolute -top-3 -right-3 bg-emerald-500 text-white rounded-full w-5 h-5 text-[9px] font-bold shadow hover:bg-emerald-600 transition hidden"
                     id="ocupante-restore"
                     onclick="document.querySelectorAll('.ocupante-row').forEach(r=>r.classList.remove('hidden'));this.classList.add('hidden');"
-                    title="Restaurar campos ocultos">â†º</button>
+                    title="Restaurar campos ocultos">↺</button>
 
                 <div class="flex-1">
                     <div class="mb-1 ocupante-row flex items-center gap-1">
@@ -652,7 +655,7 @@
                                 title="Ocultar">✖</button>
                         </div>
                         <div class="ocupante-row flex items-center gap-1">
-                            <span class="w-24"><strong>NÂº Bono :</strong></span>
+                            <span class="w-24"><strong>Nº Bono :</strong></span>
                             <span class="editable" contenteditable="true" id="f-voucher">---</span>
                             <button class="no-print text-red-300 hover:text-red-600 text-[10px] ml-auto"
                                 onclick="this.parentElement.classList.add('hidden');document.getElementById('ocupante-restore').classList.remove('hidden');"
@@ -692,7 +695,7 @@
                         <th width="8%" class="text-center py-1.5">CANTIDAD</th>
                         <th width="30%" class="text-left py-1.5">CONCEPTO</th>
                         <th width="8%" class="text-center py-1.5">REG.</th>
-                        <th width="8%" class="text-center py-1.5">DÃAS</th>
+                        <th width="8%" class="text-center py-1.5">DÍAS</th>
                         <th width="10%" class="text-right py-1.5">PRECIO/U</th>
                         <th width="12%" class="text-right py-1.5">TOTAL</th>
                         <th width="12%" class="text-right py-1.5">ACUMULADO</th>
@@ -709,7 +712,7 @@
             <!-- Notas y Comentarios Especiales (oculto por defecto) -->
             <button id="btn-proforma-notas" class="no-print mt-4 text-[9px] font-bold text-slate-400 uppercase tracking-widest hover:text-slate-600 transition flex items-center gap-1"
                 onclick="document.getElementById('proforma-notas-block').style.display='block'; this.style.display='none';">
-                ï¼‹ Añadir Notas / Comentarios
+                ＋ Añadir Notas / Comentarios
             </button>
             <div id="proforma-notas-block" class="mt-4 pt-4 border-t border-slate-100 mb-4" style="display:none;">
                 <div class="flex items-center justify-between mb-2">
@@ -869,7 +872,7 @@
             </div>
         </div>
         <!-- Botón para mostrar qr de nuevo (no imprime) -->
-        <button id="qr-show-btn" class="no-print" onclick="document.getElementById('payment-qr-block').style.display='block'; sessionStorage.setItem('proforma_qr_hidden','0'); this.style.display='none';" style="display:none; margin-top:6px; align-items:center; gap:4px; background:#f1f5f9; border:1px solid #e2e8f0; border-radius:6px; padding:3px 10px; font-size:8px; cursor:pointer; color:#475569; font-weight:700; letter-spacing:0.05em;">ï¼‹ Incluir pasarela de pago (QR)</button>
+        <button id="qr-show-btn" class="no-print" onclick="document.getElementById('payment-qr-block').style.display='block'; sessionStorage.setItem('proforma_qr_hidden','0'); this.style.display='none';" style="display:none; margin-top:6px; align-items:center; gap:4px; background:#f1f5f9; border:1px solid #e2e8f0; border-radius:6px; padding:3px 10px; font-size:8px; cursor:pointer; color:#475569; font-weight:700; letter-spacing:0.05em;">＋ Incluir pasarela de pago (QR)</button>
 
         <!-- FIN BLOQUE PAGO QR -->
 
@@ -882,9 +885,9 @@
         </div>
         </div>
     </div>
-    <!-- FIN CAPTURE-AREA (PÃGINA 1) -->
+    <!-- FIN CAPTURE-AREA (PÁGINA 1) -->
 
-    <!-- Políticas de Reserva (PÃGINA 2) -->
+    <!-- Políticas de Reserva (PÁGINA 2) -->
     <div id="tpl-policies" class="page-container shadow-2xl border border-gray-300 mt-8 hidden" style="break-before: page;">
         <!-- Sidebar Legal Vertical (Página 2) -->
         <div class="static-legal-sidebar">
@@ -1844,8 +1847,8 @@
             if (!s) return '';
             return String(s)
                 .replace(/ EUR/g, 'EUR')
-                .replace(/Ãƒ¡/g, 'a').replace(/ÃƒÂ©/g, 'e').replace(/ÃƒÂ­/g, 'i').replace(/ÃƒÂ³/g, 'o').replace(/ÃƒÂº/g, 'u')
-                .replace(/ÃƒÂ±/g, 'n')
+                .replace(/Ãƒ¡/g, 'a').replace(/é/g, 'e').replace(/í/g, 'i').replace(/ó/g, 'o').replace(/ú/g, 'u')
+                .replace(/ñ/g, 'n')
                 .replace(/á¿/g, '?').replace(/á¡/g, '!')
                 .replace(/[^\x20-\x7E\n\r\t]/g, ' ')
                 .replace(/\s{2,}/g, ' ')
@@ -1878,25 +1881,36 @@
             if (jobs.length === 0) return { translatedCount: 0, rollback: [] };
 
             const translatedMap = {};
-            const chunkSize = 20;
+            const chunkSize = 50; // Aumentado para reducir el número de peticiones
+            const chunkPromises = [];
+
             for (let start = 0; start < jobs.length; start += chunkSize) {
                 const slice = jobs.slice(start, start + chunkSize);
-                const payload = slice.map((j, i) => `${i + 1}|||${j.original}`).join('\n');
-                const prompt = `Translate each line to ${targetLang}. Keep numbering and separator exactly as "N|||". Keep names, codes, urls and amounts unchanged. Return only translated lines.\n\n${payload}`;
-                let raw = '';
-                try {
-                    raw = await callGeminiWithTimeout(prompt, 10000);
-                } catch (_) {
-                    continue;
-                }
-                const lines = String(raw || '').split('\n').map(x => x.trim()).filter(Boolean);
-                lines.forEach((line) => {
-                    const m = line.match(/^(\d+)\|\|\|(.*)$/);
-                    if (!m) return;
-                    const localId = parseInt(m[1], 10);
-                    translatedMap[start + localId] = cleanWeirdChars(m[2] || '');
-                });
+                const currentStart = start;
+                
+                const processChunk = async () => {
+                    const payload = slice.map((j, i) => `${i + 1}|||${j.original}`).join('\n');
+                    const prompt = `Translate each line to ${targetLang}. Keep numbering and separator exactly as "N|||". Keep names, codes, urls and amounts unchanged. Return only translated lines.\n\n${payload}`;
+                    
+                    try {
+                        const raw = await callGeminiWithTimeout(prompt, 15000);
+                        const lines = String(raw || '').split('\n').map(x => x.trim()).filter(Boolean);
+                        lines.forEach((line) => {
+                            const m = line.match(/^(\d+)\|\|\|(.*)$/);
+                            if (!m) return;
+                            const localId = parseInt(m[1], 10);
+                            translatedMap[currentStart + localId] = cleanWeirdChars(m[2] || '');
+                        });
+                    } catch (err) {
+                        console.warn(`[Translation] Chunk ${currentStart} falló:`, err);
+                    }
+                };
+
+                chunkPromises.push(processChunk());
             }
+
+            // Ejecutar en paralelo para mayor velocidad
+            await Promise.all(chunkPromises);
 
             const rollback = [];
             let translatedCount = 0;
