@@ -8,14 +8,12 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Times+New+Roman&display=swap');
-        
         body {
             background-color: #f1f5f9;
             font-family: 'Times New Roman', Times, serif;
             margin: 0;
             padding: 20px;
         }
-
         .page-container {
             width: 210mm;
             min-height: 297mm;
@@ -25,14 +23,12 @@
             box-sizing: border-box;
             position: relative;
         }
-
         @media print {
             body { background-color: transparent; padding: 0; }
             .page-container { box-shadow: none; border: none; margin: 0; padding: 15mm 15mm; min-height: auto; }
             .no-print { display: none !important; }
             input, textarea, .editable { border: none !important; resize: none; overflow: hidden; background: transparent !important; }
         }
-
         .editable {
             transition: all 0.2s;
             border-bottom: 1px dotted transparent;
@@ -47,13 +43,11 @@
             outline: 2px solid #ca8a04;
             border-bottom: 1px dotted transparent;
         }
-        
         .editable[contenteditable="true"]:empty:before {
             content: "---";
             color: #999;
             pointer-events: none;
         }
-
         h1 {
             font-size: 26px;
             font-weight: bold;
@@ -61,14 +55,12 @@
             letter-spacing: 1px;
             text-transform: uppercase;
         }
-
         .info-block {
             font-size: 14px;
             line-height: 1.5;
             margin-bottom: 30px;
         }
         .info-block strong { font-weight: bold; }
-
         .section-title {
             font-size: 17px;
             font-weight: bold;
@@ -78,18 +70,15 @@
             margin-bottom: 15px;
             text-transform: uppercase;
         }
-
         table { width: 100%; border-collapse: collapse; font-size: 13px; }
         th { border-bottom: 1px solid #000; text-align: left; padding: 4px 8px; font-weight: bold; text-transform: uppercase; }
         td { padding: 6px 8px; vertical-align: top; border-bottom: 1px solid #f1f5f9; }
-
         .notas-container {
             font-size: 13px;
             margin-top: 10px;
             min-height: 100px;
             padding: 10px;
         }
-        
         .hotel-footer {
             margin-top: 40px;
             text-align: center;
@@ -103,7 +92,6 @@
     </style>
 </head>
 <body>
-
     <div class="no-print" style="max-width: 210mm; margin: 0 auto 20px auto; display: flex; justify-content: space-between; align-items: center;">
         <button onclick="goBackToReserva()" class="px-5 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-lg transition-colors text-sm shadow">
             &larr; Volver a la Reserva
@@ -114,14 +102,12 @@
                 Restaurar Datos
             </button>
             <button onclick="window.print()" class="px-6 py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-lg transition-colors text-sm shadow cursor-pointer">
-                ðŸ–¨ï¸ Imprimir / PDF
+                Imprimir / PDF
             </button>
         </div>
     </div>
-
     <!-- MAIN DOCUMENT AREA -->
     <div class="page-container flex flex-col" style="min-height: 29.7cm;" id="document-area">
-        
         <!-- HEADER -->
         <div class="flex justify-between items-start mb-6 border-b-2 border-slate-900 pb-4">
             <h1 class="editable" contenteditable="true" id="informe-title" oninput="triggerSave()" style="margin-bottom: 0;">ORDEN DE SERVICIO Nº <span id="title-reserva">---</span></h1>
@@ -131,7 +117,6 @@
                 <div id="logo-top-sub" style="font-size: 9px; font-family: sans-serif; color: #64748b; letter-spacing: 1.5px; margin-top: 2px;"></div>
             </div>
         </div>
-
         <!-- INFO -->
         <div class="info-block" id="info-block">
             <div class="grid grid-cols-2 gap-x-8 gap-y-1">
@@ -143,13 +128,12 @@
                 <p><strong>Comercial:</strong> <span class="editable" contenteditable="true" id="comercial-val" oninput="triggerSave()">...</span></p>
             </div>
         </div>
-
         <!-- PLAN -->
         <div class="section-title">PLAN DE SERVICIOS</div>
         <table id="table-plan">
             <thead>
                 <tr>
-                    <th style="width: 15%">DÃA</th>
+                    <th style="width: 15%">DÍA</th>
                     <th style="width: 15%">SERVICIO</th>
                     <th style="width: 8%">PAX</th>
                     <th style="width: 45%">MENÚ</th>
@@ -164,7 +148,6 @@
         <div class="no-print mt-2 text-right">
             <button onclick="addRowPlan('', '', '', '', '')" class="text-[10px] uppercase font-bold text-amber-600 hover:text-amber-800 tracking-wider bg-amber-50 px-2 py-1 rounded border border-amber-200 shadow-sm">+ Añadir servicio</button>
         </div>
-
         <!-- INCIDENCIAS -->
         <div class="section-title mt-8">MENÚS ESPECIALES / INCIDENCIAS</div>
         <table id="table-incidencias">
@@ -184,7 +167,6 @@
         <div class="no-print mt-2 text-right">
             <button onclick="addRowIncidencia('', '', '', '')" class="text-[10px] uppercase font-bold text-amber-600 hover:text-amber-800 tracking-wider bg-amber-50 px-2 py-1 rounded border border-amber-200 shadow-sm">+ Añadir incidencia</button>
         </div>
-
         <!-- NOTAS -->
         <div class="section-title mt-8">NOTAS OPERATIVAS</div>
         <div class="notas-container editable" contenteditable="true" id="notas-val" oninput="triggerSave()">
@@ -192,7 +174,6 @@
                 <li>Detalles operativos aquí...</li>
             </ul>
         </div>
-
         <!-- FOOTER / LOGO -->
         <div class="hotel-footer mt-auto pt-8 pb-4">
             <div id="hotel-banner-container" style="display:flex; justify-content:center; align-items:center; background-color:#7f7f70; color:#fff; padding: 12px; margin-top:20px;">
@@ -204,32 +185,26 @@
             <!-- Backup Image Banner instead of Text -->
             <img id="logo-bottom-banner" src="" class="mt-4" style="display: none; width: 100%; object-fit: contain; max-height: 80px;" alt="Banner Hotel" />
         </div>
-
     </div>
-
     <!-- Script principal de lógica de guardado y carga -->
     <script>
         let currentReservaId = "unknown";
         let currentGroupName = "";
-
         function goBackToReserva() {
             // Guardamos la referencia para que Gestion de Grupos sepa qué ficha abrir
             localStorage.setItem('nexus_return_reserva', currentReservaId);
             window.location.href = 'Gestion-de-Grupos.html';
         }
         let saveTimeout = null;
-
         // Auto Save Trigger
         function triggerSave() {
             clearTimeout(saveTimeout);
             saveTimeout = setTimeout(saveStateToCache, 800);
-            
             // Visual feedback
             const status = document.getElementById('save-status');
             status.style.opacity = '1';
             setTimeout(() => status.style.opacity = '0', 2000);
         }
-
         function createEditableCell(text) {
             const td = document.createElement('td');
             td.className = 'editable';
@@ -238,8 +213,6 @@
             td.oninput = triggerSave;
             return td;
         }
-
-        // Table Plan
         function addRowPlan(dia, serv, pax, menu, hora) {
             const tbody = document.querySelector('#table-plan tbody');
             const tr = document.createElement('tr');
@@ -248,21 +221,17 @@
             tr.appendChild(createEditableCell(pax));
             tr.appendChild(createEditableCell(menu));
             tr.appendChild(createEditableCell(hora));
-
             const btnTd = document.createElement('td');
             btnTd.className = 'no-print text-right';
             const btn = document.createElement('button');
-            btn.innerHTML = '✖';
-            btn.className = 'text-red-400 font-black hover:text-red-600 px-1';
+            btn.innerText = '✖';
+            btn.className = 'text-red-400 font-black hover:text-red-600 px-1 cursor-pointer';
             btn.onclick = () => { tr.remove(); triggerSave(); };
             btnTd.appendChild(btn);
             tr.appendChild(btnTd);
-
             tbody.appendChild(tr);
             triggerSave();
         }
-
-        // Table Incidencias
         function addRowIncidencia(tipo, numPax, detalle, servAfectado) {
             const tbody = document.querySelector('#table-incidencias tbody');
             const tr = document.createElement('tr');
@@ -270,24 +239,45 @@
             tr.appendChild(createEditableCell(numPax));
             tr.appendChild(createEditableCell(detalle));
             tr.appendChild(createEditableCell(servAfectado));
-
             const btnTd = document.createElement('td');
             btnTd.className = 'no-print text-right';
             const btn = document.createElement('button');
-            btn.innerHTML = '✖';
-            btn.className = 'text-red-400 font-black hover:text-red-600 px-1';
+            btn.innerText = '✖';
+            btn.className = 'text-red-400 font-black hover:text-red-600 px-1 cursor-pointer';
             btn.onclick = () => { tr.remove(); triggerSave(); };
             btnTd.appendChild(btn);
             tr.appendChild(btnTd);
-
             tbody.appendChild(tr);
             triggerSave();
+        }
+        // --- Sanitization ---
+        function sanitizeText(text) {
+            if (typeof text !== 'string') return text;
+            return text
+                .replace(/Â\u2014|â€”|Â—|Â –/g, '-') // Em-dash/En-dash artifacts
+                .replace(/Â\u00A0/g, ' ')            // Non-breaking space artifact
+                .replace(/Ã\u00A1/g, 'á')
+                .replace(/Ã\u00A9/g, 'é')
+                .replace(/Ã\u00AD/g, 'í')
+                .replace(/Ã\u00B3/g, 'ó')
+                .replace(/Ã\u00BA/g, 'ú')
+                .replace(/Ã\u00B1/g, 'ñ')
+                .replace(/Ã\u0081/g, 'Á')
+                .replace(/Ã\u0089/g, 'É')
+                .replace(/Ã\u008D/g, 'Í')
+                .replace(/Ã\u0093/g, 'Ó')
+                .replace(/Ã\u009A/g, 'Ú')
+                .replace(/Ã\u0091/g, 'Ñ')
+                .replace(/Ã\u0097/g, '×')
+                .replace(/Âº/g, 'º')
+                .replace(/Â¿/g, '¿')
+                .replace(/\u00C2/g, '')             // Final safety: remove stray Â
+                .trim();
         }
 
         // --- Save / Load Core ---
         function saveStateToCache() {
             if (currentReservaId === "unknown") return;
-            
             // Collect tables data
             const planRows = [];
             document.querySelectorAll('#table-plan tbody tr').forEach(tr => {
@@ -302,7 +292,6 @@
                     });
                 }
             });
-
             const incidenciaRows = [];
             document.querySelectorAll('#table-incidencias tbody tr').forEach(tr => {
                 const cells = tr.querySelectorAll('td.editable');
@@ -315,30 +304,26 @@
                     });
                 }
             });
-
             const saveData = {
-                title: document.getElementById('informe-title').innerText,
-                ref: document.getElementById('ref-val').innerText,
-                grupo: document.getElementById('grupo-val').innerText,
-                agencia: document.getElementById('agencia-val').innerText,
-                pax: document.getElementById('pax-val').innerText,
-                regimen: document.getElementById('regimen-val').innerText,
-                comercial: document.getElementById('comercial-val').innerText,
+                title: sanitizeText(document.getElementById('informe-title').innerText),
+                ref: sanitizeText(document.getElementById('ref-val').innerText),
+                grupo: sanitizeText(document.getElementById('grupo-val').innerText),
+                agencia: sanitizeText(document.getElementById('agencia-val').innerText),
+                pax: sanitizeText(document.getElementById('pax-val').innerText),
+                regimen: sanitizeText(document.getElementById('regimen-val').innerText),
+                comercial: sanitizeText(document.getElementById('comercial-val').innerText),
                 notasHTML: document.getElementById('notas-val').innerHTML,
                 planRows,
                 incidenciaRows
             };
-
             localStorage.setItem('ordenServicio_' + currentReservaId, JSON.stringify(saveData));
         }
-
         function clearReservaCache() {
             if(confirm("¿Estás seguro de que deseas limpiar los datos y restaurar la información original de la reserva? Se perderán las modificaciones manuales que hayas hecho en el menú/horas.")) {
                 localStorage.removeItem('ordenServicio_' + currentReservaId);
                 window.location.reload();
             }
         }
-
         function formatD(dtStr) {
             if (!dtStr) return '---';
             const f = new Date(dtStr);
@@ -346,7 +331,6 @@
             const days = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
             return days[f.getDay()] + ' ' + f.toLocaleDateString('es-ES', {day: '2-digit', month: '2-digit'});
         }
-
         // --- Initialization ---
         document.addEventListener('DOMContentLoaded', () => {
             const rawGroupData = localStorage.getItem('selectedGroup');
@@ -354,16 +338,12 @@
                 addRowPlan('', 'Cena', '', '', '');
                 return;
             }
-
             const group = JSON.parse(rawGroupData);
             const rec = group.records ? (group.records[0] || {}) : group;
-            
             // Extract core logic
             currentReservaId = rec['Reserva'] || group.id || group.reserva || 'unknown';
             document.getElementById('title-reserva').innerText = currentReservaId;
-            
             const savedStateStr = localStorage.getItem('ordenServicio_' + currentReservaId);
-            
             // Hotel Logos / Banners Assignment (Always execute, even if cached)
             const hotelName = (rec['Hotel_Asignado'] || rec['Hotel'] || '').toLowerCase();
             const topTitle = document.getElementById('logo-top-title');
@@ -371,7 +351,6 @@
             const textBanner = document.getElementById('hotel-banner-container');
             const footerTitle = document.getElementById('footer-logo-text');
             const footerSub = document.getElementById('footer-sub-text');
-
             if (hotelName.includes('sercotel') || hotelName.includes('guadiana')) {
                 topTitle.innerText = "SERCOTEL GUADIANA";
                 topSub.innerText = "HOTELES";
@@ -391,28 +370,38 @@
                 footerSub.innerHTML = "Departamento de Operaciones | Gestión Centralizada de Grupos";
                 textBanner.style.backgroundColor = '#0f172a';
             }
-
             // Populate fields
             if (savedStateStr) {
                 // LOAD FROM CACHE
                 const s = JSON.parse(savedStateStr);
-                document.getElementById('informe-title').innerText = s.title || `ORDEN DE SERVICIO Nº ${currentReservaId}`;
-                document.getElementById('ref-val').innerText = s.ref;
-                document.getElementById('grupo-val').innerText = s.grupo;
-                document.getElementById('agencia-val').innerText = s.agencia;
-                document.getElementById('pax-val').innerText = s.pax;
-                document.getElementById('regimen-val').innerText = s.regimen;
-                document.getElementById('comercial-val').innerText = s.comercial || '---';
+                document.getElementById('informe-title').innerText = sanitizeText(s.title || `ORDEN DE SERVICIO Nº ${currentReservaId}`);
+                document.getElementById('ref-val').innerText = sanitizeText(s.ref || '');
+                document.getElementById('grupo-val').innerText = sanitizeText(s.grupo || '');
+                document.getElementById('agencia-val').innerText = sanitizeText(s.agencia || '');
+                document.getElementById('pax-val').innerText = sanitizeText(s.pax || '');
+                document.getElementById('regimen-val').innerText = sanitizeText(s.regimen || '');
+                document.getElementById('comercial-val').innerText = sanitizeText(s.comercial || '---');
                 document.getElementById('notas-val').innerHTML = s.notasHTML || '';
                 
                 // Only use cache if it actually contains plan rows. 
-                // If it's empty, it might be a corrupted or initial save, so we force-regenerate below.
                 if (s.planRows && s.planRows.length > 0) {
-                    s.planRows.forEach(r => addRowPlan(r.dia, r.serv, r.pax, r.menu, r.hora));
-                    s.incidenciaRows.forEach(r => addRowIncidencia(r.tipo, r.numPax, r.detalle, r.serv));
-                    return; // Exit here as we used valid cache
+                    s.planRows.forEach(r => addRowPlan(
+                        sanitizeText(r.dia), 
+                        sanitizeText(r.serv), 
+                        sanitizeText(r.pax), 
+                        sanitizeText(r.menu), 
+                        sanitizeText(r.hora)
+                    ));
+                    s.incidenciaRows.forEach(r => addRowIncidencia(
+                        sanitizeText(r.tipo), 
+                        sanitizeText(r.numPax), 
+                        sanitizeText(r.detalle), 
+                        sanitizeText(r.serv)
+                    ));
+                    return; 
                 }
             }
+<<<<<<< HEAD
             
             // ═══════════════════════════════════════════════
             // CREATE NEW FROM GROUP DATA + RoomingList_JSON
@@ -432,11 +421,24 @@
     document.getElementById('comercial-val').innerText = gCom;
 
                 // ── Parse RoomingList_JSON for real per-day regime data ──
+=======
+            // CREATE NEW FROM GROUP DATA + RoomingList_JSON
+            // (Used if no cache found OR if cache was empty)
+            const gName = rec['Nombre del Grupo'] || group.name || '---';
+            const gAgency = rec['Empresa/Agencia'] || group.agency || 'Directo';
+            const gPax = rec['Pax.'] || rec['Pax'] || group.totalPax || '---';
+            const gCom = rec['Com_Comercial'] || group.commercial || 'S/A';
+            document.getElementById('ref-val').innerText = currentReservaId;
+            document.getElementById('grupo-val').innerText = gName;
+            document.getElementById('agencia-val').innerText = gAgency;
+            document.getElementById('pax-val').innerText = gPax;
+            document.getElementById('comercial-val').innerText = gCom;
+                // Parse RoomingList_JSON for real per-day regime data
+>>>>>>> eb2d6c4536967ac1de91d6ffccf3c2b6dda8eb45
                 let roomingList = [];
                 try {
                     roomingList = JSON.parse(rec['RoomingList_JSON'] || '[]');
                 } catch(e) { roomingList = []; }
-
                 // Robust date parser (handles ISO, DD/MM/YYYY, DD-MM-YYYY, Excel serial)
                 function parseDate(dStr) {
                     if (!dStr) return null;
@@ -458,8 +460,7 @@
                     }
                     return new Date(s);
                 }
-
-                // ── Regime â†’ Services mapping ──
+                // Regime -> Services mapping
                 // SA = Solo Alojamiento (no meals)
                 // AD = Alojamiento y Desayuno (Desayuno only)
                 // MP/HD = Media Pension (Desayuno + Cena)
@@ -474,51 +475,43 @@
                     if (r) return ['Desayuno'];
                     return [];
                 }
-
-                // ── Build a day-by-day map from RoomingList entries ──
+                // Build a day-by-day map from RoomingList entries
                 // Each RoomingList item: { dateIn, dateOut, regime, qty, pax, hotel, ... }
                 // qty = number of rooms, pax = persons per room
-                // Real persons = qty Ã— pax
+                // Real persons = qty * pax
                 const dayMap = new Map(); // key = ISO date string, value = { regimePax: Map<regime, persons>, explicitServices: Map<serviceName, persons> }
-
                 if (roomingList.length > 0) {
                     roomingList.forEach(item => {
                         const dIn = parseDate(item.dateIn);
                         let nights = parseInt(item.nights);
                         if (isNaN(nights) || nights <= 0) nights = 1;
-                        
                         let dOut = parseDate(item.dateOut);
                         if (!dOut || isNaN(dOut) || dOut <= dIn) {
                             dOut = new Date(dIn);
                             dOut.setDate(dOut.getDate() + nights);
                         }
-
                         const typeUpper = (item.type || '').toUpperCase();
                         const regime = (item.regime || '').toUpperCase();
                         const qty = parseInt(item.qty) || 0;
                         const paxPerRoom = parseInt(item.pax) || (typeUpper.includes('IND') ? 1 : 2);
                         const realPersons = qty * paxPerRoom;
-
                         const isMealsOrService = ['DESAYUNO', 'ALMUERZO', 'CENA', 'COCTEL', 'COFFEE', 'BUFFET', 'MENÚ', 'MENU', 'BREAK'].some(w => typeUpper.includes(w));
-
                         if (dIn && !isNaN(dIn)) {
                             for (let i = 0; i < nights; i++) {
                                 const d = new Date(dIn);
                                 d.setDate(d.getDate() + i);
                                 const key = d.toISOString().split('T')[0];
-                                
                                 if (!dayMap.has(key)) {
                                     dayMap.set(key, { regimePax: new Map(), explicitServices: new Map() });
                                 }
                                 const entry = dayMap.get(key);
-
                                 if (isMealsOrService) {
                                     // Para servicios adicionales, mapamos con el nombre real de item.type
                                     // Y no procesamos régimen, asumen que lo que ingresan es lo que se cobra/sirve en esa "Fecha Cargo"
                                     const explicitName = (item.type || 'SERVICIO EXTRA').toUpperCase();
                                     const prev = entry.explicitServices.get(explicitName) || 0;
                                     // Los servicios en presupuestos establecen su número total en CANT. (qty). 
-                                    // No multiplicamos por PAX. porque PAX. en un servicio a veces no aplica o multiplica artificialmente la cantidad.
+                                    // No multiplicamos por PAX. en un servicio a veces no aplica o multiplica artificialmente la cantidad.
                                     const serviceUnits = qty > 0 ? qty : paxPerRoom;
                                     entry.explicitServices.set(explicitName, prev + serviceUnits);
                                 } else {
@@ -529,42 +522,37 @@
                         }
                     });
                 }
-
                 // Determine the dominant/global regime for header display
                 const allRegimes = new Set();
                 dayMap.forEach(v => v.regimePax.forEach((pax, r) => { if(r) allRegimes.add(r); }));
-                
                 // Also check top-level Régimen field
                 const topRegime = rec['Régimen'] || '';
                 if (topRegime) allRegimes.add(topRegime.toUpperCase());
-
                 const globalRegime = allRegimes.size === 1 
                     ? [...allRegimes][0] 
                     : (allRegimes.size > 1 ? [...allRegimes].join(' / ') : (topRegime || '---'));
-                
                 document.getElementById('regimen-val').innerText = globalRegime;
+<<<<<<< HEAD
 
                         // ── Generate service rows from dayMap ──
+=======
+                        // Ã¢ââ¬Ã¢ââ¬ Generate service rows from dayMap Ã¢ââ¬Ã¢ââ¬
+>>>>>>> eb2d6c4536967ac1de91d6ffccf3c2b6dda8eb45
                         if (dayMap.size > 0) {
                             const servicePaxMap = new Map(); // key = dateKey, value = Map<ServiceName, Pax>
-
                             const sortedNights = [...dayMap.entries()].sort((a, b) => a[0].localeCompare(b[0]));
-                            
                             sortedNights.forEach(([dateKey, data]) => {
                                 const nightDate = new Date(dateKey + 'T12:00:00');
-                                
                                 data.regimePax.forEach((pax, regime) => {
                                     const svcs = getServicesForRegime(regime);
                                     svcs.forEach(servicio => {
                                         let targetDateKey = dateKey;
-                                        
                                         // Breakfast always happens the morning AFTER the night
                                         if (servicio === 'Desayuno') {
                                             const nextDay = new Date(nightDate);
                                             nextDay.setDate(nextDay.getDate() + 1);
                                             targetDateKey = nextDay.toISOString().split('T')[0];
                                         }
-                                        
                                         if (!servicePaxMap.has(targetDateKey)) {
                                             servicePaxMap.set(targetDateKey, new Map());
                                         }
@@ -572,11 +560,9 @@
                                         servicePaxMap.get(targetDateKey).set(servicio, prevPax + pax);
                                     });
                                 });
-
                                 // Add explicit services directly to their targetDateKey (same day as dateIn/Fecha Cargo)
                                 data.explicitServices.forEach((pax, serviceName) => {
                                     let sanitizedName = serviceName.charAt(0).toUpperCase() + serviceName.slice(1).toLowerCase();
-                                    
                                     if (!servicePaxMap.has(dateKey)) {
                                         servicePaxMap.set(dateKey, new Map());
                                     }
@@ -584,19 +570,15 @@
                                     servicePaxMap.get(dateKey).set(sanitizedName, prevPax + pax);
                                 });
                             });
-
                             // Output all generated days/services
                             const sortedOutputDays = [...servicePaxMap.keys()].sort();
                             const suggestedHours = { 'Desayuno': '___:___ h', 'Almuerzo': '___:___ h', 'Cena': '___:___ h' };
-
                             sortedOutputDays.forEach(dKey => {
                                 const dayLabel = formatD(dKey);
                                 const svcs = servicePaxMap.get(dKey); // This is a Map
-                                
                                 // To keep reasonable ordering, try these standard ones first
                                 const standardOrder = ['Desayuno', 'Almuerzo', 'Cena'];
                                 const allCurrentSvcs = [...svcs.keys()];
-                                
                                 // Sort keys: Standard ones first, then alphabetical for the rest
                                 allCurrentSvcs.sort((a, b) => {
                                     const indexA = standardOrder.indexOf(a);
@@ -606,7 +588,6 @@
                                     if (indexB !== -1) return 1;
                                     return a.localeCompare(b);
                                 });
-
                                 allCurrentSvcs.forEach(sName => {
                                     const p = svcs.get(sName);
                                     if (p > 0) {
@@ -624,39 +605,37 @@
                                 });
                             });
                         } else {
+<<<<<<< HEAD
                     // ── Fallback: no RoomingList, use basic record dates ──
+=======
+                    // Ã¢ââ¬Ã¢ââ¬ Fallback: no RoomingList, use basic record dates Ã¢ââ¬Ã¢ââ¬
+>>>>>>> eb2d6c4536967ac1de91d6ffccf3c2b6dda8eb45
                     const inDate = rec['Entrada'] || group.arrival || rec['Fecha Entrada'];
                     const outDate = rec['Salida'] || group.departure || rec['Fecha Salida'];
                     const regFallback = topRegime || rec['Régimen'] || 'MP';
                     const services = getServicesForRegime(regFallback);
                     const paxFb = gPax;
-
                     if (inDate) {
                         const dIn = parseDate(inDate);
                         const dOut = outDate ? parseDate(outDate) : null;
-                        
                         if (dIn && !isNaN(dIn)) {
                             const dOut = outDate ? parseDate(outDate) : null;
                             const nights = (dOut && !isNaN(dOut) && dOut > dIn) 
                                 ? Math.ceil((dOut - dIn) / (86400000)) 
                                 : 1;
-                            
                             const servicePaxMap = new Map();
                             const suggestedHours = { 'Desayuno': '___:___ h', 'Almuerzo': '___:___ h', 'Cena': '___:___ h' };
-
                             for (let i = 0; i < nights; i++) {
                                 const cur = new Date(dIn);
                                 cur.setDate(cur.getDate() + i);
                                 services.forEach(s => {
                                     let targetD = new Date(cur);
                                     if (s === 'Desayuno') targetD.setDate(targetD.getDate() + 1);
-                                    
                                     const tKey = targetD.toISOString().split('T')[0];
                                     if (!servicePaxMap.has(tKey)) servicePaxMap.set(tKey, { Desayuno: 0, Almuerzo: 0, Cena: 0 });
                                     servicePaxMap.get(tKey)[s] = paxFb;
                                 });
                             }
-
                             const sortedOutputDays = [...servicePaxMap.keys()].sort();
                             sortedOutputDays.forEach(dKey => {
                                 const dayLabel = formatD(dKey);
@@ -669,13 +648,11 @@
                             });
                         }
                     } else {
-                        addRowPlan('DÃA 1', 'Cena', String(gPax), '', '');
+                        addRowPlan('DÍA 1', 'Cena', String(gPax), '', '');
                     }
                 }
-
                 // Add default incidencia placeholder
                 addRowIncidencia('', '', '', '');
-
                 // Extract group notes automatically
                 const rawNotas = rec['Com_Notas'] || group.notes || '';
                 if (rawNotas) {
@@ -692,12 +669,10 @@
                         }
                     });
                 }
-                
                 const notesList = document.getElementById('notas-ul');
                 if (notesList.children.length === 0) {
                      notesList.innerHTML = '<li>Sin notas operativas registradas en la reserva.</li>';
                 }
-
                 // --- FINAL SAFETY CHECK ---
                 // If even after regeneration/fallback the table is empty, something is wrong with dates/regime.
                 // We add at least one generic row for today so the user isn't faced with a blank screen.
@@ -715,4 +690,3 @@
     </script>
 </body>
 </html>
-
