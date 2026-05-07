@@ -42,7 +42,7 @@ var fmt = NexusUtils.formatCurrency;
 var formatDate = NexusUtils.formatDate;
 
 // --- MÃ“DULO IA (CONEXIÃ“N SEGURA) ---
-// --- MÃ“DULO IA ESTRATÉGICA (CONEXIÃ“N POR PARÃMETROS) ---
+// --- MÃ“DULO IA ESTRATÉGICA (CONEXIÃ“N POR PARÁMETROS) ---
 function analizarGrupos(_x) {
   return _analizarGrupos.apply(this, arguments);
 }

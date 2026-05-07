@@ -250,6 +250,31 @@
             tbody.appendChild(tr);
             triggerSave();
         }
+        // --- Sanitization ---
+        function sanitizeText(text) {
+            if (typeof text !== 'string') return text;
+            return text
+                .replace(/Â\u2014|â€”|Â—|Â –/g, '-') // Em-dash/En-dash artifacts
+                .replace(/Â\u00A0/g, ' ')            // Non-breaking space artifact
+                .replace(/Ã\u00A1/g, 'á')
+                .replace(/Ã\u00A9/g, 'é')
+                .replace(/Ã\u00AD/g, 'í')
+                .replace(/Ã\u00B3/g, 'ó')
+                .replace(/Ã\u00BA/g, 'ú')
+                .replace(/Ã\u00B1/g, 'ñ')
+                .replace(/Ã\u0081/g, 'Á')
+                .replace(/Ã\u0089/g, 'É')
+                .replace(/Ã\u008D/g, 'Í')
+                .replace(/Ã\u0093/g, 'Ó')
+                .replace(/Ã\u009A/g, 'Ú')
+                .replace(/Ã\u0091/g, 'Ñ')
+                .replace(/Ã\u0097/g, '×')
+                .replace(/Âº/g, 'º')
+                .replace(/Â¿/g, '¿')
+                .replace(/\u00C2/g, '')             // Final safety: remove stray Â
+                .trim();
+        }
+
         // --- Save / Load Core ---
         function saveStateToCache() {
             if (currentReservaId === "unknown") return;
@@ -280,13 +305,13 @@
                 }
             });
             const saveData = {
-                title: document.getElementById('informe-title').innerText,
-                ref: document.getElementById('ref-val').innerText,
-                grupo: document.getElementById('grupo-val').innerText,
-                agencia: document.getElementById('agencia-val').innerText,
-                pax: document.getElementById('pax-val').innerText,
-                regimen: document.getElementById('regimen-val').innerText,
-                comercial: document.getElementById('comercial-val').innerText,
+                title: sanitizeText(document.getElementById('informe-title').innerText),
+                ref: sanitizeText(document.getElementById('ref-val').innerText),
+                grupo: sanitizeText(document.getElementById('grupo-val').innerText),
+                agencia: sanitizeText(document.getElementById('agencia-val').innerText),
+                pax: sanitizeText(document.getElementById('pax-val').innerText),
+                regimen: sanitizeText(document.getElementById('regimen-val').innerText),
+                comercial: sanitizeText(document.getElementById('comercial-val').innerText),
                 notasHTML: document.getElementById('notas-val').innerHTML,
                 planRows,
                 incidenciaRows
@@ -349,20 +374,32 @@
             if (savedStateStr) {
                 // LOAD FROM CACHE
                 const s = JSON.parse(savedStateStr);
-                document.getElementById('informe-title').innerText = s.title;
-                document.getElementById('ref-val').innerText = s.ref;
-                document.getElementById('grupo-val').innerText = s.grupo;
-                document.getElementById('agencia-val').innerText = s.agencia;
-                document.getElementById('pax-val').innerText = s.pax;
-                document.getElementById('regimen-val').innerText = s.regimen;
-                document.getElementById('comercial-val').innerText = s.comercial || '---';
+                
+                document.getElementById('informe-title').innerText = sanitizeText(s.title || '');
+                document.getElementById('ref-val').innerText = sanitizeText(s.ref || '');
+                document.getElementById('grupo-val').innerText = sanitizeText(s.grupo || '');
+                document.getElementById('agencia-val').innerText = sanitizeText(s.agencia || '');
+                document.getElementById('pax-val').innerText = sanitizeText(s.pax || '');
+                document.getElementById('regimen-val').innerText = sanitizeText(s.regimen || '');
+                document.getElementById('comercial-val').innerText = sanitizeText(s.comercial || '---');
                 document.getElementById('notas-val').innerHTML = s.notasHTML || '';
+                
                 // Only use cache if it actually contains plan rows. 
-                // If it's empty, it might be a corrupted or initial save, so we force-regenerate below.
                 if (s.planRows && s.planRows.length > 0) {
-                    s.planRows.forEach(r => addRowPlan(r.dia, r.serv, r.pax, r.menu, r.hora));
-                    s.incidenciaRows.forEach(r => addRowIncidencia(r.tipo, r.numPax, r.detalle, r.serv));
-                    return; // Exit here as we used valid cache
+                    s.planRows.forEach(r => addRowPlan(
+                        sanitizeText(r.dia), 
+                        sanitizeText(r.serv), 
+                        sanitizeText(r.pax), 
+                        sanitizeText(r.menu), 
+                        sanitizeText(r.hora)
+                    ));
+                    s.incidenciaRows.forEach(r => addRowIncidencia(
+                        sanitizeText(r.tipo), 
+                        sanitizeText(r.numPax), 
+                        sanitizeText(r.detalle), 
+                        sanitizeText(r.serv)
+                    ));
+                    return; 
                 }
             }
             // CREATE NEW FROM GROUP DATA + RoomingList_JSON
