@@ -4837,71 +4837,132 @@ const [customBudgetIdInput, setCustomBudgetIdInput] = useState("");
 
       const reconcileReactPaymentPlan = (paymentPlan, netTotal, arrivalDate, options = {}) => {
         if (!paymentPlan || paymentPlan.length === 0) return paymentPlan || [];
+        const total = Math.max(0, parseFloat(netTotal) || 0);
         const planCopy = paymentPlan.map(p => ({ ...p }));
         const lockedIndex = options && typeof options.lockedIndex === "number" ? options.lockedIndex : -1;
         const lockedField = options && options.lockedField ? options.lockedField : null;
 
-        // 1. Recalculate percent/amount for each row
-        planCopy.forEach((p, pIdx) => {
-          const userEditedPercent = (lockedIndex === pIdx && lockedField === "percent");
-          const userEditedAmount = (lockedIndex === pIdx && lockedField === "amount");
-          const hasExistingAmount = p.amount !== undefined && p.amount !== null && p.amount !== "" && !isNaN(parseFloat(p.amount));
+        const isCobradoRow = (p) => p.status === "Cobrado" || p.status === "Pagado";
 
-          if (userEditedPercent) {
-            // El usuario cambió explícitamente el %: calcular el importe a partir del porcentaje
-            const pct = parseFloat(p.percent) || 0;
-            p.percent = parseFloat(pct.toFixed(2));
-            p.amount = netTotal > 0 ? ((netTotal * pct) / 100).toFixed(2) : "0.00";
-            p.manual = false;
-          } else if (userEditedAmount || p.manual === true || p.manual === "true" || p.status === "Cobrado" || hasExistingAmount) {
-            // IMPORTANTE: Si la fila tiene importe (o fue fijada manualmente, o está cobrada, o ya existe un importe numérico):
-            // ¡PRESERVAR EL IMPORTE EXACTO! Nunca recalcular desde el % redondeado.
-            // ej. 1000.00€ se mantiene exactamente como 1000.00€ (no cambia a 999.92€).
-            const amt = parseFloat(p.amount) || 0;
+        // 1. Filas cobradas: sus importes son sagrados e inmutables
+        let totalCobrado = 0;
+        planCopy.forEach((p) => {
+          if (isCobradoRow(p)) {
+            const amt = Math.max(0, parseFloat(p.amount) || 0);
             p.amount = amt.toFixed(2);
-            if (userEditedAmount) p.manual = true;
-            // El porcentaje se calcula de forma informativa a partir del importe exacto:
-            p.percent = netTotal > 0 ? parseFloat(((amt / netTotal) * 100).toFixed(2)) : 0;
-          } else {
-            // Fila nueva sin importe previo
-            const pct = parseFloat(p.percent) || 0;
-            p.percent = parseFloat(pct.toFixed(2));
-            p.amount = netTotal > 0 ? ((netTotal * pct) / 100).toFixed(2) : "0.00";
+            p.percent = total > 0 ? parseFloat(((amt / total) * 100).toFixed(2)) : 0;
+            totalCobrado += amt;
           }
         });
 
-        // 2. Ajuste de redondeo: ÚNICAMENTE para diferencias ínfimas de céntimos (<= 0.15€)
-        // y SOLO cuando el plan esté configurado para cubrir el total completo (~100%).
-        // NUNCA alterar importes grandes de cientos o miles de euros arbitrariamente.
-        let sumOfAmounts = planCopy.reduce((acc, p) => acc + (parseFloat(p.amount) || 0), 0);
-        let diff = netTotal - sumOfAmounts;
-        const totalPct = planCopy.reduce((acc, p) => acc + (parseFloat(p.percent) || 0), 0);
-        const isFullPlan = Math.abs(totalPct - 100) <= 0.25;
-
-        if (isFullPlan && Math.abs(diff) > 0.001 && Math.abs(diff) <= 0.20) {
-          let targetRow = [...planCopy].reverse().find((p, idxFromEnd) => {
-            const idx = planCopy.length - 1 - idxFromEnd;
-            return p.status !== "Cobrado" && idx !== lockedIndex && !p.manual;
-          });
-          if (!targetRow) {
-            targetRow = [...planCopy].reverse().find((p, idxFromEnd) => {
-              const idx = planCopy.length - 1 - idxFromEnd;
-              return p.status !== "Cobrado" && idx !== lockedIndex;
-            });
+        const remainingPending = Math.max(0, total - totalCobrado);
+        const pendingIndices = [];
+        planCopy.forEach((p, idx) => {
+          if (!isCobradoRow(p)) {
+            pendingIndices.push(idx);
           }
-          if (targetRow) {
-            const currentAmt = parseFloat(targetRow.amount) || 0;
-            targetRow.amount = (currentAmt + diff).toFixed(2);
-            targetRow.percent = netTotal > 0 ? parseFloat(((parseFloat(targetRow.amount) || 0) / netTotal * 100).toFixed(2)) : 0;
+        });
+
+        // 2. Gestionar filas pendientes (se sincronizan automáticamente cuando cambia el importe total)
+        if (pendingIndices.length === 1) {
+          // Una única fila pendiente (ej: Depósito cobrado 300€ + Resto pendiente)
+          // Esta fila pendiente absorbe exactamente el saldo pendiente: total - cobrado
+          const pIdx = pendingIndices[0];
+          const p = planCopy[pIdx];
+          const userEditedPercent = (lockedIndex === pIdx && lockedField === "percent");
+          const userEditedAmount = (lockedIndex === pIdx && lockedField === "amount");
+
+          if (userEditedPercent) {
+            const pct = parseFloat(p.percent) || 0;
+            p.percent = parseFloat(pct.toFixed(2));
+            p.amount = total > 0 ? ((total * pct) / 100).toFixed(2) : "0.00";
+            p.manual = false;
+          } else if (userEditedAmount) {
+            const amt = Math.max(0, parseFloat(p.amount) || 0);
+            p.amount = amt.toFixed(2);
+            p.percent = total > 0 ? parseFloat(((amt / total) * 100).toFixed(2)) : 0;
+            p.manual = true;
+          } else {
+            // El importe de la reserva cambió o cálculo automático: la fila pendiente es el remanente exacto
+            p.amount = remainingPending.toFixed(2);
+            p.percent = total > 0 ? parseFloat(((remainingPending / total) * 100).toFixed(2)) : 0;
+            p.manual = false;
+          }
+        } else if (pendingIndices.length > 1) {
+          if (lockedIndex >= 0 && pendingIndices.includes(lockedIndex)) {
+            // El usuario editó una fila pendiente específica
+            const lockedRow = planCopy[lockedIndex];
+            if (lockedField === "percent") {
+              const pct = parseFloat(lockedRow.percent) || 0;
+              lockedRow.percent = parseFloat(pct.toFixed(2));
+              lockedRow.amount = total > 0 ? ((total * pct) / 100).toFixed(2) : "0.00";
+              lockedRow.manual = false;
+            } else if (lockedField === "amount") {
+              const amt = Math.max(0, parseFloat(lockedRow.amount) || 0);
+              lockedRow.amount = amt.toFixed(2);
+              lockedRow.percent = total > 0 ? parseFloat(((amt / total) * 100).toFixed(2)) : 0;
+              lockedRow.manual = true;
+            }
+
+            const lockedAmt = parseFloat(lockedRow.amount) || 0;
+            const otherPendingIndices = pendingIndices.filter(i => i !== lockedIndex);
+            const remainingForOthers = Math.max(0, remainingPending - lockedAmt);
+            const sumOtherPcts = otherPendingIndices.reduce((sum, i) => sum + (parseFloat(planCopy[i].percent) || 0), 0);
+
+            let allocated = 0;
+            otherPendingIndices.forEach((i, oIdx) => {
+              const other = planCopy[i];
+              if (oIdx === otherPendingIndices.length - 1) {
+                const lastAmt = Math.max(0, remainingForOthers - allocated);
+                other.amount = lastAmt.toFixed(2);
+              } else {
+                const ratio = sumOtherPcts > 0 ? (parseFloat(other.percent) || 0) / sumOtherPcts : (1 / otherPendingIndices.length);
+                const a = Math.max(0, remainingForOthers * ratio);
+                other.amount = a.toFixed(2);
+                allocated += a;
+              }
+              other.percent = total > 0 ? parseFloat(((parseFloat(other.amount) / total) * 100).toFixed(2)) : 0;
+            });
+          } else {
+            // Múltiples filas pendientes sin fila bloqueada: repartir remainingPending proporcionalmente
+            const sumPendingAmounts = pendingIndices.reduce((sum, i) => sum + (parseFloat(planCopy[i].amount) || 0), 0);
+            const sumPendingPcts = pendingIndices.reduce((sum, i) => sum + (parseFloat(planCopy[i].percent) || 0), 0);
+
+            let allocated = 0;
+            pendingIndices.forEach((i, pSubIdx) => {
+              const p = planCopy[i];
+              if (pSubIdx === pendingIndices.length - 1) {
+                const lastAmt = Math.max(0, remainingPending - allocated);
+                p.amount = lastAmt.toFixed(2);
+              } else {
+                let ratio = 0;
+                if (sumPendingPcts > 0) {
+                  ratio = (parseFloat(p.percent) || 0) / sumPendingPcts;
+                } else if (sumPendingAmounts > 0) {
+                  ratio = (parseFloat(p.amount) || 0) / sumPendingAmounts;
+                } else {
+                  ratio = 1 / pendingIndices.length;
+                }
+                const amt = Math.max(0, remainingPending * ratio);
+                p.amount = amt.toFixed(2);
+                allocated += amt;
+              }
+              p.percent = total > 0 ? parseFloat(((parseFloat(p.amount) / total) * 100).toFixed(2)) : 0;
+            });
           }
         }
 
-        // 3. Limpieza de filas vacías accidentales si se solicita
-        if (diff <= 0.01 && !options.preserveZeroRows) {
-          for (let i = planCopy.length - 1; i >= 0; i--) {
-            const p = planCopy[i];
-            if (p.status !== "Cobrado" && (parseFloat(p.amount) || 0) <= 0.01) {
-              planCopy.splice(i, 1);
+        // 3. Verificación exacta de céntimos para que la suma total sea idéntica al total contratado
+        if (pendingIndices.length > 0 && total > 0) {
+          const currentSum = planCopy.reduce((acc, p) => acc + (parseFloat(p.amount) || 0), 0);
+          const centDiff = total - currentSum;
+          if (Math.abs(centDiff) > 0.001) {
+            const targetIdx = pendingIndices.filter(i => i !== lockedIndex).pop() || pendingIndices[pendingIndices.length - 1];
+            if (targetIdx !== undefined) {
+              const p = planCopy[targetIdx];
+              const adjusted = Math.max(0, (parseFloat(p.amount) || 0) + centDiff);
+              p.amount = adjusted.toFixed(2);
+              p.percent = parseFloat(((adjusted / total) * 100).toFixed(2));
             }
           }
         }
@@ -10733,7 +10794,205 @@ const [customBudgetIdInput, setCustomBudgetIdInput] = useState("");
 
       const [crmNote, setCrmNote] = useState('');
 
+      const [crmNoteType, setCrmNoteType] = useState('nota'); // 'nota' | 'notificacion'
+
+      const [crmNotifChannel, setCrmNotifChannel] = useState('Email');
+
       const [crmHistory, setCrmHistory] = useState([]);
+
+      const getGroupClientNotification = (group) => {
+        if (!group) return null;
+        const records = group.records || [group];
+
+        // 1. Campo directo Ultima_Notificacion_Cliente
+        for (const r of records) {
+          if (r && r.Ultima_Notificacion_Cliente) {
+            try {
+              const u = typeof r.Ultima_Notificacion_Cliente === "string"
+                ? JSON.parse(r.Ultima_Notificacion_Cliente)
+                : r.Ultima_Notificacion_Cliente;
+              if (u) return u;
+            } catch (e) {}
+          }
+        }
+
+        // 2. Lista Notificaciones_Cliente
+        for (const r of records) {
+          if (r && r.Notificaciones_Cliente) {
+            try {
+              const notifs = typeof r.Notificaciones_Cliente === "string"
+                ? JSON.parse(r.Notificaciones_Cliente)
+                : r.Notificaciones_Cliente;
+              if (Array.isArray(notifs) && notifs.length > 0) {
+                return notifs[0];
+              }
+            } catch (e) {}
+          }
+        }
+
+        // 3. tracking con tipo notificacion_cliente
+        for (const r of records) {
+          try {
+            const raw = r.tracking || r.Com_CRM_History;
+            if (raw) {
+              const entries = typeof raw === "string" ? JSON.parse(raw) : raw;
+              if (Array.isArray(entries)) {
+                const match = entries.find(e => e && (e.type === "notificacion_cliente" || (e.text && (e.text.includes("✉️ Notificación al Cliente") || e.text.includes("Notificación al Cliente")))));
+                if (match) {
+                  return {
+                    id: match.id,
+                    fecha: match.date,
+                    dateFormatted: match.date,
+                    dateShort: match.date ? match.date.split(" ")[0] : "",
+                    tipo: match.columnTitle || "Aviso",
+                    asunto: match.subject || (match.text ? match.text.split("\n")[0].replace(/^✉️\s*/, "") : "Notificación al Cliente"),
+                    destinatario: match.recipient || ""
+                  };
+                }
+              }
+            }
+          } catch (e) {}
+        }
+
+        // 4. Fallback a localStorage nexus_notified_alerts
+        try {
+          const rawLocal = localStorage.getItem("nexus_notified_alerts");
+          if (rawLocal) {
+            const localMap = JSON.parse(rawLocal);
+            const possibleIds = [
+              group.id,
+              String(group.id || "").replace(/^#/, ""),
+              normalizeId(group.id),
+              group.name,
+              ...records.map(r => r.Reserva),
+              ...records.map(r => String(r.Reserva || "").replace(/^#/, "")),
+              ...records.map(r => normalizeId(r.Reserva)),
+              ...records.map(r => r.Com_Id),
+              ...records.map(r => r._docId)
+            ].filter(Boolean);
+
+            for (const pid of possibleIds) {
+              if (localMap[pid]) {
+                const dtStr = localMap[pid];
+                const d = new Date(dtStr);
+                const dateShort = !isNaN(d.getTime())
+                  ? String(d.getDate()).padStart(2, "0") + "/" + String(d.getMonth() + 1).padStart(2, "0") + "/" + d.getFullYear()
+                  : "";
+                const dateFmt = !isNaN(d.getTime())
+                  ? dateShort + " " + String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0")
+                  : dtStr;
+                return {
+                  fecha: dtStr,
+                  dateFormatted: dateFmt,
+                  dateShort: dateShort,
+                  tipo: "Tentativas Urgentes",
+                  asunto: "Gestión Urgente: Próxima Llegada",
+                  destinatario: records[0]?.Com_Email_Contacto || records[0]?.Email || ""
+                };
+              }
+            }
+          }
+        } catch (e) {}
+
+        return null;
+      };
+
+      const getGroupInternalAlert = (group) => {
+        if (!group) return null;
+        const records = group.records || [group];
+
+        // 1. Campo directo Ultima_Alerta_Interna
+        for (const r of records) {
+          if (r && r.Ultima_Alerta_Interna) {
+            try {
+              const u = typeof r.Ultima_Alerta_Interna === "string"
+                ? JSON.parse(r.Ultima_Alerta_Interna)
+                : r.Ultima_Alerta_Interna;
+              if (u) return u;
+            } catch (e) {}
+          }
+        }
+
+        // 2. Lista Notificaciones_Internas
+        for (const r of records) {
+          if (r && r.Notificaciones_Internas) {
+            try {
+              const notifs = typeof r.Notificaciones_Internas === "string"
+                ? JSON.parse(r.Notificaciones_Internas)
+                : r.Notificaciones_Internas;
+              if (Array.isArray(notifs) && notifs.length > 0) {
+                return notifs[0];
+              }
+            } catch (e) {}
+          }
+        }
+
+        // 3. tracking con tipo control_interno
+        for (const r of records) {
+          try {
+            const raw = r.tracking || r.Com_CRM_History;
+            if (raw) {
+              const entries = typeof raw === "string" ? JSON.parse(raw) : raw;
+              if (Array.isArray(entries)) {
+                const match = entries.find(e => e && (e.type === "control_interno" || (e.text && (e.text.includes("🔒 Control Interno") || e.text.includes("Control Interno")))));
+                if (match) {
+                  return {
+                    id: match.id,
+                    fecha: match.date,
+                    dateFormatted: match.date,
+                    dateShort: match.date ? match.date.split(" ")[0] : "",
+                    tipo: match.columnTitle || "Control Interno",
+                    asunto: match.subject || (match.text ? match.text.split("\n")[0].replace(/^🔒\s*/, "") : "Alerta Interna"),
+                    destinatario: match.recipient || "Control Interno"
+                  };
+                }
+              }
+            }
+          } catch (e) {}
+        }
+
+        // 4. Fallback a localStorage nexus_notified_internal_alerts
+        try {
+          const rawLocal = localStorage.getItem("nexus_notified_internal_alerts");
+          if (rawLocal) {
+            const localMap = JSON.parse(rawLocal);
+            const possibleIds = [
+              group.id,
+              String(group.id || "").replace(/^#/, ""),
+              normalizeId(group.id),
+              group.name,
+              ...records.map(r => r.Reserva),
+              ...records.map(r => String(r.Reserva || "").replace(/^#/, "")),
+              ...records.map(r => normalizeId(r.Reserva)),
+              ...records.map(r => r.Com_Id),
+              ...records.map(r => r._docId)
+            ].filter(Boolean);
+
+            for (const pid of possibleIds) {
+              if (localMap[pid]) {
+                const dtStr = localMap[pid];
+                const d = new Date(dtStr);
+                const dateShort = !isNaN(d.getTime())
+                  ? String(d.getDate()).padStart(2, "0") + "/" + String(d.getMonth() + 1).padStart(2, "0") + "/" + d.getFullYear()
+                  : "";
+                const dateFmt = !isNaN(d.getTime())
+                  ? dateShort + " " + String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0")
+                  : dtStr;
+                return {
+                  fecha: dtStr,
+                  dateFormatted: dateFmt,
+                  dateShort: dateShort,
+                  tipo: "Control Interno",
+                  asunto: "Alerta Interna Registrada",
+                  destinatario: "Equipo Interno"
+                };
+              }
+            }
+          }
+        } catch (e) {}
+
+        return null;
+      };
 
 
 
@@ -10770,6 +11029,35 @@ const [customBudgetIdInput, setCustomBudgetIdInput] = useState("");
             }
           } catch (error) {}
         }
+
+        // Si hay una notificación registrada al cliente que no esté en el tracking actual, incorporarla
+        const notif = getGroupClientNotification(selectedGroupFicha);
+        if (notif) {
+          const hasNotifInHistory = history.some(h =>
+            h.type === "notificacion_cliente" ||
+            (h.text && (h.text.includes("Notificación al Cliente") || h.text.includes(notif.asunto || "Gestión Urgente")))
+          );
+          if (!hasNotifInHistory) {
+            const notifEntry = {
+              id: notif.id || Date.now(),
+              date: notif.dateFormatted || notif.dateShort || notif.fecha,
+              type: "notificacion_cliente",
+              subject: notif.asunto || "Notificación al Cliente",
+              recipient: notif.destinatario || "",
+              columnTitle: notif.tipo || "Aviso Operativo",
+              text: `✉️ Notificación al Cliente [${notif.tipo || 'Aviso'}]: ${notif.asunto || 'Aviso Oficial'}\nPara: ${notif.destinatario || '(No especificado)'}`
+            };
+            history.unshift(notifEntry);
+
+            // Persistir a Firestore para que quede registrado definitivamente en la ficha
+            updateGroupMetadata(selectedGroupFicha.id, {
+              tracking: JSON.stringify(history),
+              Ultima_Notificacion_Cliente: notif,
+              notificadoClienteAt: notif.fecha || new Date().toISOString()
+            }).catch(console.error);
+          }
+        }
+
         setCrmHistory(history);
 
       }, [selectedGroupFicha]);
@@ -10783,15 +11071,21 @@ const [customBudgetIdInput, setCustomBudgetIdInput] = useState("");
           const now = new Date();
 
           const fmtDate = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0') + ' ' + String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+          const dateShort = String(now.getDate()).padStart(2, '0') + '/' + String(now.getMonth() + 1).padStart(2, '0') + '/' + now.getFullYear();
+
+          const isNotif = crmNoteType === 'notificacion';
+          const clientEmail = selectedGroupFicha.records?.[0]?.Com_Email_Contacto || selectedGroupFicha.records?.[0]?.Email || "";
 
           const newEntry = { 
-
             id: Date.now(),
-
             date: fmtDate, 
-
-            text: `Nota: ${crmNote.trim()}` 
-
+            type: isNotif ? "notificacion_cliente" : "nota",
+            channel: isNotif ? crmNotifChannel : null,
+            recipient: isNotif ? clientEmail : null,
+            subject: isNotif ? `Comunicación con Cliente (${crmNotifChannel})` : null,
+            text: isNotif
+              ? `✉️ Notificación al Cliente [${crmNotifChannel}]: ${crmNote.trim()}${clientEmail ? `\nPara: ${clientEmail}` : ''}`
+              : `Nota: ${crmNote.trim()}`
           };
 
         const updated = [newEntry, ...crmHistory];
@@ -10800,9 +11094,38 @@ const [customBudgetIdInput, setCustomBudgetIdInput] = useState("");
 
         setCrmNote('');
 
-        // Persist to Firestore en el campo unificado 'tracking'
+        const updatePayload = {
+          tracking: JSON.stringify(updated)
+        };
 
-        await updateGroupMetadata(selectedGroupFicha.id, 'tracking', JSON.stringify(updated));
+        if (isNotif) {
+          const notifObj = {
+            id: newEntry.id,
+            fecha: now.toISOString(),
+            dateFormatted: fmtDate,
+            dateShort: dateShort,
+            tipo: `Notificación (${crmNotifChannel})`,
+            asunto: `Comunicación directa con cliente`,
+            destinatario: clientEmail,
+            canal: crmNotifChannel,
+            resumen: crmNote.trim()
+          };
+          updatePayload.Ultima_Notificacion_Cliente = notifObj;
+          updatePayload.notificadoClienteAt = now.toISOString();
+
+          // Sincronizar en localStorage
+          try {
+            const rawL = JSON.parse(localStorage.getItem("nexus_notified_alerts") || "{}");
+            rawL[selectedGroupFicha.id] = now.toISOString();
+            if (selectedGroupFicha.records?.[0]?.Reserva) {
+              rawL[String(selectedGroupFicha.records[0].Reserva).replace(/^#/, '')] = now.toISOString();
+            }
+            localStorage.setItem("nexus_notified_alerts", JSON.stringify(rawL));
+          } catch(e) {}
+        }
+
+        // Persist to Firestore
+        await updateGroupMetadata(selectedGroupFicha.id, updatePayload);
 
       };
 
@@ -12131,7 +12454,7 @@ const [customBudgetIdInput, setCustomBudgetIdInput] = useState("");
                 });
               }
             });
-            updates["PaymentPlan_JSON"] = JSON.stringify(newPlan);
+            updates["PaymentPlan_JSON"] = JSON.stringify(reconcileReactPaymentPlan(newPlan, netRevenue, firstRow.Entrada, { preserveZeroRows: true }));
 
           } catch (err) {
 
@@ -12145,6 +12468,32 @@ const [customBudgetIdInput, setCustomBudgetIdInput] = useState("");
 
           }
 
+        } else if (updates["Importe(*)"] !== undefined || updates["RoomingList_JSON"] !== undefined) {
+          // Si cambia el importe de la reserva o las habitaciones/precios, recalcular automáticamente las líneas de pago pendientes
+          try {
+            const firstRow = currentGroupRows[0] || {};
+            const totalRevenue = updates["Importe(*)"] !== undefined ? parseNum(updates["Importe(*)"]) : parseNum(firstRow["Importe(*)"]);
+            let totalCommission = 0;
+            try {
+              const rl = parseRoomingListSafe(updates.RoomingList_JSON || firstRow.RoomingList_JSON, "metadata-sync");
+              totalCommission = rl.reduce((acc, i) => acc + (parseFloat(i.comision?.total_comision) || 0), 0);
+            } catch(e) {}
+            const netRevenue = Math.max(0, totalRevenue - totalCommission);
+
+            let currentPlan = [];
+            try {
+              currentPlan = JSON.parse(updates["PaymentPlan_JSON"] || firstRow["PaymentPlan_JSON"] || "[]");
+            } catch (e) {
+              currentPlan = [];
+            }
+
+            if (currentPlan && currentPlan.length > 0) {
+              const reconciled = reconcileReactPaymentPlan(currentPlan, netRevenue, firstRow.Entrada, { preserveZeroRows: true });
+              updates["PaymentPlan_JSON"] = JSON.stringify(reconciled);
+            }
+          } catch(err) {
+            console.error("Error auto-reconciling PaymentPlan on Importe update:", err);
+          }
         }
 
         // Sincronizar automáticamente DailyDistribution_JSON cuando se actualiza RoomingList_JSON
@@ -21430,6 +21779,46 @@ const [customBudgetIdInput, setCustomBudgetIdInput] = useState("");
                                     );
                                   })()}
 
+                                  {(() => {
+                                    const notif = getGroupClientNotification(selectedGroupFicha);
+                                    if (!notif) return null;
+                                    return (
+                                      <>
+                                        <span className="opacity-30">•</span>
+                                        <button
+                                          type="button"
+                                          onClick={() => setShowCrmPanel(true)}
+                                          className="inline-flex items-center gap-1.5 bg-emerald-500/20 hover:bg-emerald-500/35 border border-emerald-400/40 text-emerald-200 px-2 py-0.5 rounded text-[10px] font-black cursor-pointer shadow-sm transition-all group/notif"
+                                          title={`Notificación al cliente registrada: ${notif.dateFormatted || notif.dateShort || notif.fecha} (${notif.asunto || notif.tipo}). Clic para ver historial.`}
+                                        >
+                                          <IconCheckCircle size={11} className="text-emerald-300 shrink-0" stroke={3} />
+                                          <span className="uppercase tracking-wider">Cliente Notificado</span>
+                                          <span className="text-[9px] opacity-75 font-semibold">({notif.dateShort || notif.dateFormatted})</span>
+                                        </button>
+                                      </>
+                                    );
+                                  })()}
+
+                                  {(() => {
+                                    const intAlert = getGroupInternalAlert(selectedGroupFicha);
+                                    if (!intAlert) return null;
+                                    return (
+                                      <>
+                                        <span className="opacity-30">•</span>
+                                        <button
+                                          type="button"
+                                          onClick={() => setShowCrmPanel(true)}
+                                          className="inline-flex items-center gap-1.5 bg-indigo-500/20 hover:bg-indigo-500/35 border border-indigo-400/40 text-indigo-200 px-2 py-0.5 rounded text-[10px] font-black cursor-pointer shadow-sm transition-all group/notif"
+                                          title={`Alerta interna registrada: ${intAlert.dateFormatted || intAlert.dateShort || intAlert.fecha} (${intAlert.asunto || intAlert.tipo}). Clic para ver historial.`}
+                                        >
+                                          <IconBell size={11} className="text-indigo-300 shrink-0" />
+                                          <span className="uppercase tracking-wider">Alerta Interna</span>
+                                          <span className="text-[9px] opacity-75 font-semibold">({intAlert.dateShort || intAlert.dateFormatted})</span>
+                                        </button>
+                                      </>
+                                    );
+                                  })()}
+
                                   {((
                                     selectedGroupFicha.records[0]?.[
                                       "Reserva"
@@ -21690,6 +22079,51 @@ const [customBudgetIdInput, setCustomBudgetIdInput] = useState("");
                               </div>
 
                             )}
+
+                            {(() => {
+                              const notif = getGroupClientNotification(selectedGroupFicha);
+                              if (!notif) return null;
+                              return (
+                                <div className="bg-emerald-50 border border-emerald-200/90 rounded-2xl p-3 flex items-center justify-between gap-3 shadow-xs">
+                                  <div className="flex items-center gap-3 min-w-0">
+                                    <div className="w-8 h-8 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                                      <IconMail size={16} stroke={2.5} />
+                                    </div>
+                                    <div className="min-w-0">
+                                      <div className="flex items-center gap-2 flex-wrap">
+                                        <span className="text-[9px] font-black uppercase tracking-wider text-emerald-800 bg-emerald-100/80 px-2 py-0.5 rounded-md border border-emerald-200">
+                                          ✓ Notificación al Cliente Registrada
+                                        </span>
+                                        <span className="text-[10px] font-bold text-slate-500">
+                                          {notif.dateFormatted || notif.dateShort}
+                                        </span>
+                                        {notif.tipo && (
+                                          <span className="text-[9px] font-black text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-100">
+                                            {notif.tipo}
+                                          </span>
+                                        )}
+                                      </div>
+                                      <p className="text-xs font-bold text-slate-800 truncate mt-0.5">
+                                        {notif.asunto || "Notificación de alerta enviada al cliente"}
+                                      </p>
+                                      {notif.destinatario && (
+                                        <p className="text-[10px] text-slate-500 truncate">
+                                          Destinatario: <span className="font-bold text-slate-700">{notif.destinatario}</span>
+                                        </p>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => setShowCrmPanel(true)}
+                                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all shrink-0 shadow-xs flex items-center gap-1.5 cursor-pointer"
+                                  >
+                                    <IconMessage size={12} />
+                                    <span>Ver Historial</span>
+                                  </button>
+                                </div>
+                              );
+                            })()}
 
                             {/* BARRA DE HERRAMIENTAS - Compacta y Optimizada */}
 
@@ -25233,6 +25667,26 @@ const [customBudgetIdInput, setCustomBudgetIdInput] = useState("");
                                           {isGroupCredito ? "A Crédito" : "Pago a Crédito"}
                                         </button>
 
+                                      {(() => {
+                                        const notif = getGroupClientNotification(selectedGroupFicha);
+                                        const isNotified = !!notif;
+                                        return (
+                                          <button
+                                            type="button"
+                                            onClick={() => setShowCrmPanel(true)}
+                                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[9px] font-black uppercase tracking-wider transition-all border cursor-pointer ${
+                                              isNotified
+                                                ? 'bg-emerald-50 border-emerald-200 text-emerald-700 shadow-sm'
+                                                : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-100'
+                                            }`}
+                                            title={isNotified ? `Notificado al cliente el ${notif.dateFormatted || notif.dateShort}. Clic para ver historial.` : "Sin notificaciones registradas"}
+                                          >
+                                            {isNotified ? <IconCheckCircle size={12} stroke={3} className="text-emerald-600" /> : <IconMail size={12} stroke={2} />}
+                                            <span>{isNotified ? `Notificado (${notif.dateShort || "OK"})` : "Notif. Cliente"}</span>
+                                          </button>
+                                        );
+                                      })()}
+
 
 
                                       {needsMP && (
@@ -25594,13 +26048,23 @@ const [customBudgetIdInput, setCustomBudgetIdInput] = useState("");
 
                               onClick={() => setShowCrmPanel(p => !p)}
 
-                              className={`px-4 h-11 rounded-2xl flex items-center justify-center transition-all ${showCrmPanel ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 hover:bg-slate-200 text-slate-500'}`}
+                              className={`px-4 h-11 rounded-2xl flex items-center justify-center transition-all relative ${showCrmPanel ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 hover:bg-slate-200 text-slate-500'}`}
 
                               title="Historial / CRM"
 
                             >
 
                               <IconMessage size={18} />
+
+                              {crmHistory.length > 0 && (
+                                <span className={`absolute -top-1 -right-1 text-[8px] font-black w-4 h-4 rounded-full flex items-center justify-center shadow-xs ${
+                                  crmHistory.some(h => h.type === "notificacion_cliente" || (h.text && h.text.includes("Notificación")))
+                                    ? "bg-emerald-600 text-white"
+                                    : "bg-indigo-600 text-white"
+                                }`}>
+                                  {crmHistory.length}
+                                </span>
+                              )}
 
                             </button>
 
@@ -25654,12 +26118,24 @@ const [customBudgetIdInput, setCustomBudgetIdInput] = useState("");
                                       distMap = buildDailyDistributionFromRoomingList(currentRL, distMap, hotelTarget);
                                     }
                                     const firstValidRegime = (Array.isArray(currentRL) ? currentRL.find(r => !r.isService && r.regime && r.regime !== "-")?.regime : null) || currentRec["Régimen"] || "MP";
+                                    const finalRevenue = selectedGroupFicha.totalRevenue !== undefined ? Number(selectedGroupFicha.totalRevenue) : parseNum(currentRec["Importe(*)"] || "0");
+                                    let reconciledPlanForSave = currentRec.PaymentPlan_JSON;
+                                    try {
+                                      const pList = JSON.parse(currentRec.PaymentPlan_JSON || "[]");
+                                      if (pList && pList.length > 0) {
+                                        let comm = (currentRL || []).reduce((acc, i) => acc + (parseFloat(i.comision?.total_comision) || 0), 0);
+                                        let netRev = Math.max(0, finalRevenue - comm);
+                                        reconciledPlanForSave = JSON.stringify(reconcileReactPaymentPlan(pList, netRev, currentRec.Entrada, { preserveZeroRows: true }));
+                                      }
+                                    } catch(e) {}
+
                                     const savePayload = {
                                       RoomingList_JSON: JSON.stringify(currentRL || []),
                                       DailyDistribution_JSON: JSON.stringify(distMap || {}),
                                       "Pax.": String(selectedGroupFicha.totalPax || 0),
                                       "Cant.": String(selectedGroupFicha.totalRooms || 0),
-                                      "Importe(*)": String(selectedGroupFicha.totalRevenue !== undefined ? Number(selectedGroupFicha.totalRevenue).toFixed(2) : (currentRec["Importe(*)"] || "0.00"))
+                                      "Importe(*)": String(finalRevenue.toFixed(2)),
+                                      PaymentPlan_JSON: reconciledPlanForSave
                                     };
                                     if (firstValidRegime) {
                                       savePayload["Régimen"] = firstValidRegime;
@@ -25753,7 +26229,7 @@ const [customBudgetIdInput, setCustomBudgetIdInput] = useState("");
 
                             
 
-                            <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar bg-slate-50">
+                            <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar bg-slate-50">
 
                                 {crmHistory.length === 0 ? (
 
@@ -25761,27 +26237,49 @@ const [customBudgetIdInput, setCustomBudgetIdInput] = useState("");
 
                                         <IconMessage size={32} className="mx-auto mb-2" />
 
-                                        <p className="text-[10px] font-bold uppercase">Sin notas de seguimiento</p>
+                                        <p className="text-[10px] font-bold uppercase">Sin registros de seguimiento ni notificaciones</p>
 
                                     </div>
 
                                 ) : (
 
-                                    crmHistory.map((h, i) => (
-
-                                        <div key={i} className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm space-y-1">
-
-                                            <div className="flex justify-between items-center">
-
-                                                <span className="text-[8px] font-black text-indigo-500 uppercase">{h.date}</span>
-
+                                    crmHistory.map((h, i) => {
+                                      const isNotif = h.type === "notificacion_cliente" || (h.text && (h.text.includes("Notificación al Cliente") || h.text.includes("✉️")));
+                                      if (isNotif) {
+                                        return (
+                                          <div key={i} className="bg-emerald-50/80 p-3 rounded-xl border border-emerald-200 shadow-xs space-y-1.5">
+                                            <div className="flex justify-between items-center gap-2">
+                                              <span className="inline-flex items-center gap-1 text-[8px] font-black uppercase tracking-wider text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded border border-emerald-200">
+                                                <IconMail size={10} className="text-emerald-700" />
+                                                Notificación al Cliente
+                                              </span>
+                                              <span className="text-[8px] font-bold text-slate-400">{h.date}</span>
                                             </div>
-
-                                            <p className="text-xs text-slate-700 leading-relaxed whitespace-pre-line">{h.text}</p>
-
+                                            {h.subject && (
+                                              <p className="text-xs font-bold text-slate-800 leading-snug">
+                                                {h.subject}
+                                              </p>
+                                            )}
+                                            {h.recipient && (
+                                              <p className="text-[9px] text-slate-500">
+                                                Para: <span className="font-semibold text-slate-700">{h.recipient}</span>
+                                              </p>
+                                            )}
+                                            <p className="text-[11px] text-slate-700 leading-relaxed whitespace-pre-line bg-white/90 p-2 rounded-lg border border-emerald-100">
+                                              {h.text}
+                                            </p>
+                                          </div>
+                                        );
+                                      }
+                                      return (
+                                        <div key={i} className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm space-y-1">
+                                          <div className="flex justify-between items-center">
+                                            <span className="text-[8px] font-black text-indigo-500 uppercase">{h.date}</span>
+                                          </div>
+                                          <p className="text-xs text-slate-700 leading-relaxed whitespace-pre-line">{h.text}</p>
                                         </div>
-
-                                    ))
+                                      );
+                                    })
 
                                 )}
 
@@ -25790,12 +26288,54 @@ const [customBudgetIdInput, setCustomBudgetIdInput] = useState("");
 
 
                             <div className="p-4 bg-white border-t border-slate-200 space-y-3">
+                                {/* Selector de tipo: Nota vs Notificación al cliente */}
+                                <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl">
+                                  <button
+                                    type="button"
+                                    onClick={() => setCrmNoteType('nota')}
+                                    className={`flex-1 py-1 text-[9px] font-black uppercase tracking-wider rounded-lg transition-all ${
+                                      crmNoteType === 'nota' ? 'bg-white text-slate-800 shadow-xs' : 'text-slate-500 hover:text-slate-700'
+                                    }`}
+                                  >
+                                    Nota Interna
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setCrmNoteType('notificacion')}
+                                    className={`flex-1 py-1 text-[9px] font-black uppercase tracking-wider rounded-lg transition-all flex items-center justify-center gap-1 ${
+                                      crmNoteType === 'notificacion' ? 'bg-emerald-600 text-white shadow-xs' : 'text-slate-500 hover:text-slate-700'
+                                    }`}
+                                  >
+                                    <IconMail size={10} />
+                                    <span>Notif. Cliente</span>
+                                  </button>
+                                </div>
+
+                                {crmNoteType === 'notificacion' && (
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-[9px] font-bold text-slate-400 uppercase">Canal:</span>
+                                    {['Email', 'Teléfono', 'WhatsApp', 'En Persona'].map((ch) => (
+                                      <button
+                                        key={ch}
+                                        type="button"
+                                        onClick={() => setCrmNotifChannel(ch)}
+                                        className={`px-2 py-0.5 rounded text-[9px] font-bold border transition-all ${
+                                          crmNotifChannel === ch
+                                            ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                                            : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'
+                                        }`}
+                                      >
+                                        {ch}
+                                      </button>
+                                    ))}
+                                  </div>
+                                )}
 
                                 <textarea 
 
-                                    className="w-full h-24 p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all resize-none"
+                                    className="w-full h-20 p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all resize-none"
 
-                                    placeholder="Añadir nota de seguimiento..."
+                                    placeholder={crmNoteType === 'notificacion' ? "Detalla la comunicación enviada o acordada con el cliente..." : "Añadir nota de seguimiento..."}
 
                                     value={crmNote}
 
@@ -25809,11 +26349,15 @@ const [customBudgetIdInput, setCustomBudgetIdInput] = useState("");
 
                                     disabled={!crmNote.trim()}
 
-                                    className="w-full h-10 bg-indigo-600 disabled:opacity-50 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200"
+                                    className={`w-full h-10 disabled:opacity-50 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-md ${
+                                      crmNoteType === 'notificacion'
+                                        ? 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-200'
+                                        : 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-200'
+                                    }`}
 
                                 >
 
-                                    Guardar Nota
+                                    {crmNoteType === 'notificacion' ? "Registrar Notificación Cliente" : "Guardar Nota"}
 
                                 </button>
 

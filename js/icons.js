@@ -137,6 +137,8 @@
         IconEye: "eye",
         IconFileSpreadsheet: "file-spreadsheet",
         IconMessage: "message-square",
+        IconBell: "bell",
+        IconBellRing: "bell-ring",
     };
 
     // ── Factory para crear wrapper components ─────────────

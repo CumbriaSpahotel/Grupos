@@ -1,17 +1,18 @@
 "use strict";
 
+function _createForOfIteratorHelper(r, e) { var t = "undefined" != typeof Symbol && r[Symbol.iterator] || r["@@iterator"]; if (!t) { if (Array.isArray(r) || (t = _unsupportedIterableToArray(r)) || e && r && "number" == typeof r.length) { t && (r = t); var _n = 0, F = function F() {}; return { s: F, n: function n() { return _n >= r.length ? { done: !0 } : { done: !1, value: r[_n++] }; }, e: function e(r) { throw r; }, f: F }; } throw new TypeError("Invalid attempt to iterate non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method."); } var o, a = !0, u = !1; return { s: function s() { t = t.call(r); }, n: function n() { var r = t.next(); return a = r.done, r; }, e: function e(r) { u = !0, o = r; }, f: function f() { try { a || null == t.return || t.return(); } finally { if (u) throw o; } } }; }
 function _regenerator() { /*! regenerator-runtime -- Copyright (c) 2014-present, Facebook, Inc. -- license (MIT): https://github.com/babel/babel/blob/main/packages/babel-helpers/LICENSE */ var e, t, r = "function" == typeof Symbol ? Symbol : {}, n = r.iterator || "@@iterator", o = r.toStringTag || "@@toStringTag"; function i(r, n, o, i) { var c = n && n.prototype instanceof Generator ? n : Generator, u = Object.create(c.prototype); return _regeneratorDefine2(u, "_invoke", function (r, n, o) { var i, c, u, f = 0, p = o || [], y = !1, G = { p: 0, n: 0, v: e, a: d, f: d.bind(e, 4), d: function d(t, r) { return i = t, c = 0, u = e, G.n = r, a; } }; function d(r, n) { for (c = r, u = n, t = 0; !y && f && !o && t < p.length; t++) { var o, i = p[t], d = G.p, l = i[2]; r > 3 ? (o = l === n) && (u = i[(c = i[4]) ? 5 : (c = 3, 3)], i[4] = i[5] = e) : i[0] <= d && ((o = r < 2 && d < i[1]) ? (c = 0, G.v = n, G.n = i[1]) : d < l && (o = r < 3 || i[0] > n || n > l) && (i[4] = r, i[5] = n, G.n = l, c = 0)); } if (o || r > 1) return a; throw y = !0, n; } return function (o, p, l) { if (f > 1) throw TypeError("Generator is already running"); for (y && 1 === p && d(p, l), c = p, u = l; (t = c < 2 ? e : u) || !y;) { i || (c ? c < 3 ? (c > 1 && (G.n = -1), d(c, u)) : G.n = u : G.v = u); try { if (f = 2, i) { if (c || (o = "next"), t = i[o]) { if (!(t = t.call(i, u))) throw TypeError("iterator result is not an object"); if (!t.done) return t; u = t.value, c < 2 && (c = 0); } else 1 === c && (t = i.return) && t.call(i), c < 2 && (u = TypeError("The iterator does not provide a '" + o + "' method"), c = 1); i = e; } else if ((t = (y = G.n < 0) ? u : r.call(n, G)) !== a) break; } catch (t) { i = e, c = 1, u = t; } finally { f = 1; } } return { value: t, done: y }; }; }(r, o, i), !0), u; } var a = {}; function Generator() {} function GeneratorFunction() {} function GeneratorFunctionPrototype() {} t = Object.getPrototypeOf; var c = [][n] ? t(t([][n]())) : (_regeneratorDefine2(t = {}, n, function () { return this; }), t), u = GeneratorFunctionPrototype.prototype = Generator.prototype = Object.create(c); function f(e) { return Object.setPrototypeOf ? Object.setPrototypeOf(e, GeneratorFunctionPrototype) : (e.__proto__ = GeneratorFunctionPrototype, _regeneratorDefine2(e, o, "GeneratorFunction")), e.prototype = Object.create(u), e; } return GeneratorFunction.prototype = GeneratorFunctionPrototype, _regeneratorDefine2(u, "constructor", GeneratorFunctionPrototype), _regeneratorDefine2(GeneratorFunctionPrototype, "constructor", GeneratorFunction), GeneratorFunction.displayName = "GeneratorFunction", _regeneratorDefine2(GeneratorFunctionPrototype, o, "GeneratorFunction"), _regeneratorDefine2(u), _regeneratorDefine2(u, o, "Generator"), _regeneratorDefine2(u, n, function () { return this; }), _regeneratorDefine2(u, "toString", function () { return "[object Generator]"; }), (_regenerator = function _regenerator() { return { w: i, m: f }; })(); }
 function _regeneratorDefine2(e, r, n, t) { var i = Object.defineProperty; try { i({}, "", {}); } catch (e) { i = 0; } _regeneratorDefine2 = function _regeneratorDefine(e, r, n, t) { function o(r, n) { _regeneratorDefine2(e, r, function (e) { return this._invoke(r, n, e); }); } r ? i ? i(e, r, { value: n, enumerable: !t, configurable: !t, writable: !t }) : e[r] = n : (o("next", 0), o("throw", 1), o("return", 2)); }, _regeneratorDefine2(e, r, n, t); }
-function ownKeys(e, r) { var t = Object.keys(e); if (Object.getOwnPropertySymbols) { var o = Object.getOwnPropertySymbols(e); r && (o = o.filter(function (r) { return Object.getOwnPropertyDescriptor(e, r).enumerable; })), t.push.apply(t, o); } return t; }
-function _objectSpread(e) { for (var r = 1; r < arguments.length; r++) { var t = null != arguments[r] ? arguments[r] : {}; r % 2 ? ownKeys(Object(t), !0).forEach(function (r) { _defineProperty(e, r, t[r]); }) : Object.getOwnPropertyDescriptors ? Object.defineProperties(e, Object.getOwnPropertyDescriptors(t)) : ownKeys(Object(t)).forEach(function (r) { Object.defineProperty(e, r, Object.getOwnPropertyDescriptor(t, r)); }); } return e; }
-function _defineProperty(e, r, t) { return (r = _toPropertyKey(r)) in e ? Object.defineProperty(e, r, { value: t, enumerable: !0, configurable: !0, writable: !0 }) : e[r] = t, e; }
-function _toPropertyKey(t) { var i = _toPrimitive(t, "string"); return "symbol" == _typeof(i) ? i : i + ""; }
-function _toPrimitive(t, r) { if ("object" != _typeof(t) || !t) return t; var e = t[Symbol.toPrimitive]; if (void 0 !== e) { var i = e.call(t, r || "default"); if ("object" != _typeof(i)) return i; throw new TypeError("@@toPrimitive must return a primitive value."); } return ("string" === r ? String : Number)(t); }
 function _toConsumableArray(r) { return _arrayWithoutHoles(r) || _iterableToArray(r) || _unsupportedIterableToArray(r) || _nonIterableSpread(); }
 function _nonIterableSpread() { throw new TypeError("Invalid attempt to spread non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method."); }
 function _iterableToArray(r) { if ("undefined" != typeof Symbol && null != r[Symbol.iterator] || null != r["@@iterator"]) return Array.from(r); }
 function _arrayWithoutHoles(r) { if (Array.isArray(r)) return _arrayLikeToArray(r); }
 function _typeof(o) { "@babel/helpers - typeof"; return _typeof = "function" == typeof Symbol && "symbol" == typeof Symbol.iterator ? function (o) { return typeof o; } : function (o) { return o && "function" == typeof Symbol && o.constructor === Symbol && o !== Symbol.prototype ? "symbol" : typeof o; }, _typeof(o); }
+function ownKeys(e, r) { var t = Object.keys(e); if (Object.getOwnPropertySymbols) { var o = Object.getOwnPropertySymbols(e); r && (o = o.filter(function (r) { return Object.getOwnPropertyDescriptor(e, r).enumerable; })), t.push.apply(t, o); } return t; }
+function _objectSpread(e) { for (var r = 1; r < arguments.length; r++) { var t = null != arguments[r] ? arguments[r] : {}; r % 2 ? ownKeys(Object(t), !0).forEach(function (r) { _defineProperty(e, r, t[r]); }) : Object.getOwnPropertyDescriptors ? Object.defineProperties(e, Object.getOwnPropertyDescriptors(t)) : ownKeys(Object(t)).forEach(function (r) { Object.defineProperty(e, r, Object.getOwnPropertyDescriptor(t, r)); }); } return e; }
+function _defineProperty(e, r, t) { return (r = _toPropertyKey(r)) in e ? Object.defineProperty(e, r, { value: t, enumerable: !0, configurable: !0, writable: !0 }) : e[r] = t, e; }
+function _toPropertyKey(t) { var i = _toPrimitive(t, "string"); return "symbol" == _typeof(i) ? i : i + ""; }
+function _toPrimitive(t, r) { if ("object" != _typeof(t) || !t) return t; var e = t[Symbol.toPrimitive]; if (void 0 !== e) { var i = e.call(t, r || "default"); if ("object" != _typeof(i)) return i; throw new TypeError("@@toPrimitive must return a primitive value."); } return ("string" === r ? String : Number)(t); }
 function _slicedToArray(r, e) { return _arrayWithHoles(r) || _iterableToArrayLimit(r, e) || _unsupportedIterableToArray(r, e) || _nonIterableRest(); }
 function _nonIterableRest() { throw new TypeError("Invalid attempt to destructure non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method."); }
 function _unsupportedIterableToArray(r, a) { if (r) { if ("string" == typeof r) return _arrayLikeToArray(r, a); var t = {}.toString.call(r).slice(8, -1); return "Object" === t && r.constructor && (t = r.constructor.name), "Map" === t || "Set" === t ? Array.from(r) : "Arguments" === t || /^(?:Ui|I)nt(?:8|16|32)(?:Clamped)?Array$/.test(t) ? _arrayLikeToArray(r, a) : void 0; } }
@@ -164,41 +165,41 @@ function analizarGrupos(_x) {
   return _analizarGrupos.apply(this, arguments);
 }
 function _analizarGrupos() {
-  _analizarGrupos = _asyncToGenerator(/*#__PURE__*/_regenerator().m(function _callee4(datos) {
-    var apiKey, model, settingsDoc, s, url, prompt, response, _error$error, error, msg, data, _t4, _t5;
-    return _regenerator().w(function (_context4) {
-      while (1) switch (_context4.p = _context4.n) {
+  _analizarGrupos = _asyncToGenerator(/*#__PURE__*/_regenerator().m(function _callee6(datos) {
+    var apiKey, model, settingsDoc, s, url, prompt, response, _error$error, error, msg, data, _t8, _t9;
+    return _regenerator().w(function (_context6) {
+      while (1) switch (_context6.p = _context6.n) {
         case 0:
           // 1. Obtener parámetros dinámicos de Firestore
           apiKey = window.firebaseConfig.apiKey;
           model = "gemini-1.5-flash"; // Default Standard Model
-          _context4.p = 1;
-          _context4.n = 2;
+          _context6.p = 1;
+          _context6.n = 2;
           return db.collection("settings").doc("main").get();
         case 2:
-          settingsDoc = _context4.v;
+          settingsDoc = _context6.v;
           if (settingsDoc.exists) {
             s = settingsDoc.data().system || {};
             if (s.geminiApiKey) apiKey = s.geminiApiKey;
             if (s.geminiModel) model = s.geminiModel;
           }
-          _context4.n = 4;
+          _context6.n = 4;
           break;
         case 3:
-          _context4.p = 3;
-          _t4 = _context4.v;
+          _context6.p = 3;
+          _t8 = _context6.v;
           console.warn("No se pudo cargar la API Key de Firestore, usando fallback.");
         case 4:
           if (!(!apiKey || apiKey === "TU_API_KEY_AQUI")) {
-            _context4.n = 5;
+            _context6.n = 5;
             break;
           }
           throw new Error("ERROR: No se ha configurado la API Key de Gemini en el panel de Configuración.");
         case 5:
           url = "https://generativelanguage.googleapis.com/v1/models/".concat(model, ":generateContent?key=").concat(apiKey);
           prompt = "\n            Act\xFAa como un experto analista de Revenue Management hotelero de alto nivel.\n            Analiza los siguientes datos de grupos consolidados de los hoteles Sercotel Guadiana y Cumbria Spa & Hotel.\n            Derrame un informe estrat\xE9gico conciso con:\n            1. Puntos cr\xEDticos de release (vencimientos pr\xF3ximos).\n            2. An\xE1lisis de ocupaci\xF3n y revenue por hotel.\n            3. Recomendaciones de seguimiento comercial (upselling, confirmaci\xF3n de grupos en tentativa).\n            4. Proyecci\xF3n de cierre de mes.\n            Utiliza un tono profesional y directo.\n            \n            DATOS DE GRUPOS:\n            ".concat(JSON.stringify(datos), "\n            ");
-          _context4.p = 6;
-          _context4.n = 7;
+          _context6.p = 6;
+          _context6.n = 7;
           return fetch(url, {
             method: "POST",
             headers: {
@@ -213,44 +214,44 @@ function _analizarGrupos() {
             })
           });
         case 7:
-          response = _context4.v;
+          response = _context6.v;
           if (response.ok) {
-            _context4.n = 11;
+            _context6.n = 11;
             break;
           }
-          _context4.n = 8;
+          _context6.n = 8;
           return response.json();
         case 8:
-          error = _context4.v;
+          error = _context6.v;
           msg = ((_error$error = error.error) === null || _error$error === void 0 ? void 0 : _error$error.message) || "";
           if (!(msg.includes("blocked") || msg.includes("PERMISSION_DENIED"))) {
-            _context4.n = 9;
+            _context6.n = 9;
             break;
           }
           throw new Error("ðŸš« ACCESO DENEGADO: Tu API Key está bloqueada o no tiene permisos. Verifica en Google AI Studio que la 'Generative Language API' esté activa y que no haya restricciones de IP/dominio.");
         case 9:
           if (!msg.includes("leaked")) {
-            _context4.n = 10;
+            _context6.n = 10;
             break;
           }
           throw new Error("⚠️ SEGURIDAD: Tu API Key ha sido desactivada por filtración pública (leaked). Por favor, genera una nueva clave privada en Google AI Studio.");
         case 10:
           throw new Error("Error en API Gemini: ".concat(msg || JSON.stringify(error)));
         case 11:
-          _context4.n = 12;
+          _context6.n = 12;
           return response.json();
         case 12:
-          data = _context4.v;
-          return _context4.a(2, data.candidates[0].content.parts[0].text);
+          data = _context6.v;
+          return _context6.a(2, data.candidates[0].content.parts[0].text);
         case 13:
-          _context4.p = 13;
-          _t5 = _context4.v;
-          console.error("Error llamando a Gemini:", _t5);
-          throw _t5;
+          _context6.p = 13;
+          _t9 = _context6.v;
+          console.error("Error llamando a Gemini:", _t9);
+          throw _t9;
         case 14:
-          return _context4.a(2);
+          return _context6.a(2);
       }
-    }, _callee4, null, [[6, 13], [1, 3]]);
+    }, _callee6, null, [[6, 13], [1, 3]]);
   }));
   return _analizarGrupos.apply(this, arguments);
 }
@@ -402,6 +403,48 @@ var Dashboard = function Dashboard(_ref2) {
     _React$useState12 = _slicedToArray(_React$useState11, 2),
     notifiedAlerts = _React$useState12[0],
     setNotifiedAlerts = _React$useState12[1];
+  var _React$useState13 = React.useState(function () {
+      try {
+        return JSON.parse(localStorage.getItem("nexus_notified_internal_alerts") || "{}");
+      } catch (e) {
+        return {};
+      }
+    }),
+    _React$useState14 = _slicedToArray(_React$useState13, 2),
+    notifiedInternalAlerts = _React$useState14[0],
+    setNotifiedInternalAlerts = _React$useState14[1];
+
+  // Sincronizar notificaciones al cliente y alertas internas con Firestore y data
+  React.useEffect(function () {
+    if (data && Array.isArray(data) && data.length > 0) {
+      setNotifiedAlerts(function (prev) {
+        var merged = _objectSpread({}, prev);
+        data.forEach(function (r) {
+          var rKey = String(r.Reserva || r.Com_Id || r._docId || "").replace(/^#/, "");
+          if (r.notificadoClienteAt || r.Ultima_Notificacion_Cliente) {
+            merged[rKey] = r.notificadoClienteAt || r.Ultima_Notificacion_Cliente && r.Ultima_Notificacion_Cliente.fecha || new Date().toISOString();
+          }
+        });
+        try {
+          localStorage.setItem("nexus_notified_alerts", JSON.stringify(merged));
+        } catch (e) {}
+        return merged;
+      });
+      setNotifiedInternalAlerts(function (prev) {
+        var merged = _objectSpread({}, prev);
+        data.forEach(function (r) {
+          var rKey = String(r.Reserva || r.Com_Id || r._docId || "").replace(/^#/, "");
+          if (r.notificadoInternoAt || r.Ultima_Alerta_Interna) {
+            merged[rKey] = r.notificadoInternoAt || r.Ultima_Alerta_Interna && r.Ultima_Alerta_Interna.fecha || new Date().toISOString();
+          }
+        });
+        try {
+          localStorage.setItem("nexus_notified_internal_alerts", JSON.stringify(merged));
+        } catch (e) {}
+        return merged;
+      });
+    }
+  }, [data]);
   React.useEffect(function () {
     if (toastInfo) {
       var t = setTimeout(function () {
@@ -436,6 +479,120 @@ var Dashboard = function Dashboard(_ref2) {
     }
     var d = new Date(str);
     return isNaN(d.getTime()) ? null : d;
+  };
+  var formatDateTimeDisplay = function formatDateTimeDisplay(val) {
+    if (!val) return "";
+    if (typeof val === "string") {
+      var trimmed = val.trim();
+      if (/^\d{2}\/\d{2}\/\d{4}(\s+\d{2}:\d{2})?$/.test(trimmed)) {
+        return trimmed;
+      }
+    }
+    var d = null;
+    if (val instanceof Date) {
+      d = val;
+    } else if (val && _typeof(val) === "object" && typeof val.toDate === "function") {
+      d = val.toDate();
+    } else {
+      d = parseDate(val) || new Date(val);
+    }
+    if (!d || isNaN(d.getTime())) {
+      if (typeof val === "string" && val.length > 5) return val;
+      return "";
+    }
+    var day = String(d.getDate()).padStart(2, "0");
+    var month = String(d.getMonth() + 1).padStart(2, "0");
+    var year = d.getFullYear();
+    var hours = String(d.getHours()).padStart(2, "0");
+    var mins = String(d.getMinutes()).padStart(2, "0");
+    return "".concat(day, "/").concat(month, "/").concat(year, " ").concat(hours, ":").concat(mins);
+  };
+  var getGroupNotificationStatus = function getGroupNotificationStatus(group) {
+    var clientNotifsMap = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
+    var internalNotifsMap = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : {};
+    if (!group) return {
+      client: null,
+      internal: null
+    };
+    var resKey = String(group.Reserva || group.Com_Id || group._docId || "").replace(/^#/, "");
+
+    // 1. Notificación al Cliente
+    var clientDate = null;
+    var clientDetail = null;
+    if (group.Ultima_Notificacion_Cliente) {
+      var unc = typeof group.Ultima_Notificacion_Cliente === "string" ? JSON.parse(group.Ultima_Notificacion_Cliente) : group.Ultima_Notificacion_Cliente;
+      clientDate = unc.fecha || unc.date || unc.dateFormatted;
+      clientDetail = unc;
+    } else if (group.notificadoClienteAt) {
+      clientDate = group.notificadoClienteAt;
+    } else if (clientNotifsMap[resKey]) {
+      clientDate = clientNotifsMap[resKey];
+    } else if (group.Notificaciones_Cliente) {
+      try {
+        var list = typeof group.Notificaciones_Cliente === "string" ? JSON.parse(group.Notificaciones_Cliente) : group.Notificaciones_Cliente;
+        if (Array.isArray(list) && list.length > 0) {
+          clientDate = list[0].fecha || list[0].dateFormatted;
+          clientDetail = list[0];
+        }
+      } catch (e) {}
+    }
+    if (!clientDate && (group.tracking || group.Com_CRM_History)) {
+      try {
+        var trList = Array.isArray(group.tracking || group.Com_CRM_History) ? group.tracking || group.Com_CRM_History : JSON.parse(group.tracking || group.Com_CRM_History || "[]");
+        var match = trList.find(function (t) {
+          return t && (t.type === "notificacion_cliente" || t.text && t.text.includes("Notificación al Cliente"));
+        });
+        if (match) {
+          clientDate = match.date || match.fecha;
+          clientDetail = match;
+        }
+      } catch (e) {}
+    }
+
+    // 2. Alertas Internas Enviadas
+    var internalDate = null;
+    var internalDetail = null;
+    if (group.Ultima_Alerta_Interna) {
+      var uai = typeof group.Ultima_Alerta_Interna === "string" ? JSON.parse(group.Ultima_Alerta_Interna) : group.Ultima_Alerta_Interna;
+      internalDate = uai.fecha || uai.date || uai.dateFormatted;
+      internalDetail = uai;
+    } else if (group.notificadoInternoAt) {
+      internalDate = group.notificadoInternoAt;
+    } else if (internalNotifsMap[resKey]) {
+      internalDate = internalNotifsMap[resKey];
+    } else if (group.Notificaciones_Internas) {
+      try {
+        var _list = typeof group.Notificaciones_Internas === "string" ? JSON.parse(group.Notificaciones_Internas) : group.Notificaciones_Internas;
+        if (Array.isArray(_list) && _list.length > 0) {
+          internalDate = _list[0].fecha || _list[0].dateFormatted;
+          internalDetail = _list[0];
+        }
+      } catch (e) {}
+    }
+    if (!internalDate && (group.tracking || group.Com_CRM_History)) {
+      try {
+        var _trList = Array.isArray(group.tracking || group.Com_CRM_History) ? group.tracking || group.Com_CRM_History : JSON.parse(group.tracking || group.Com_CRM_History || "[]");
+        var _match = _trList.find(function (t) {
+          return t && (t.type === "control_interno" || t.text && t.text.includes("Control Interno"));
+        });
+        if (_match) {
+          internalDate = _match.date || _match.fecha;
+          internalDetail = _match;
+        }
+      } catch (e) {}
+    }
+    return {
+      client: clientDate ? {
+        raw: clientDate,
+        formatted: formatDateTimeDisplay(clientDate),
+        detail: clientDetail
+      } : null,
+      internal: internalDate ? {
+        raw: internalDate,
+        formatted: formatDateTimeDisplay(internalDate),
+        detail: internalDetail
+      } : null
+    };
   };
   var getPaymentNotice = function getPaymentNotice(g) {
     var today = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : new Date();
@@ -566,13 +723,6 @@ var Dashboard = function Dashboard(_ref2) {
     fiveDaysFromNow.setDate(fiveDaysFromNow.getDate() + 5);
     var fifteenDaysFromNow = new Date(startOfToday);
     fifteenDaysFromNow.setDate(fifteenDaysFromNow.getDate() + 15);
-    var seenFinancial = new Set();
-    var seenRelease = new Set();
-    var seenLogistics = new Set();
-    var seenCrm = new Set();
-    var seenTentative = new Set();
-    var twentyFiveDaysFromNow = new Date(startOfToday);
-    twentyFiveDaysFromNow.setDate(twentyFiveDaysFromNow.getDate() + 25);
     filteredGroups.forEach(function (g) {
       var resId = g.Reserva || g.Com_Id || "";
       var status = ((g.Com_Estado_Interno || g["Segment."] || "") + " " + (g.Estado || "")).toUpperCase();
@@ -591,43 +741,66 @@ var Dashboard = function Dashboard(_ref2) {
       var pending = fin.pending;
       var isCredito = _isCreditoGroup(g);
 
-      // 1. Column 1: Financial Alerts (ignorar si es crédito)
-      if (!isCredito && (isConfirmed || isTentative) && pending > 0.1 && !seenFinancial.has(resId)) {
+      // Recopilar TODOS los avisos que aplican a este grupo
+      var groupAlerts = [];
+
+      // 1. Alertas Financieras (ignorar si es crédito)
+      if (!isCredito && (isConfirmed || isTentative) && pending > 0.1) {
         try {
           var notice = getPaymentNotice(g, startOfToday);
           if (notice && notice.days <= 5) {
-            seenFinancial.add(resId);
-            financialAlerts.push({
-              group: g,
+            groupAlerts.push({
+              categoryKey: "financial",
+              categoryName: "Financiera",
               icon: "alert-triangle",
               label: notice.label,
               detail: "".concat(notice.label, ": ").concat(fmt(pending), " pendiente. Fecha de vencimiento: ").concat(formatDate(notice.date)),
-              type: notice.days < 0 ? "danger" : "warning"
+              text: "".concat(notice.label, ": ").concat(fmt(pending), " pendiente. Fecha de vencimiento: ").concat(formatDate(notice.date)),
+              type: notice.days < 0 ? "danger" : "warning",
+              priority: 1
             });
           }
         } catch (e) {}
       }
 
-      // El plazo de confirmación es independiente del saldo y de la forma de pago.
-      if (!isConfirmed && !seenRelease.has(resId)) {
+      // 2. Release / Plazo de Confirmación (independiente del saldo y forma de pago)
+      if (!isConfirmed) {
         var dRel = parseDate(g.Com_Vencimiento_Rel);
         if (dRel && dRel <= fiveDaysFromNow) {
-          seenRelease.add(resId);
           var diffTime = dRel - startOfToday;
           var diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
           var isOverdue = dRel < startOfToday;
-          releaseAlerts.push({
-            group: g,
+          groupAlerts.push({
+            categoryKey: "release",
+            categoryName: "Confirmación",
             icon: "clock",
             label: isOverdue ? "Plazo de confirmación vencido" : diffDays === 0 ? "Confirmación vence hoy" : "Confirmación próxima a vencer",
             detail: isOverdue ? "Confirmaci\xF3n pendiente: el plazo venci\xF3 hace ".concat(Math.abs(diffDays), " d\xEDas (").concat(formatDate(dRel), ")") : diffDays === 0 ? "Confirmaci\xF3n pendiente: el plazo vence hoy (".concat(formatDate(dRel), ")") : "Confirmaci\xF3n pendiente: el plazo vence en ".concat(diffDays, " d\xEDas (").concat(formatDate(dRel), ")"),
-            type: isOverdue ? "danger" : "warning"
+            text: isOverdue ? "Confirmaci\xF3n pendiente: el plazo venci\xF3 hace ".concat(Math.abs(diffDays), " d\xEDas (").concat(formatDate(dRel), ")") : diffDays === 0 ? "Confirmaci\xF3n pendiente: el plazo vence hoy (".concat(formatDate(dRel), ")") : "Confirmaci\xF3n pendiente: el plazo vence en ".concat(diffDays, " d\xEDas (").concat(formatDate(dRel), ")"),
+            type: isOverdue ? "danger" : "warning",
+            priority: 2
           });
         }
       }
 
-      // 3. Column 3: Datos Operativos Faltantes
-      if (isConfirmed && entryDate && entryDate >= startOfToday && entryDate <= fifteenDaysFromNow && !seenLogistics.has(resId)) {
+      // 3. Tentativas Urgentes (< 25 días para la llegada)
+      if (isTentative && entryDate && entryDate >= startOfToday && entryDate <= twentyFiveDaysFromNow) {
+        var _diffDays = Math.ceil((entryDate - startOfToday) / (1000 * 60 * 60 * 24));
+        var urgency = _diffDays <= 7 ? "danger" : _diffDays <= 14 ? "warning" : "info";
+        groupAlerts.push({
+          categoryKey: "tentative",
+          categoryName: "Tentativa",
+          icon: "calendar-clock",
+          label: _diffDays <= 7 ? "Llegada Crítica" : _diffDays <= 14 ? "Confirmar Pronto" : "Confirmar Antes de Plazo",
+          detail: "Entrada en ".concat(_diffDays, " d\xEDa").concat(_diffDays !== 1 ? 's' : '', " (").concat(formatDate(entryDate), ") \u2014 a\xFAn en Tentativa"),
+          text: "Entrada en ".concat(_diffDays, " d\xEDa").concat(_diffDays !== 1 ? 's' : '', " (").concat(formatDate(entryDate), ") \u2014 a\xFAn en Tentativa"),
+          type: urgency,
+          priority: 3
+        });
+      }
+
+      // 4. Datos Operativos Faltantes (solo grupos confirmados próximos a llegada)
+      if (isConfirmed && entryDate && entryDate >= startOfToday && entryDate <= fifteenDaysFromNow) {
         var missingDetails = [];
         if (!g.Logistica_Rooming) {
           missingDetails.push({
@@ -649,53 +822,96 @@ var Dashboard = function Dashboard(_ref2) {
           });
         }
         if (missingDetails.length > 0) {
-          seenLogistics.add(resId);
-          logisticsAlerts.push({
-            group: g,
+          groupAlerts.push({
+            categoryKey: "logistics",
+            categoryName: "Datos Faltantes",
             icon: "file-warning",
             label: "Datos Faltantes",
             detail: missingDetails.map(function (d) {
               return d.text;
             }).join(", "),
-            details: missingDetails,
-            type: "warning"
+            text: missingDetails.map(function (d) {
+              return d.text;
+            }).join(", "),
+            subDetails: missingDetails,
+            type: "warning",
+            priority: 4
           });
         }
       }
 
-      // 4. Column 4: CRM Tasks
-      if (!seenCrm.has(resId)) {
-        var dFollow = parseDate(g.Com_Seguimiento);
-        var followDay = dFollow && new Date(dFollow.getFullYear(), dFollow.getMonth(), dFollow.getDate());
-        if (followDay && followDay <= fifteenDaysFromNow) {
-          seenCrm.add(resId);
-          var isPastDue = dFollow < startOfToday;
-          var isToday = followDay.getTime() === startOfToday.getTime();
-          var daysUntil = Math.round((followDay - startOfToday) / (1000 * 60 * 60 * 24));
-          crmAlerts.push({
-            group: g,
-            icon: "phone-call",
-            label: isPastDue ? "CRM Retrasado" : isToday ? "CRM Hoy" : "CRM Próximo",
-            detail: isPastDue ? "Planificado para el ".concat(formatDate(dFollow)) : isToday ? "Programado para hoy (".concat(formatDate(dFollow), ")") : "Seguimiento en ".concat(daysUntil, " d\xEDa").concat(daysUntil === 1 ? "" : "s", " (").concat(formatDate(dFollow), ")"),
-            type: isPastDue ? "danger" : "info"
-          });
-        }
+      // 5. CRM Tasks / Seguimientos
+      var dFollow = parseDate(g.Com_Seguimiento);
+      var followDay = dFollow && new Date(dFollow.getFullYear(), dFollow.getMonth(), dFollow.getDate());
+      if (followDay && followDay <= fifteenDaysFromNow) {
+        var isPastDue = dFollow < startOfToday;
+        var isToday = followDay.getTime() === startOfToday.getTime();
+        var daysUntil = Math.round((followDay - startOfToday) / (1000 * 60 * 60 * 24));
+        groupAlerts.push({
+          categoryKey: "crm",
+          categoryName: "Seguimiento CRM",
+          icon: "phone-call",
+          label: isPastDue ? "CRM Retrasado" : isToday ? "CRM Hoy" : "CRM Próximo",
+          detail: isPastDue ? "Planificado para el ".concat(formatDate(dFollow)) : isToday ? "Programado para hoy (".concat(formatDate(dFollow), ")") : "Seguimiento en ".concat(daysUntil, " d\xEDa").concat(daysUntil === 1 ? "" : "s", " (").concat(formatDate(dFollow), ")"),
+          text: isPastDue ? "Planificado para el ".concat(formatDate(dFollow)) : isToday ? "Programado para hoy (".concat(formatDate(dFollow), ")") : "Seguimiento en ".concat(daysUntil, " d\xEDa").concat(daysUntil === 1 ? "" : "s", " (").concat(formatDate(dFollow), ")"),
+          type: isPastDue ? "danger" : "info",
+          priority: 5
+        });
       }
+      if (groupAlerts.length === 0) return;
 
-      // 5. Column 5: Tentativas Urgentes (< 25 días para la llegada)
-      if (isTentative && entryDate && !seenTentative.has(resId)) {
-        if (entryDate >= startOfToday && entryDate <= twentyFiveDaysFromNow) {
-          seenTentative.add(resId);
-          var _diffDays = Math.ceil((entryDate - startOfToday) / (1000 * 60 * 60 * 24));
-          var urgency = _diffDays <= 7 ? "danger" : _diffDays <= 14 ? "warning" : "info";
-          tentativeAlerts.push({
-            group: g,
-            icon: "calendar-clock",
-            label: _diffDays <= 7 ? "Llegada Crítica" : _diffDays <= 14 ? "Confirmar Pronto" : "Confirmar Antes de Plazo",
-            detail: "Entrada en ".concat(_diffDays, " d\xEDa").concat(_diffDays !== 1 ? 's' : '', " (").concat(formatDate(entryDate), ") \u2014 a\xFAn en Tentativa"),
-            type: urgency
+      // Ordenar por prioridad: el grupo se ubicará en la columna de mayor urgencia
+      groupAlerts.sort(function (a, b) {
+        return a.priority - b.priority;
+      });
+      var primary = groupAlerts[0];
+
+      // Construir lista unificada de avisos para la tarjeta
+      var combinedDetails = [];
+      groupAlerts.forEach(function (a) {
+        if (a.subDetails && a.subDetails.length > 0) {
+          a.subDetails.forEach(function (sd) {
+            combinedDetails.push({
+              icon: sd.icon || a.icon,
+              category: a.categoryName,
+              text: groupAlerts.length > 1 ? "[".concat(a.categoryName, "] ").concat(sd.text) : sd.text,
+              rawText: sd.text,
+              type: a.type
+            });
+          });
+        } else {
+          combinedDetails.push({
+            icon: a.icon,
+            category: a.categoryName,
+            text: groupAlerts.length > 1 ? "[".concat(a.categoryName, "] ").concat(a.text) : a.text,
+            rawText: a.text,
+            type: a.type
           });
         }
+      });
+      var consolidatedCard = {
+        group: g,
+        primaryCategory: primary.categoryKey,
+        icon: primary.icon,
+        label: primary.label,
+        detail: primary.detail,
+        details: combinedDetails,
+        allAlerts: groupAlerts,
+        alertCount: groupAlerts.length,
+        type: primary.type
+      };
+
+      // Ubicar el grupo EXCLUSIVAMENTE en su columna principal (sin duplicar)
+      if (primary.categoryKey === "financial") {
+        financialAlerts.push(consolidatedCard);
+      } else if (primary.categoryKey === "release") {
+        releaseAlerts.push(consolidatedCard);
+      } else if (primary.categoryKey === "tentative") {
+        tentativeAlerts.push(consolidatedCard);
+      } else if (primary.categoryKey === "logistics") {
+        logisticsAlerts.push(consolidatedCard);
+      } else if (primary.categoryKey === "crm") {
+        crmAlerts.push(consolidatedCard);
       }
     });
 
@@ -1328,19 +1544,23 @@ var Dashboard = function Dashboard(_ref2) {
           "text/html": blobHtml,
           "text/plain": blobText
         })]).then(function () {
+          recordInternalReportInFirestore(reportData);
           setToastInfo("✨ ¡Informe visual copiado! Pégalo en Outlook o Gmail con formato y tablas.");
         }).catch(function () {
           navigator.clipboard.writeText(fullPlain).then(function () {
+            recordInternalReportInFirestore(reportData);
             setToastInfo("📋 Informe en texto copiado al portapapeles.");
           });
         });
       } catch (e) {
         navigator.clipboard.writeText(fullPlain).then(function () {
+          recordInternalReportInFirestore(reportData);
           setToastInfo("📋 Informe en texto copiado al portapapeles.");
         });
       }
     } else {
       navigator.clipboard.writeText(fullPlain).then(function () {
+        recordInternalReportInFirestore(reportData);
         setToastInfo("📋 Informe en texto copiado al portapapeles.");
       });
     }
@@ -1350,6 +1570,7 @@ var Dashboard = function Dashboard(_ref2) {
     var bodyText = (internalReportModal === null || internalReportModal === void 0 ? void 0 : internalReportModal.customBody) || internalReportText;
     var fullPlain = "Para: ".concat((internalReportModal === null || internalReportModal === void 0 ? void 0 : internalReportModal.emailTo) || "", "\nAsunto: ").concat((internalReportModal === null || internalReportModal === void 0 ? void 0 : internalReportModal.subject) || "", "\n\n").concat(bodyText);
     navigator.clipboard.writeText(fullPlain).then(function () {
+      recordInternalReportInFirestore(reportData);
       setToastInfo("📋 Texto del informe copiado al portapapeles.");
     }).catch(function () {
       setToastInfo("❌ Error al copiar texto.");
@@ -1363,8 +1584,73 @@ var Dashboard = function Dashboard(_ref2) {
     var mailtoUrl = "mailto:".concat(encodeURIComponent(to), "?subject=").concat(encodeURIComponent(sub), "&body=").concat(encodeURIComponent(bodyText));
     window.location.href = mailtoUrl;
     setToastInfo("🚀 Gestor de correo abierto con el informe interno por secciones.");
+    recordInternalReportInFirestore(reportData);
     setInternalReportModal(null);
   };
+  var recordInternalReportInFirestore = /*#__PURE__*/function () {
+    var _ref3 = _asyncToGenerator(/*#__PURE__*/_regenerator().m(function _callee(repData) {
+      var now, nowIso, recipient, updatedInternal, groupsToRecord, seen, _i, _groupsToRecord, item;
+      return _regenerator().w(function (_context) {
+        while (1) switch (_context.n) {
+          case 0:
+            if (!(!repData || !window.db)) {
+              _context.n = 1;
+              break;
+            }
+            return _context.a(2);
+          case 1:
+            try {
+              now = new Date();
+              nowIso = now.toISOString();
+              recipient = (internalReportModal === null || internalReportModal === void 0 ? void 0 : internalReportModal.emailTo) || "comunicaciones@hotelguadiana.es";
+              updatedInternal = _objectSpread({}, notifiedInternalAlerts);
+              groupsToRecord = [];
+              seen = new Set();
+              (repData.sections || []).forEach(function (sec) {
+                (sec.alerts || []).forEach(function (a) {
+                  var g = a.group || {};
+                  var resId = String(g.Reserva || g.Com_Id || g._docId || "").replace(/^#/, "");
+                  if (resId && !seen.has(resId)) {
+                    seen.add(resId);
+                    groupsToRecord.push({
+                      group: g,
+                      resId: resId,
+                      title: sec.shortTitle || sec.title
+                    });
+                    updatedInternal[resId] = nowIso;
+                  }
+                });
+              });
+              setNotifiedInternalAlerts(updatedInternal);
+              try {
+                localStorage.setItem("nexus_notified_internal_alerts", JSON.stringify(updatedInternal));
+              } catch (e) {}
+              for (_i = 0, _groupsToRecord = groupsToRecord; _i < _groupsToRecord.length; _i++) {
+                item = _groupsToRecord[_i];
+                recordNotificationInFirestore({
+                  resId: item.resId,
+                  grupoName: item.group["Nombre del Grupo"] || "",
+                  mode: "internal",
+                  isInternal: true,
+                  columnTitle: "Informe Interno (".concat(item.title, ")"),
+                  subject: (internalReportModal === null || internalReportModal === void 0 ? void 0 : internalReportModal.subject) || "Informe Interno de Control Operativo",
+                  emailTo: recipient,
+                  group: item.group,
+                  body: "Grupo incluido en Informe General de Alertas Operativas enviado a ".concat(recipient)
+                }, "informe_interno");
+              }
+            } catch (e) {
+              console.error("Error al registrar informe interno:", e);
+            }
+          case 2:
+            return _context.a(2);
+        }
+      }, _callee);
+    }));
+    return function recordInternalReportInFirestore(_x2) {
+      return _ref3.apply(this, arguments);
+    };
+  }();
   var generateRichHtmlEmail = function generateRichHtmlEmail(data) {
     var _data$alert;
     if (!data) return "";
@@ -1378,7 +1664,7 @@ var Dashboard = function Dashboard(_ref2) {
     return "\n<center style=\"width: 100%; table-layout: fixed; background-color: #f1f5f9; padding: 15px 0;\">\n  <!--[if mso]>\n  <table role=\"presentation\" width=\"620\" align=\"center\" border=\"0\" cellpadding=\"0\" cellspacing=\"0\"><tr><td>\n  <![endif]-->\n  <table role=\"presentation\" width=\"620\" border=\"0\" cellpadding=\"0\" cellspacing=\"0\" align=\"center\" style=\"width: 620px; max-width: 620px; margin: 0 auto; color: #1e293b; background-color: #ffffff; border: 1px solid #cbd5e1; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; border-collapse: collapse;\">\n    <!-- Header Banner: Fondo solido azul oscuro para compatibilidad con Outlook -->\n    <tr>\n      <td bgcolor=\"#0f172a\" style=\"background-color: #0f172a; padding: 20px 24px;\">\n        <table role=\"presentation\" width=\"100%\" border=\"0\" cellpadding=\"0\" cellspacing=\"0\">\n          <tr>\n            <td valign=\"middle\" style=\"vertical-align: middle;\">\n              ".concat(isInternal ? "\n              <table role=\"presentation\" border=\"0\" cellpadding=\"0\" cellspacing=\"0\">\n                <tr>\n                  <td bgcolor=\"#d97706\" style=\"background-color: #d97706; color: #ffffff; font-size: 9.5px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; padding: 2px 7px; border-radius: 4px;\">\n                    CONTROL INTERNO OPERATIVO\n                  </td>\n                </tr>\n              </table>" : '', "\n              <div style=\"font-size: 18px; font-weight: 800; color: #ffffff; letter-spacing: 0.5px; text-transform: uppercase; margin-top: ").concat(isInternal ? '6px' : '0', ";\">\n                ").concat(data.hotelOfficial, "\n              </div>\n              <div style=\"font-size: 11px; color: #94a3b8; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; margin-top: 3px;\">\n                ").concat(isInternal ? "Aviso a Comercial / Administración" : "Dpto. Reservas y Gestión de Grupos", "\n              </div>\n            </td>\n            <td valign=\"middle\" align=\"right\" style=\"vertical-align: middle; text-align: right;\">\n              <table role=\"presentation\" border=\"0\" cellpadding=\"0\" cellspacing=\"0\" align=\"right\">\n                <tr>\n                  <td bgcolor=\"#1e293b\" style=\"background-color: #1e293b; border: 1px solid #334155; padding: 5px 12px; border-radius: 16px; font-size: 11px; font-weight: 700; color: #f8fafc;\">\n                    Ref #").concat(data.resId, "\n                  </td>\n                </tr>\n              </table>\n            </td>\n          </tr>\n        </table>\n      </td>\n    </tr>\n\n    <!-- Group Summary Bar -->\n    <tr>\n      <td bgcolor=\"#f8fafc\" style=\"background-color: #f8fafc; padding: 12px 24px; border-bottom: 1px solid #e2e8f0;\">\n        <div style=\"font-size: 14px; font-weight: 800; color: #0f172a; margin-bottom: 3px;\">\n          ").concat(data.grupoName, "\n        </div>\n        <table role=\"presentation\" width=\"100%\" border=\"0\" cellpadding=\"0\" cellspacing=\"0\" style=\"font-size: 11.5px; color: #64748b;\">\n          <tr>\n            <td>\n              <strong>Estancia:</strong> ").concat(data.entrada || "---", " \u2794 ").concat(data.salida || "---", "\n            </td>\n            <td align=\"right\" style=\"text-align: right;\">\n              <strong>Ocupaci\xF3n:</strong> ").concat(data.pax || 0, " pax &nbsp;|&nbsp; <strong>Comercial:</strong> ").concat(data.comercial || "---", "\n            </td>\n          </tr>\n        </table>\n      </td>\n    </tr>\n\n    <!-- Content Container -->\n    <tr>\n      <td bgcolor=\"#ffffff\" style=\"background-color: #ffffff; padding: 22px 24px; font-size: 13px; line-height: 1.65; color: #334155;\">\n        \n        ").concat(hasFin ? "\n        <!-- Financial Metrics Grid -->\n        <table role=\"presentation\" width=\"100%\" border=\"0\" cellpadding=\"0\" cellspacing=\"0\" style=\"margin-bottom: 20px;\">\n          <tr>\n            <td bgcolor=\"#f8fafc\" width=\"31%\" style=\"background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 6px; text-align: center;\">\n              <div style=\"font-size: 9px; font-weight: 800; color: #64748b; text-transform: uppercase;\">Total Contratado</div>\n              <div style=\"font-size: 14px; font-weight: 800; color: #0f172a; margin-top: 3px;\">".concat(fmt(fin.total), "</div>\n            </td>\n            <td width=\"3%\">&nbsp;</td>\n            <td bgcolor=\"#ecfdf5\" width=\"32%\" style=\"background-color: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 8px; padding: 10px 6px; text-align: center;\">\n              <div style=\"font-size: 9px; font-weight: 800; color: #059669; text-transform: uppercase;\">Abonado / Confirmado</div>\n              <div style=\"font-size: 14px; font-weight: 800; color: #047857; margin-top: 3px;\">").concat(fmt(fin.paid), "</div>\n            </td>\n            <td width=\"3%\">&nbsp;</td>\n            <td bgcolor=\"#fff1f2\" width=\"31%\" style=\"background-color: #fff1f2; border: 1px solid #fecdd3; border-radius: 8px; padding: 10px 6px; text-align: center;\">\n              <div style=\"font-size: 9px; font-weight: 800; color: #e11d48; text-transform: uppercase;\">Pendiente de Cobro</div>\n              <div style=\"font-size: 14px; font-weight: 800; color: #be123c; margin-top: 3px;\">").concat(fmt(fin.pending), "</div>\n            </td>\n          </tr>\n        </table>") : '', "\n\n        <!-- Callout Box -->\n        <table role=\"presentation\" width=\"100%\" border=\"0\" cellpadding=\"0\" cellspacing=\"0\" style=\"margin-bottom: 20px;\">\n          <tr>\n            <td bgcolor=\"#fef2f2\" style=\"background-color: #fef2f2; border-left: 4px solid #ef4444; padding: 10px 14px;\">\n              <div style=\"font-size: 10px; font-weight: 800; color: #991b1b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px;\">\n                ").concat(isInternal ? "Actuación Crítica Detectada" : "Situación / Requerimiento", "\n              </div>\n              <div style=\"font-size: 12px; font-weight: 700; color: #7f1d1d;\">\n                ").concat(((_data$alert = data.alert) === null || _data$alert === void 0 ? void 0 : _data$alert.detail) || "Revisión operativa de las condiciones acordadas.", "\n              </div>\n            </td>\n          </tr>\n        </table>\n\n        <!-- Body text -->\n        <div style=\"white-space: pre-line; margin-bottom: 20px; color: #334155; font-size: 12.5px; line-height: 1.65;\">\n          ").concat(data.body, "\n        </div>\n\n        <!-- Bank Details Card si no es interno -->\n        ").concat(!isInternal && data.includeBankDetails && data.hotelIban ? "\n        <table role=\"presentation\" width=\"100%\" border=\"0\" cellpadding=\"0\" cellspacing=\"0\" style=\"margin-top: 20px;\">\n          <tr>\n            <td bgcolor=\"#0f172a\" style=\"background-color: #0f172a; border-radius: 8px; padding: 16px 20px; color: #ffffff;\">\n              <div style=\"font-size: 10px; font-weight: 800; color: #38bdf8; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;\">\n                \uD83D\uDCB3 Datos Oficiales para Transferencia Bancaria\n              </div>\n              <table role=\"presentation\" width=\"100%\" border=\"0\" cellpadding=\"0\" cellspacing=\"0\" style=\"font-size: 11.5px; color: #f8fafc;\">\n                <tr>\n                  <td width=\"100\" style=\"padding: 2px 0; color: #94a3b8;\"><strong>Entidad:</strong></td>\n                  <td style=\"padding: 2px 0; font-weight: 700; color: #ffffff;\">".concat(data.hotelBank, "</td>\n                </tr>\n                <tr>\n                  <td style=\"padding: 2px 0; color: #94a3b8;\"><strong>IBAN:</strong></td>\n                  <td style=\"padding: 2px 0; font-weight: 800; font-family: monospace; font-size: 13px; color: #38bdf8; letter-spacing: 1px;\">").concat(data.hotelIban, "</td>\n                </tr>\n                <tr>\n                  <td style=\"padding: 2px 0; color: #94a3b8;\"><strong>Beneficiario:</strong></td>\n                  <td style=\"padding: 2px 0; font-weight: 700; color: #ffffff;\">").concat(data.hotelOfficial, "</td>\n                </tr>\n                <tr>\n                  <td style=\"padding: 2px 0; color: #94a3b8;\"><strong>Concepto:</strong></td>\n                  <td style=\"padding: 2px 0; font-weight: 800; color: #facc15;\">Reserva #").concat(data.resId, " - ").concat(data.grupoName, "</td>\n                </tr>\n              </table>\n            </td>\n          </tr>\n        </table>") : '', "\n\n      </td>\n    </tr>\n\n    <!-- Footer -->\n    <tr>\n      <td bgcolor=\"#f8fafc\" style=\"background-color: #f8fafc; border-top: 1px solid #e2e8f0; padding: 14px 24px; font-size: 11px; color: #64748b; text-align: center;\">\n        <strong>").concat(data.hotelOfficial, "</strong> \u2022 ").concat(isInternal ? "Sistema de Control Interno Operativo" : "Dpto. Reservas y Gestión de Grupos", " \u2022 Nexus Groups\n      </td>\n    </tr>\n  </table>\n  <!--[if mso]>\n  </td></tr></table>\n  <![endif]-->\n</center>");
   };
   var handleOpenEmailModal = function handleOpenEmailModal(alert, columnTitle) {
-    var mode = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : "internal";
+    var mode = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : "client";
     var g = alert.group || {};
     var resId = String(g.Reserva || g.Com_Id || "").replace(/^#/, "");
     var grupoName = g["Nombre del Grupo"] || "Grupo sin nombre";
@@ -1409,7 +1695,9 @@ var Dashboard = function Dashboard(_ref2) {
     var isDatos = columnTitle.toLowerCase().includes("dato");
     var isCrm = columnTitle.toLowerCase().includes("crm") || columnTitle.toLowerCase().includes("seguimiento");
     var internalSubject = "[CONTROL INTERNO] ".concat(columnTitle, " - Reserva #").concat(resId, " (").concat(grupoName, ") - ").concat(hotelOfficial);
-    var internalBody = "PARA: ".concat(comercial, " / Administraci\xF3n\nASUNTO: Control Interno - ").concat(columnTitle, "\nESTABLECIMIENTO: ").concat(hotelOfficial, "\n\nDATOS DE LA RESERVA:\n\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\n\u2022 Localizador:    #").concat(resId, "\n\u2022 Grupo:          ").concat(grupoName, "\n\u2022 Estancia:       ").concat(entrada || "---", " \u2794 ").concat(salida || "---", "\n\u2022 Ocupaci\xF3n:      ").concat(pax, " personas\n\u2022 Comercial:      ").concat(comercial, "\n\u2022 Email Cliente:  ").concat(clientEmail || "No especificado", "\n\nACTUACI\xD3N REQUERIDA (").concat(columnTitle.toUpperCase(), "):\n\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\n").concat(alert.detail || "Revisión operativa de la situación acordada.", "\n\nESTADO ECON\xD3MICO:\n\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\n\u2022 Total Contratado:  ").concat(fmt(fin.total), "\n\u2022 Abonado / Confirm: ").concat(fmt(fin.paid), "\n\u2022 PENDIENTE:         ").concat(fmt(fin.pending), "\n\nPor favor revisar con urgencia las actuaciones necesarias para mantener la operativa al d\xEDa.");
+    var internalBody = "PARA: ".concat(comercial, " / Administraci\xF3n\nASUNTO: Control Interno - ").concat(columnTitle, "\nESTABLECIMIENTO: ").concat(hotelOfficial, "\n\nDATOS DE LA RESERVA:\n\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\n\u2022 Localizador:    #").concat(resId, "\n\u2022 Grupo:          ").concat(grupoName, "\n\u2022 Estancia:       ").concat(entrada || "---", " \u2794 ").concat(salida || "---", "\n\u2022 Ocupaci\xF3n:      ").concat(pax, " personas\n\u2022 Comercial:      ").concat(comercial, "\n\u2022 Email Cliente:  ").concat(clientEmail || "No especificado", "\n\nACTUACI\xD3N REQUERIDA (").concat(columnTitle.toUpperCase(), "):\n\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\n").concat(alert.details && alert.details.length > 1 ? alert.details.map(function (d) {
+      return "\u2022 ".concat(d.text);
+    }).join("\n") : alert.detail || "Revisión operativa de la situación acordada.", "\n\nESTADO ECON\xD3MICO:\n\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\n\u2022 Total Contratado:  ").concat(fmt(fin.total), "\n\u2022 Abonado / Confirm: ").concat(fmt(fin.paid), "\n\u2022 PENDIENTE:         ").concat(fmt(fin.pending), "\n\nPor favor revisar con urgencia las actuaciones necesarias para mantener la operativa al d\xEDa.");
     var clientSubject = "";
     var clientBody = "";
     if (isFinanciera) {
@@ -1473,16 +1761,259 @@ var Dashboard = function Dashboard(_ref2) {
       clientBody: clientBody
     });
   };
+  var recordNotificationInFirestore = /*#__PURE__*/function () {
+    var _ref4 = _asyncToGenerator(/*#__PURE__*/_regenerator().m(function _callee2(data) {
+      var channel,
+        now,
+        fmtDate,
+        dateShort,
+        isClient,
+        notifType,
+        notifSubject,
+        notifRecipient,
+        logText,
+        newTrackingEntry,
+        newNotifItem,
+        targetDocIds,
+        g,
+        matchedDocs,
+        _iterator,
+        _step,
+        docId,
+        snap,
+        qSnap,
+        batch,
+        targetId,
+        payload,
+        _args2 = arguments,
+        _t,
+        _t2,
+        _t3,
+        _t4;
+      return _regenerator().w(function (_context2) {
+        while (1) switch (_context2.p = _context2.n) {
+          case 0:
+            channel = _args2.length > 1 && _args2[1] !== undefined ? _args2[1] : "email";
+            if (!(!data || !window.db)) {
+              _context2.n = 1;
+              break;
+            }
+            return _context2.a(2);
+          case 1:
+            _context2.p = 1;
+            now = new Date();
+            fmtDate = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0') + ' ' + String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+            dateShort = String(now.getDate()).padStart(2, '0') + '/' + String(now.getMonth() + 1).padStart(2, '0') + '/' + now.getFullYear();
+            isClient = data.mode === "client" || !data.mode && !data.isInternal;
+            notifType = data.columnTitle || "Aviso Operativo";
+            notifSubject = data.subject || "Notificación de Alerta";
+            notifRecipient = data.emailTo || "Cliente";
+            logText = isClient ? "\u2709\uFE0F Notificaci\xF3n al Cliente [".concat(notifType, "]: ").concat(notifSubject, "\nPara: ").concat(notifRecipient || "(No especificado)") : "\uD83D\uDD12 Control Interno [".concat(notifType, "]: ").concat(notifSubject, "\nPara: ").concat(notifRecipient || "(No especificado)");
+            newTrackingEntry = {
+              id: Date.now(),
+              date: fmtDate,
+              type: isClient ? "notificacion_cliente" : "control_interno",
+              channel: channel,
+              subject: notifSubject,
+              recipient: notifRecipient,
+              columnTitle: notifType,
+              text: logText
+            };
+            newNotifItem = {
+              id: Date.now(),
+              fecha: now.toISOString(),
+              dateFormatted: fmtDate,
+              dateShort: dateShort,
+              tipo: notifType,
+              asunto: notifSubject,
+              destinatario: notifRecipient,
+              canal: channel,
+              modo: data.mode || "client",
+              resumen: data.body ? data.body.length > 250 ? data.body.slice(0, 250) + "..." : data.body : ""
+            }; // Identificar todos los posibles IDs del documento en Firestore
+            targetDocIds = new Set();
+            g = data.group || {};
+            if (g._docId) targetDocIds.add(String(g._docId).trim());
+            if (data.resId) {
+              targetDocIds.add(String(data.resId).trim().replace(/^#/, ''));
+            }
+            if (g.Reserva) {
+              targetDocIds.add(String(g.Reserva).trim().replace(/^#/, ''));
+            }
+            if (g.Com_Id) {
+              targetDocIds.add(String(g.Com_Id).trim().replace(/^#/, ''));
+            }
+            matchedDocs = [];
+            _iterator = _createForOfIteratorHelper(targetDocIds);
+            _context2.p = 2;
+            _iterator.s();
+          case 3:
+            if ((_step = _iterator.n()).done) {
+              _context2.n = 8;
+              break;
+            }
+            docId = _step.value;
+            _context2.p = 4;
+            _context2.n = 5;
+            return db.collection("groups").doc(docId).get();
+          case 5:
+            snap = _context2.v;
+            if (snap.exists) matchedDocs.push(snap);
+            _context2.n = 7;
+            break;
+          case 6:
+            _context2.p = 6;
+            _t = _context2.v;
+          case 7:
+            _context2.n = 3;
+            break;
+          case 8:
+            _context2.n = 10;
+            break;
+          case 9:
+            _context2.p = 9;
+            _t2 = _context2.v;
+            _iterator.e(_t2);
+          case 10:
+            _context2.p = 10;
+            _iterator.f();
+            return _context2.f(10);
+          case 11:
+            if (!(matchedDocs.length === 0 && data.resId)) {
+              _context2.n = 15;
+              break;
+            }
+            _context2.p = 12;
+            _context2.n = 13;
+            return db.collection("groups").where("Reserva", "==", data.resId).get();
+          case 13:
+            qSnap = _context2.v;
+            qSnap.forEach(function (d) {
+              return matchedDocs.push(d);
+            });
+            _context2.n = 15;
+            break;
+          case 14:
+            _context2.p = 14;
+            _t3 = _context2.v;
+          case 15:
+            if (!(matchedDocs.length > 0)) {
+              _context2.n = 17;
+              break;
+            }
+            batch = db.batch();
+            matchedDocs.forEach(function (snap) {
+              var existingData = snap.data() || {};
+              var existingTracking = [];
+              try {
+                var raw = existingData.tracking || existingData.Com_CRM_History || '[]';
+                existingTracking = Array.isArray(raw) ? raw : JSON.parse(raw);
+              } catch (e) {
+                existingTracking = [];
+              }
+              var existingNotifs = [];
+              try {
+                var rawN = existingData.Notificaciones_Cliente || '[]';
+                existingNotifs = Array.isArray(rawN) ? rawN : JSON.parse(rawN);
+              } catch (e) {}
+              var existingInternalNotifs = [];
+              try {
+                var rawI = existingData.Notificaciones_Internas || '[]';
+                existingInternalNotifs = Array.isArray(rawI) ? rawI : JSON.parse(rawI);
+              } catch (e) {}
+              var updatedTracking = [newTrackingEntry].concat(_toConsumableArray(existingTracking.filter(function (t) {
+                return t.id !== newTrackingEntry.id;
+              })));
+              var updatedClientNotifs = isClient ? [newNotifItem].concat(_toConsumableArray(existingNotifs.filter(function (n) {
+                return n.id !== newNotifItem.id;
+              }))) : existingNotifs;
+              var updatedInternalNotifs = !isClient ? [newNotifItem].concat(_toConsumableArray(existingInternalNotifs.filter(function (n) {
+                return n.id !== newNotifItem.id;
+              }))) : existingInternalNotifs;
+              var payload = {
+                tracking: JSON.stringify(updatedTracking),
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+              };
+              if (isClient) {
+                payload.Notificaciones_Cliente = JSON.stringify(updatedClientNotifs);
+                payload.Ultima_Notificacion_Cliente = newNotifItem;
+                payload.notificadoClienteAt = now.toISOString();
+              } else {
+                payload.Notificaciones_Internas = JSON.stringify(updatedInternalNotifs);
+                payload.Ultima_Alerta_Interna = newNotifItem;
+                payload.notificadoInternoAt = now.toISOString();
+              }
+              batch.set(snap.ref, payload, {
+                merge: true
+              });
+            });
+            _context2.n = 16;
+            return batch.commit();
+          case 16:
+            _context2.n = 18;
+            break;
+          case 17:
+            if (!data.resId) {
+              _context2.n = 18;
+              break;
+            }
+            targetId = String(data.resId).trim().replace(/^#/, '');
+            payload = {
+              tracking: JSON.stringify([newTrackingEntry]),
+              updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            };
+            if (isClient) {
+              payload.Notificaciones_Cliente = JSON.stringify([newNotifItem]);
+              payload.Ultima_Notificacion_Cliente = newNotifItem;
+              payload.notificadoClienteAt = now.toISOString();
+            } else {
+              payload.Notificaciones_Internas = JSON.stringify([newNotifItem]);
+              payload.Ultima_Alerta_Interna = newNotifItem;
+              payload.notificadoInternoAt = now.toISOString();
+            }
+            _context2.n = 18;
+            return db.collection("groups").doc(targetId).set(payload, {
+              merge: true
+            });
+          case 18:
+            _context2.n = 20;
+            break;
+          case 19:
+            _context2.p = 19;
+            _t4 = _context2.v;
+            console.error("Error al registrar notificación en Firestore:", _t4);
+          case 20:
+            return _context2.a(2);
+        }
+      }, _callee2, null, [[12, 14], [4, 6], [2, 9, 10, 11], [1, 19]]);
+    }));
+    return function recordNotificationInFirestore(_x3) {
+      return _ref4.apply(this, arguments);
+    };
+  }();
   var handleExecuteOpenEmail = function handleExecuteOpenEmail(data) {
     if (!data) return;
     var mailtoUrl = "mailto:".concat(encodeURIComponent(data.emailTo || ""), "?subject=").concat(encodeURIComponent(data.subject || ""), "&body=").concat(encodeURIComponent(data.body || ""));
-    var updated = _objectSpread(_objectSpread({}, notifiedAlerts), {}, _defineProperty({}, data.resId, new Date().toISOString()));
-    setNotifiedAlerts(updated);
-    try {
-      localStorage.setItem("nexus_notified_alerts", JSON.stringify(updated));
-    } catch (e) {}
+    var isInternal = data.mode === "internal";
+    var nowIso = new Date().toISOString();
+    if (isInternal) {
+      var updated = _objectSpread(_objectSpread({}, notifiedInternalAlerts), {}, _defineProperty({}, data.resId, nowIso));
+      setNotifiedInternalAlerts(updated);
+      try {
+        localStorage.setItem("nexus_notified_internal_alerts", JSON.stringify(updated));
+      } catch (e) {}
+    } else {
+      var _updated = _objectSpread(_objectSpread({}, notifiedAlerts), {}, _defineProperty({}, data.resId, nowIso));
+      setNotifiedAlerts(_updated);
+      try {
+        localStorage.setItem("nexus_notified_alerts", JSON.stringify(_updated));
+      } catch (e) {}
+    }
+
+    // Registrar en base de datos para la ficha del grupo
+    recordNotificationInFirestore(data, "email");
     window.location.href = mailtoUrl;
-    setToastInfo("\u2705 Gestor de correo abierto para #".concat(data.resId, " (").concat(data.grupoName, "). Notificaci\xF3n confirmada."));
+    setToastInfo(isInternal ? "\uD83D\uDD12 Alerta interna enviada y registrada para #".concat(data.resId, " (").concat(data.grupoName, ").") : "\u2705 Gestor de correo abierto para #".concat(data.resId, " (").concat(data.grupoName, "). Registrado en la ficha del grupo."));
     setSelectedEmailAlert(null);
   };
   var handleCopyRichEmail = function handleCopyRichEmail(data) {
@@ -1490,11 +2021,23 @@ var Dashboard = function Dashboard(_ref2) {
     var htmlContent = generateRichHtmlEmail(data);
     var plainText = "Para: ".concat(data.emailTo || "(No especificado)", "\nAsunto: ").concat(data.subject, "\n\n").concat(data.body);
     var markAsNotified = function markAsNotified() {
-      var updated = _objectSpread(_objectSpread({}, notifiedAlerts), {}, _defineProperty({}, data.resId, new Date().toISOString()));
-      setNotifiedAlerts(updated);
-      try {
-        localStorage.setItem("nexus_notified_alerts", JSON.stringify(updated));
-      } catch (e) {}
+      var isInternal = data.mode === "internal";
+      var nowIso = new Date().toISOString();
+      if (isInternal) {
+        var updated = _objectSpread(_objectSpread({}, notifiedInternalAlerts), {}, _defineProperty({}, data.resId, nowIso));
+        setNotifiedInternalAlerts(updated);
+        try {
+          localStorage.setItem("nexus_notified_internal_alerts", JSON.stringify(updated));
+        } catch (e) {}
+      } else {
+        var _updated2 = _objectSpread(_objectSpread({}, notifiedAlerts), {}, _defineProperty({}, data.resId, nowIso));
+        setNotifiedAlerts(_updated2);
+        try {
+          localStorage.setItem("nexus_notified_alerts", JSON.stringify(_updated2));
+        } catch (e) {}
+      }
+      // Registrar en base de datos para la ficha del grupo
+      recordNotificationInFirestore(data, "email");
     };
     if (window.ClipboardItem && navigator.clipboard && navigator.clipboard.write) {
       try {
@@ -1534,12 +2077,25 @@ var Dashboard = function Dashboard(_ref2) {
     if (!data) return;
     var fullText = "Para: ".concat(data.emailTo || "(No especificado)", "\nAsunto: ").concat(data.subject, "\n\n").concat(data.body);
     navigator.clipboard.writeText(fullText).then(function () {
-      var updated = _objectSpread(_objectSpread({}, notifiedAlerts), {}, _defineProperty({}, data.resId, new Date().toISOString()));
-      setNotifiedAlerts(updated);
-      try {
-        localStorage.setItem("nexus_notified_alerts", JSON.stringify(updated));
-      } catch (e) {}
-      setToastInfo("\uD83D\uDCCB Texto copiado al portapapeles y registrado para #".concat(data.resId, "."));
+      var isInternal = data.mode === "internal";
+      var nowIso = new Date().toISOString();
+      if (isInternal) {
+        var updated = _objectSpread(_objectSpread({}, notifiedInternalAlerts), {}, _defineProperty({}, data.resId, nowIso));
+        setNotifiedInternalAlerts(updated);
+        try {
+          localStorage.setItem("nexus_notified_internal_alerts", JSON.stringify(updated));
+        } catch (e) {}
+      } else {
+        var _updated3 = _objectSpread(_objectSpread({}, notifiedAlerts), {}, _defineProperty({}, data.resId, nowIso));
+        setNotifiedAlerts(_updated3);
+        try {
+          localStorage.setItem("nexus_notified_alerts", JSON.stringify(_updated3));
+        } catch (e) {}
+      }
+
+      // Registrar en base de datos para la ficha del grupo
+      recordNotificationInFirestore(data, "email");
+      setToastInfo(isInternal ? "\uD83D\uDCCB Alerta interna copiada y registrada para #".concat(data.resId, ".") : "\uD83D\uDCCB Texto copiado al portapapeles y registrado en la ficha de #".concat(data.resId, "."));
     }).catch(function () {
       setToastInfo("❌ No se pudo copiar al portapapeles automáticamente.");
     });
@@ -1553,11 +2109,11 @@ var Dashboard = function Dashboard(_ref2) {
       setToastInfo("\uD83D\uDCB3 IBAN: ".concat(iban));
     });
   };
-  var AlertColumn = function AlertColumn(_ref3) {
-    var title = _ref3.title,
-      icon = _ref3.icon,
-      colorClass = _ref3.colorClass,
-      alerts = _ref3.alerts;
+  var AlertColumn = function AlertColumn(_ref5) {
+    var title = _ref5.title,
+      icon = _ref5.icon,
+      colorClass = _ref5.colorClass,
+      alerts = _ref5.alerts;
     var theme = {
       rose: {
         bg: "bg-rose-50/50",
@@ -1635,8 +2191,10 @@ var Dashboard = function Dashboard(_ref2) {
     }, alerts.length))), /*#__PURE__*/React.createElement("div", {
       className: "flex flex-col gap-4"
     }, alerts.map(function (alert, idx) {
+      var _notifStatus$client$d, _notifStatus$internal;
       var g = alert.group;
       var isCumbria = (g.Hotel_Asignado || g.Hotel || "").toLowerCase().includes("cumb");
+      var notifStatus = getGroupNotificationStatus(g, notifiedAlerts, notifiedInternalAlerts);
       var entryDate = parseDate(g.Entrada);
       var daysToArrival = null;
       if (entryDate && !isNaN(entryDate.getTime())) {
@@ -1668,10 +2226,15 @@ var Dashboard = function Dashboard(_ref2) {
         className: "text-[9px] font-bold text-slate-400 uppercase tracking-wider leading-none"
       }, formatDate(g.Entrada))))), /*#__PURE__*/React.createElement("div", {
         className: "mt-1"
+      }, /*#__PURE__*/React.createElement("div", {
+        className: "flex items-start justify-between gap-1.5"
       }, /*#__PURE__*/React.createElement("h4", {
         className: "font-bold text-slate-800 text-xs leading-snug group-hover:text-emerald-700 transition-colors uppercase line-clamp-2",
         title: g["Nombre del Grupo"]
-      }, g["Nombre del Grupo"] || "Grupo sin nombre"), /*#__PURE__*/React.createElement("div", {
+      }, g["Nombre del Grupo"] || "Grupo sin nombre"), alert.alertCount > 1 && /*#__PURE__*/React.createElement("span", {
+        className: "shrink-0 px-2 py-0.5 rounded-full text-[8.5px] font-black bg-amber-500 text-white shadow-2xs whitespace-nowrap",
+        title: "Este grupo tiene ".concat(alert.alertCount, " avisos acumulados combinados en esta ficha")
+      }, alert.alertCount, " avisos")), /*#__PURE__*/React.createElement("div", {
         className: "flex justify-between items-center mt-1"
       }, /*#__PURE__*/React.createElement("span", {
         className: "text-[8px] font-black text-slate-300 uppercase tracking-widest bg-slate-50 border border-slate-100 px-1.5 py-0.5 rounded"
@@ -1682,26 +2245,55 @@ var Dashboard = function Dashboard(_ref2) {
       }, alert.details ? alert.details.map(function (det, dIdx) {
         return /*#__PURE__*/React.createElement("div", {
           key: dIdx,
-          className: "flex items-center gap-1.5 text-[9px] font-bold text-slate-600 leading-tight"
+          className: "flex items-start gap-1.5 text-[9px] font-bold text-slate-600 leading-tight"
         }, /*#__PURE__*/React.createElement(LucideIcon, {
           name: det.icon,
-          size: 10,
-          className: theme.text,
+          size: 11,
+          className: "".concat(theme.text, " shrink-0 mt-0.5"),
           strokeWidth: 2.5
         }), /*#__PURE__*/React.createElement("span", {
-          className: "truncate"
+          className: "line-clamp-2",
+          title: det.text
         }, det.text));
       }) : /*#__PURE__*/React.createElement("div", {
-        className: "flex items-center gap-1.5 text-[9px] font-bold text-slate-600 leading-tight"
+        className: "flex items-start gap-1.5 text-[9px] font-bold text-slate-600 leading-tight"
       }, /*#__PURE__*/React.createElement(LucideIcon, {
         name: alert.icon,
-        size: 10,
-        className: theme.text,
+        size: 11,
+        className: "".concat(theme.text, " shrink-0 mt-0.5"),
         strokeWidth: 2.5
       }), /*#__PURE__*/React.createElement("span", {
         className: "line-clamp-2",
         title: alert.detail
-      }, alert.detail))), /*#__PURE__*/React.createElement("div", {
+      }, alert.detail))), (notifStatus.client || notifStatus.internal) && /*#__PURE__*/React.createElement("div", {
+        className: "mt-1 pt-1.5 border-t border-slate-100 flex flex-col gap-1"
+      }, notifStatus.client && /*#__PURE__*/React.createElement("div", {
+        className: "flex items-center justify-between gap-1.5 px-2 py-1 rounded-lg bg-emerald-50/80 border border-emerald-200/70 text-emerald-800 text-[8.5px] font-bold shadow-2xs transition hover:bg-emerald-100/70",
+        title: "Notificaci\xF3n enviada al cliente: ".concat(notifStatus.client.formatted).concat((_notifStatus$client$d = notifStatus.client.detail) !== null && _notifStatus$client$d !== void 0 && _notifStatus$client$d.destinatario ? " \u2022 Para: ".concat(notifStatus.client.detail.destinatario) : '')
+      }, /*#__PURE__*/React.createElement("span", {
+        className: "flex items-center gap-1 shrink-0"
+      }, /*#__PURE__*/React.createElement(LucideIcon, {
+        name: "mail-check",
+        size: 11,
+        className: "text-emerald-600 shrink-0"
+      }), /*#__PURE__*/React.createElement("span", {
+        className: "uppercase tracking-wider"
+      }, "Cliente Notificado:")), /*#__PURE__*/React.createElement("span", {
+        className: "font-black text-emerald-900 tabular-nums truncate text-right"
+      }, notifStatus.client.formatted)), notifStatus.internal && /*#__PURE__*/React.createElement("div", {
+        className: "flex items-center justify-between gap-1.5 px-2 py-1 rounded-lg bg-indigo-50/80 border border-indigo-200/70 text-indigo-800 text-[8.5px] font-bold shadow-2xs transition hover:bg-indigo-100/70",
+        title: "Alerta interna enviada: ".concat(notifStatus.internal.formatted).concat((_notifStatus$internal = notifStatus.internal.detail) !== null && _notifStatus$internal !== void 0 && _notifStatus$internal.destinatario ? " \u2022 Para: ".concat(notifStatus.internal.detail.destinatario) : '')
+      }, /*#__PURE__*/React.createElement("span", {
+        className: "flex items-center gap-1 shrink-0"
+      }, /*#__PURE__*/React.createElement(LucideIcon, {
+        name: "bell-ring",
+        size: 11,
+        className: "text-indigo-600 shrink-0"
+      }), /*#__PURE__*/React.createElement("span", {
+        className: "uppercase tracking-wider"
+      }, "Alerta Interna:")), /*#__PURE__*/React.createElement("span", {
+        className: "font-black text-indigo-900 tabular-nums truncate text-right"
+      }, notifStatus.internal.formatted))), /*#__PURE__*/React.createElement("div", {
         className: "mt-2 pt-2 border-t border-slate-100 flex items-center justify-between gap-2"
       }, /*#__PURE__*/React.createElement("button", {
         type: "button",
@@ -1709,13 +2301,13 @@ var Dashboard = function Dashboard(_ref2) {
           e.stopPropagation();
           handleOpenEmailModal(alert, title);
         },
-        className: "flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-black text-[9px] uppercase tracking-wider border transition-all duration-200 shadow-2xs group/btn cursor-pointer ".concat(notifiedAlerts[String(g.Reserva || g.Com_Id || "").replace(/^#/, "")] ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100" : "bg-slate-50 hover:bg-slate-900 hover:text-white text-slate-700 border-slate-200/80 hover:border-slate-900 hover:shadow-xs"),
-        title: "Redactar y abrir email con detalles confirmados y pagos"
+        className: "flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-black text-[9px] uppercase tracking-wider border transition-all duration-200 shadow-2xs group/btn cursor-pointer ".concat(notifStatus.client ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100" : notifStatus.internal ? "bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100" : "bg-slate-50 hover:bg-slate-900 hover:text-white text-slate-700 border-slate-200/80 hover:border-slate-900 hover:shadow-xs"),
+        title: notifStatus.client && notifStatus.internal ? "Cliente: ".concat(notifStatus.client.formatted, " | Interna: ").concat(notifStatus.internal.formatted, ". Clic para redactar nuevo email.") : notifStatus.client ? "Cliente notificado el ".concat(notifStatus.client.formatted, ". Clic para redactar nuevo email.") : notifStatus.internal ? "Alerta interna enviada el ".concat(notifStatus.internal.formatted, ". Clic para redactar email.") : "Redactar y abrir email con detalles confirmados y pagos"
       }, /*#__PURE__*/React.createElement(LucideIcon, {
-        name: notifiedAlerts[String(g.Reserva || g.Com_Id || "").replace(/^#/, "")] ? "check-circle" : "mail",
+        name: notifStatus.client ? "check-circle" : notifStatus.internal ? "bell" : "mail",
         size: 12,
-        className: notifiedAlerts[String(g.Reserva || g.Com_Id || "").replace(/^#/, "")] ? "text-emerald-600" : "text-slate-500 group-hover/btn:text-white transition-colors"
-      }), /*#__PURE__*/React.createElement("span", null, notifiedAlerts[String(g.Reserva || g.Com_Id || "").replace(/^#/, "")] ? "Notificado" : "Enviar Email")), /*#__PURE__*/React.createElement("span", {
+        className: notifStatus.client ? "text-emerald-600" : notifStatus.internal ? "text-indigo-600" : "text-slate-500 group-hover/btn:text-white transition-colors"
+      }), /*#__PURE__*/React.createElement("span", null, notifStatus.client && notifStatus.internal ? "Notificado (Todo)" : notifStatus.client ? "Notificado" : notifStatus.internal ? "Alerta Enviada" : "Enviar Email")), /*#__PURE__*/React.createElement("span", {
         className: "text-[9px] font-bold text-slate-400 group-hover:text-slate-600 transition-colors"
       }, "#", g.Reserva)));
     }), alerts.length === 0 && /*#__PURE__*/React.createElement("div", {
@@ -1961,7 +2553,26 @@ var Dashboard = function Dashboard(_ref2) {
     title: "Cerrar modal"
   }, "\u2715"))), /*#__PURE__*/React.createElement("div", {
     className: "bg-slate-50 border-b border-slate-200/80 px-6 py-3 space-y-2.5"
-  }, /*#__PURE__*/React.createElement("div", {
+  }, function () {
+    var g = selectedEmailAlert.group || {};
+    var status = getGroupNotificationStatus(g, notifiedAlerts, notifiedInternalAlerts);
+    if (!status.client && !status.internal) return null;
+    return /*#__PURE__*/React.createElement("div", {
+      className: "flex items-center gap-2 flex-wrap text-[10px] pb-1"
+    }, status.client && /*#__PURE__*/React.createElement("span", {
+      className: "inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-100/90 text-emerald-800 font-bold border border-emerald-300 shadow-2xs"
+    }, /*#__PURE__*/React.createElement(LucideIcon, {
+      name: "mail-check",
+      size: 11,
+      className: "text-emerald-600"
+    }), /*#__PURE__*/React.createElement("span", null, "Cliente notificado el: ", /*#__PURE__*/React.createElement("strong", null, status.client.formatted))), status.internal && /*#__PURE__*/React.createElement("span", {
+      className: "inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-100/90 text-indigo-800 font-bold border border-indigo-300 shadow-2xs"
+    }, /*#__PURE__*/React.createElement(LucideIcon, {
+      name: "bell-ring",
+      size: 11,
+      className: "text-indigo-600"
+    }), /*#__PURE__*/React.createElement("span", null, "Alerta interna enviada el: ", /*#__PURE__*/React.createElement("strong", null, status.internal.formatted))));
+  }(), /*#__PURE__*/React.createElement("div", {
     className: "flex items-center justify-between gap-2 flex-wrap"
   }, /*#__PURE__*/React.createElement("div", {
     className: "flex items-center gap-1.5 bg-slate-200/80 p-1 rounded-xl"
@@ -2527,14 +3138,14 @@ var Dashboard = function Dashboard(_ref2) {
     className: "text-[9px] font-black text-slate-300 uppercase tracking-[0.5em]"
   }, "Nexus Gold Edition v2.8.5 \u2022 System Normal \u2022 Refreshed at", " ", new Date().toLocaleTimeString())));
 };
-var GroupsManager = function GroupsManager(_ref4) {
-  var data = _ref4.data,
-    onUpdateStatus = _ref4.onUpdateStatus,
-    onDeleteGroup = _ref4.onDeleteGroup;
-  var _React$useState13 = React.useState(""),
-    _React$useState14 = _slicedToArray(_React$useState13, 2),
-    searchTerm = _React$useState14[0],
-    setSearchTerm = _React$useState14[1];
+var GroupsManager = function GroupsManager(_ref6) {
+  var data = _ref6.data,
+    onUpdateStatus = _ref6.onUpdateStatus,
+    onDeleteGroup = _ref6.onDeleteGroup;
+  var _React$useState15 = React.useState(""),
+    _React$useState16 = _slicedToArray(_React$useState15, 2),
+    searchTerm = _React$useState16[0],
+    setSearchTerm = _React$useState16[1];
   var filteredData = data.filter(function (group) {
     var res = String(group["Reserva"] || "").toUpperCase();
     var uid = String(group.uid || group.id || "").toUpperCase();
@@ -2750,18 +3361,18 @@ var GroupsManager = function GroupsManager(_ref4) {
     className: "col-span-full text-center py-20 text-slate-400"
   }, "No se encontraron grupos coincidiendo con tu b\xFAsqueda.")));
 };
-var BudgetManager = function BudgetManager(_ref5) {
-  var data = _ref5.data,
-    onUpdateStatus = _ref5.onUpdateStatus,
-    onDeleteGroup = _ref5.onDeleteGroup;
-  var _React$useState15 = React.useState(""),
-    _React$useState16 = _slicedToArray(_React$useState15, 2),
-    searchTerm = _React$useState16[0],
-    setSearchTerm = _React$useState16[1];
-  var _React$useState17 = React.useState("TODOS"),
+var BudgetManager = function BudgetManager(_ref7) {
+  var data = _ref7.data,
+    onUpdateStatus = _ref7.onUpdateStatus,
+    onDeleteGroup = _ref7.onDeleteGroup;
+  var _React$useState17 = React.useState(""),
     _React$useState18 = _slicedToArray(_React$useState17, 2),
-    statusFilter = _React$useState18[0],
-    setStatusFilter = _React$useState18[1];
+    searchTerm = _React$useState18[0],
+    setSearchTerm = _React$useState18[1];
+  var _React$useState19 = React.useState("TODOS"),
+    _React$useState20 = _slicedToArray(_React$useState19, 2),
+    statusFilter = _React$useState20[0],
+    setStatusFilter = _React$useState20[1];
   var budgetData = data.filter(function (g) {
     var isBudget = String(g.Reserva || "").startsWith("PRES-") || (g.Estado || "").toUpperCase().includes("PRESUPUESTO") || (g.Com_Estado_Interno || "").toUpperCase().includes("PRESUPUESTO") || (g.Com_Estado_Interno || "").toUpperCase().includes("ENVIADO") || (g.Com_Estado_Interno || "").toUpperCase().includes("SEGUIMIENTO");
     if (!isBudget) return false;
@@ -3035,14 +3646,14 @@ var App = function App() {
     successToast = _useState10[0],
     setSuccessToast = _useState10[1];
   var handleUpdateStatus = /*#__PURE__*/function () {
-    var _ref6 = _asyncToGenerator(/*#__PURE__*/_regenerator().m(function _callee(groupId, newStatus) {
-      var docId, _t;
-      return _regenerator().w(function (_context) {
-        while (1) switch (_context.p = _context.n) {
+    var _ref8 = _asyncToGenerator(/*#__PURE__*/_regenerator().m(function _callee3(groupId, newStatus) {
+      var docId, _t5;
+      return _regenerator().w(function (_context3) {
+        while (1) switch (_context3.p = _context3.n) {
           case 0:
-            _context.p = 0;
+            _context3.p = 0;
             docId = String(groupId || "").trim().replace(/\.0$/, "").replace(/[\/\\]/g, "-");
-            _context.n = 1;
+            _context3.n = 1;
             return db.collection("groups").doc(docId).set({
               Estado: newStatus,
               updatedAt: firebase.firestore.FieldValue.serverTimestamp()
@@ -3054,34 +3665,34 @@ var App = function App() {
             setTimeout(function () {
               return setSuccessToast(null);
             }, 3000);
-            _context.n = 3;
+            _context3.n = 3;
             break;
           case 2:
-            _context.p = 2;
-            _t = _context.v;
-            console.error("Error updating status:", _t);
+            _context3.p = 2;
+            _t5 = _context3.v;
+            console.error("Error updating status:", _t5);
           case 3:
-            return _context.a(2);
+            return _context3.a(2);
         }
-      }, _callee, null, [[0, 2]]);
+      }, _callee3, null, [[0, 2]]);
     }));
-    return function handleUpdateStatus(_x2, _x3) {
-      return _ref6.apply(this, arguments);
+    return function handleUpdateStatus(_x4, _x5) {
+      return _ref8.apply(this, arguments);
     };
   }();
   var handleDeleteGroup = /*#__PURE__*/function () {
-    var _ref7 = _asyncToGenerator(/*#__PURE__*/_regenerator().m(function _callee2(groupId) {
-      var docId, _t2;
-      return _regenerator().w(function (_context2) {
-        while (1) switch (_context2.p = _context2.n) {
+    var _ref9 = _asyncToGenerator(/*#__PURE__*/_regenerator().m(function _callee4(groupId) {
+      var docId, _t6;
+      return _regenerator().w(function (_context4) {
+        while (1) switch (_context4.p = _context4.n) {
           case 0:
             if (!window.confirm("¿Estás seguro de que deseas desestimar este grupo?")) {
-              _context2.n = 4;
+              _context4.n = 4;
               break;
             }
-            _context2.p = 1;
+            _context4.p = 1;
             docId = String(groupId || "").trim().replace(/\.0$/, "").replace(/[\/\\]/g, "-");
-            _context2.n = 2;
+            _context4.n = 2;
             return db.collection("groups").doc(docId).set({
               Estado: "DESESTIMADO",
               updatedAt: firebase.firestore.FieldValue.serverTimestamp()
@@ -3093,19 +3704,19 @@ var App = function App() {
             setTimeout(function () {
               return setSuccessToast(null);
             }, 3000);
-            _context2.n = 4;
+            _context4.n = 4;
             break;
           case 3:
-            _context2.p = 3;
-            _t2 = _context2.v;
-            console.error("Error deleting group:", _t2);
+            _context4.p = 3;
+            _t6 = _context4.v;
+            console.error("Error deleting group:", _t6);
           case 4:
-            return _context2.a(2);
+            return _context4.a(2);
         }
-      }, _callee2, null, [[1, 3]]);
+      }, _callee4, null, [[1, 3]]);
     }));
-    return function handleDeleteGroup(_x4) {
-      return _ref7.apply(this, arguments);
+    return function handleDeleteGroup(_x6) {
+      return _ref9.apply(this, arguments);
     };
   }();
 
@@ -3304,37 +3915,37 @@ var App = function App() {
     aiResult = _useState16[0],
     setAiResult = _useState16[1];
   var runStrategicAnalysis = /*#__PURE__*/function () {
-    var _ref8 = _asyncToGenerator(/*#__PURE__*/_regenerator().m(function _callee3() {
-      var analysis, _t3;
-      return _regenerator().w(function (_context3) {
-        while (1) switch (_context3.p = _context3.n) {
+    var _ref0 = _asyncToGenerator(/*#__PURE__*/_regenerator().m(function _callee5() {
+      var analysis, _t7;
+      return _regenerator().w(function (_context5) {
+        while (1) switch (_context5.p = _context5.n) {
           case 0:
             setIsAiModalOpen(true);
             setIsAiLoading(true);
-            _context3.p = 1;
-            _context3.n = 2;
+            _context5.p = 1;
+            _context5.n = 2;
             return analizarGrupos(data);
           case 2:
-            analysis = _context3.v;
+            analysis = _context5.v;
             setAiResult(analysis);
-            _context3.n = 4;
+            _context5.n = 4;
             break;
           case 3:
-            _context3.p = 3;
-            _t3 = _context3.v;
-            console.error("Error en análisis IA:", _t3);
-            setAiResult("### Error Detectado\n**Detalles t\xE9cnicos:** ".concat(_t3.message, "\n\n*Posible soluci\xF3n:* Verifica que la API Key tenga activada la \"Generative Language API\" y que las restricciones de sitio web incluyan tu URL actual."));
+            _context5.p = 3;
+            _t7 = _context5.v;
+            console.error("Error en análisis IA:", _t7);
+            setAiResult("### Error Detectado\n**Detalles t\xE9cnicos:** ".concat(_t7.message, "\n\n*Posible soluci\xF3n:* Verifica que la API Key tenga activada la \"Generative Language API\" y que las restricciones de sitio web incluyan tu URL actual."));
           case 4:
-            _context3.p = 4;
+            _context5.p = 4;
             setIsAiLoading(false);
-            return _context3.f(4);
+            return _context5.f(4);
           case 5:
-            return _context3.a(2);
+            return _context5.a(2);
         }
-      }, _callee3, null, [[1, 3, 4, 5]]);
+      }, _callee5, null, [[1, 3, 4, 5]]);
     }));
     return function runStrategicAnalysis() {
-      return _ref8.apply(this, arguments);
+      return _ref0.apply(this, arguments);
     };
   }();
   useEffect(function () {
@@ -3342,6 +3953,8 @@ var App = function App() {
       var parsed = [];
       snapshot.forEach(function (doc) {
         var row = doc.data();
+        row._docId = doc.id;
+        if (!row.Reserva) row.Reserva = doc.id;
         // Normalización de Segmentos
         var seg = (row["Segment."] || "").toString().trim().toUpperCase();
         if (seg === "GRTANTEO" || seg === "GRUPO TANTEO") {

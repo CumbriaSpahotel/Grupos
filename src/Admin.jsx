@@ -350,6 +350,46 @@
           return {};
         }
       });
+      const [notifiedInternalAlerts, setNotifiedInternalAlerts] = React.useState(() => {
+        try {
+          return JSON.parse(localStorage.getItem("nexus_notified_internal_alerts") || "{}");
+        } catch (e) {
+          return {};
+        }
+      });
+
+      // Sincronizar notificaciones al cliente y alertas internas con Firestore y data
+      React.useEffect(() => {
+        if (data && Array.isArray(data) && data.length > 0) {
+          setNotifiedAlerts(prev => {
+            const merged = { ...prev };
+            data.forEach(r => {
+              const rKey = String(r.Reserva || r.Com_Id || r._docId || "").replace(/^#/, "");
+              if (r.notificadoClienteAt || r.Ultima_Notificacion_Cliente) {
+                merged[rKey] = r.notificadoClienteAt || (r.Ultima_Notificacion_Cliente && r.Ultima_Notificacion_Cliente.fecha) || new Date().toISOString();
+              }
+            });
+            try {
+              localStorage.setItem("nexus_notified_alerts", JSON.stringify(merged));
+            } catch (e) {}
+            return merged;
+          });
+
+          setNotifiedInternalAlerts(prev => {
+            const merged = { ...prev };
+            data.forEach(r => {
+              const rKey = String(r.Reserva || r.Com_Id || r._docId || "").replace(/^#/, "");
+              if (r.notificadoInternoAt || r.Ultima_Alerta_Interna) {
+                merged[rKey] = r.notificadoInternoAt || (r.Ultima_Alerta_Interna && r.Ultima_Alerta_Interna.fecha) || new Date().toISOString();
+              }
+            });
+            try {
+              localStorage.setItem("nexus_notified_internal_alerts", JSON.stringify(merged));
+            } catch (e) {}
+            return merged;
+          });
+        }
+      }, [data]);
 
       React.useEffect(() => {
         if (toastInfo) {
@@ -384,6 +424,130 @@
 
         const d = new Date(str);
         return isNaN(d.getTime()) ? null : d;
+      };
+
+      const formatDateTimeDisplay = (val) => {
+        if (!val) return "";
+        if (typeof val === "string") {
+          const trimmed = val.trim();
+          if (/^\d{2}\/\d{2}\/\d{4}(\s+\d{2}:\d{2})?$/.test(trimmed)) {
+            return trimmed;
+          }
+        }
+        let d = null;
+        if (val instanceof Date) {
+          d = val;
+        } else if (val && typeof val === "object" && typeof val.toDate === "function") {
+          d = val.toDate();
+        } else {
+          d = parseDate(val) || new Date(val);
+        }
+        if (!d || isNaN(d.getTime())) {
+          if (typeof val === "string" && val.length > 5) return val;
+          return "";
+        }
+        const day = String(d.getDate()).padStart(2, "0");
+        const month = String(d.getMonth() + 1).padStart(2, "0");
+        const year = d.getFullYear();
+        const hours = String(d.getHours()).padStart(2, "0");
+        const mins = String(d.getMinutes()).padStart(2, "0");
+        return `${day}/${month}/${year} ${hours}:${mins}`;
+      };
+
+      const getGroupNotificationStatus = (group, clientNotifsMap = {}, internalNotifsMap = {}) => {
+        if (!group) return { client: null, internal: null };
+        const resKey = String(group.Reserva || group.Com_Id || group._docId || "").replace(/^#/, "");
+
+        // 1. Notificación al Cliente
+        let clientDate = null;
+        let clientDetail = null;
+
+        if (group.Ultima_Notificacion_Cliente) {
+          const unc = typeof group.Ultima_Notificacion_Cliente === "string"
+            ? JSON.parse(group.Ultima_Notificacion_Cliente)
+            : group.Ultima_Notificacion_Cliente;
+          clientDate = unc.fecha || unc.date || unc.dateFormatted;
+          clientDetail = unc;
+        } else if (group.notificadoClienteAt) {
+          clientDate = group.notificadoClienteAt;
+        } else if (clientNotifsMap[resKey]) {
+          clientDate = clientNotifsMap[resKey];
+        } else if (group.Notificaciones_Cliente) {
+          try {
+            const list = typeof group.Notificaciones_Cliente === "string"
+              ? JSON.parse(group.Notificaciones_Cliente)
+              : group.Notificaciones_Cliente;
+            if (Array.isArray(list) && list.length > 0) {
+              clientDate = list[0].fecha || list[0].dateFormatted;
+              clientDetail = list[0];
+            }
+          } catch (e) {}
+        }
+
+        if (!clientDate && (group.tracking || group.Com_CRM_History)) {
+          try {
+            const trList = Array.isArray(group.tracking || group.Com_CRM_History)
+              ? (group.tracking || group.Com_CRM_History)
+              : JSON.parse(group.tracking || group.Com_CRM_History || "[]");
+            const match = trList.find(t => t && (t.type === "notificacion_cliente" || (t.text && t.text.includes("Notificación al Cliente"))));
+            if (match) {
+              clientDate = match.date || match.fecha;
+              clientDetail = match;
+            }
+          } catch (e) {}
+        }
+
+        // 2. Alertas Internas Enviadas
+        let internalDate = null;
+        let internalDetail = null;
+
+        if (group.Ultima_Alerta_Interna) {
+          const uai = typeof group.Ultima_Alerta_Interna === "string"
+            ? JSON.parse(group.Ultima_Alerta_Interna)
+            : group.Ultima_Alerta_Interna;
+          internalDate = uai.fecha || uai.date || uai.dateFormatted;
+          internalDetail = uai;
+        } else if (group.notificadoInternoAt) {
+          internalDate = group.notificadoInternoAt;
+        } else if (internalNotifsMap[resKey]) {
+          internalDate = internalNotifsMap[resKey];
+        } else if (group.Notificaciones_Internas) {
+          try {
+            const list = typeof group.Notificaciones_Internas === "string"
+              ? JSON.parse(group.Notificaciones_Internas)
+              : group.Notificaciones_Internas;
+            if (Array.isArray(list) && list.length > 0) {
+              internalDate = list[0].fecha || list[0].dateFormatted;
+              internalDetail = list[0];
+            }
+          } catch (e) {}
+        }
+
+        if (!internalDate && (group.tracking || group.Com_CRM_History)) {
+          try {
+            const trList = Array.isArray(group.tracking || group.Com_CRM_History)
+              ? (group.tracking || group.Com_CRM_History)
+              : JSON.parse(group.tracking || group.Com_CRM_History || "[]");
+            const match = trList.find(t => t && (t.type === "control_interno" || (t.text && t.text.includes("Control Interno"))));
+            if (match) {
+              internalDate = match.date || match.fecha;
+              internalDetail = match;
+            }
+          } catch (e) {}
+        }
+
+        return {
+          client: clientDate ? {
+            raw: clientDate,
+            formatted: formatDateTimeDisplay(clientDate),
+            detail: clientDetail
+          } : null,
+          internal: internalDate ? {
+            raw: internalDate,
+            formatted: formatDateTimeDisplay(internalDate),
+            detail: internalDetail
+          } : null
+        };
       };
 
       const getPaymentNotice = (g, today = new Date()) => {
@@ -513,14 +677,6 @@
         const fifteenDaysFromNow = new Date(startOfToday);
         fifteenDaysFromNow.setDate(fifteenDaysFromNow.getDate() + 15);
 
-        const seenFinancial = new Set();
-        const seenRelease = new Set();
-        const seenLogistics = new Set();
-        const seenCrm = new Set();
-        const seenTentative = new Set();
-        const twentyFiveDaysFromNow = new Date(startOfToday);
-        twentyFiveDaysFromNow.setDate(twentyFiveDaysFromNow.getDate() + 25);
-
         filteredGroups.forEach((g) => {
           const resId = g.Reserva || g.Com_Id || "";
           const status = ((g.Com_Estado_Interno || g["Segment."] || "") + " " + (g.Estado || "")).toUpperCase();
@@ -542,47 +698,72 @@
 
           const isCredito = isCreditoGroup(g);
 
-          // 1. Column 1: Financial Alerts (ignorar si es crédito)
-          if (!isCredito && (isConfirmed || isTentative) && pending > 0.1 && !seenFinancial.has(resId)) {
+          // Recopilar TODOS los avisos que aplican a este grupo
+          const groupAlerts = [];
+
+          // 1. Alertas Financieras (ignorar si es crédito)
+          if (!isCredito && (isConfirmed || isTentative) && pending > 0.1) {
             try {
               const notice = getPaymentNotice(g, startOfToday);
               if (notice && notice.days <= 5) {
-                seenFinancial.add(resId);
-                financialAlerts.push({
-                  group: g,
+                groupAlerts.push({
+                  categoryKey: "financial",
+                  categoryName: "Financiera",
                   icon: "alert-triangle",
                   label: notice.label,
                   detail: `${notice.label}: ${fmt(pending)} pendiente. Fecha de vencimiento: ${formatDate(notice.date)}`,
-                  type: notice.days < 0 ? "danger" : "warning"
+                  text: `${notice.label}: ${fmt(pending)} pendiente. Fecha de vencimiento: ${formatDate(notice.date)}`,
+                  type: notice.days < 0 ? "danger" : "warning",
+                  priority: 1
                 });
               }
             } catch (e) {}
           }
 
-          // El plazo de confirmación es independiente del saldo y de la forma de pago.
-          if (!isConfirmed && !seenRelease.has(resId)) {
+          // 2. Release / Plazo de Confirmación (independiente del saldo y forma de pago)
+          if (!isConfirmed) {
             const dRel = parseDate(g.Com_Vencimiento_Rel);
             if (dRel && dRel <= fiveDaysFromNow) {
-              seenRelease.add(resId);
               const diffTime = dRel - startOfToday;
               const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
               const isOverdue = dRel < startOfToday;
-              
-              releaseAlerts.push({
-                group: g,
+              groupAlerts.push({
+                categoryKey: "release",
+                categoryName: "Confirmación",
                 icon: "clock",
                 label: isOverdue ? "Plazo de confirmación vencido" : diffDays === 0 ? "Confirmación vence hoy" : "Confirmación próxima a vencer",
                 detail: isOverdue 
                   ? `Confirmación pendiente: el plazo venció hace ${Math.abs(diffDays)} días (${formatDate(dRel)})`
                   : diffDays === 0 ? `Confirmación pendiente: el plazo vence hoy (${formatDate(dRel)})`
                     : `Confirmación pendiente: el plazo vence en ${diffDays} días (${formatDate(dRel)})`,
-                type: isOverdue ? "danger" : "warning"
+                text: isOverdue 
+                  ? `Confirmación pendiente: el plazo venció hace ${Math.abs(diffDays)} días (${formatDate(dRel)})`
+                  : diffDays === 0 ? `Confirmación pendiente: el plazo vence hoy (${formatDate(dRel)})`
+                    : `Confirmación pendiente: el plazo vence en ${diffDays} días (${formatDate(dRel)})`,
+                type: isOverdue ? "danger" : "warning",
+                priority: 2
               });
             }
           }
 
-          // 3. Column 3: Datos Operativos Faltantes
-          if (isConfirmed && entryDate && entryDate >= startOfToday && entryDate <= fifteenDaysFromNow && !seenLogistics.has(resId)) {
+          // 3. Tentativas Urgentes (< 25 días para la llegada)
+          if (isTentative && entryDate && entryDate >= startOfToday && entryDate <= twentyFiveDaysFromNow) {
+            const diffDays = Math.ceil((entryDate - startOfToday) / (1000 * 60 * 60 * 24));
+            const urgency = diffDays <= 7 ? "danger" : diffDays <= 14 ? "warning" : "info";
+            groupAlerts.push({
+              categoryKey: "tentative",
+              categoryName: "Tentativa",
+              icon: "calendar-clock",
+              label: diffDays <= 7 ? "Llegada Crítica" : diffDays <= 14 ? "Confirmar Pronto" : "Confirmar Antes de Plazo",
+              detail: `Entrada en ${diffDays} día${diffDays !== 1 ? 's' : ''} (${formatDate(entryDate)}) — aún en Tentativa`,
+              text: `Entrada en ${diffDays} día${diffDays !== 1 ? 's' : ''} (${formatDate(entryDate)}) — aún en Tentativa`,
+              type: urgency,
+              priority: 3
+            });
+          }
+
+          // 4. Datos Operativos Faltantes (solo grupos confirmados próximos a llegada)
+          if (isConfirmed && entryDate && entryDate >= startOfToday && entryDate <= fifteenDaysFromNow) {
             const missingDetails = [];
             if (!g.Logistica_Rooming) {
               missingDetails.push({ text: "Falta Rooming List", icon: "file-text" });
@@ -597,54 +778,98 @@
             }
 
             if (missingDetails.length > 0) {
-              seenLogistics.add(resId);
-              logisticsAlerts.push({
-                group: g,
+              groupAlerts.push({
+                categoryKey: "logistics",
+                categoryName: "Datos Faltantes",
                 icon: "file-warning",
                 label: "Datos Faltantes",
                 detail: missingDetails.map(d => d.text).join(", "),
-                details: missingDetails,
-                type: "warning"
+                text: missingDetails.map(d => d.text).join(", "),
+                subDetails: missingDetails,
+                type: "warning",
+                priority: 4
               });
             }
           }
 
-          // 4. Column 4: CRM Tasks
-          if (!seenCrm.has(resId)) {
-            const dFollow = parseDate(g.Com_Seguimiento);
-            const followDay = dFollow && new Date(dFollow.getFullYear(), dFollow.getMonth(), dFollow.getDate());
-            if (followDay && followDay <= fifteenDaysFromNow) {
-              seenCrm.add(resId);
-              const isPastDue = dFollow < startOfToday;
-              const isToday = followDay.getTime() === startOfToday.getTime();
-              const daysUntil = Math.round((followDay - startOfToday) / (1000 * 60 * 60 * 24));
-              crmAlerts.push({
-                group: g,
-                icon: "phone-call",
-                label: isPastDue ? "CRM Retrasado" : isToday ? "CRM Hoy" : "CRM Próximo",
-                detail: isPastDue
-                  ? `Planificado para el ${formatDate(dFollow)}`
-                  : isToday ? `Programado para hoy (${formatDate(dFollow)})`
-                    : `Seguimiento en ${daysUntil} día${daysUntil === 1 ? "" : "s"} (${formatDate(dFollow)})`,
-                type: isPastDue ? "danger" : "info"
-              });
-            }
+          // 5. CRM Tasks / Seguimientos
+          const dFollow = parseDate(g.Com_Seguimiento);
+          const followDay = dFollow && new Date(dFollow.getFullYear(), dFollow.getMonth(), dFollow.getDate());
+          if (followDay && followDay <= fifteenDaysFromNow) {
+            const isPastDue = dFollow < startOfToday;
+            const isToday = followDay.getTime() === startOfToday.getTime();
+            const daysUntil = Math.round((followDay - startOfToday) / (1000 * 60 * 60 * 24));
+            groupAlerts.push({
+              categoryKey: "crm",
+              categoryName: "Seguimiento CRM",
+              icon: "phone-call",
+              label: isPastDue ? "CRM Retrasado" : isToday ? "CRM Hoy" : "CRM Próximo",
+              detail: isPastDue
+                ? `Planificado para el ${formatDate(dFollow)}`
+                : isToday ? `Programado para hoy (${formatDate(dFollow)})`
+                  : `Seguimiento en ${daysUntil} día${daysUntil === 1 ? "" : "s"} (${formatDate(dFollow)})`,
+              text: isPastDue
+                ? `Planificado para el ${formatDate(dFollow)}`
+                : isToday ? `Programado para hoy (${formatDate(dFollow)})`
+                  : `Seguimiento en ${daysUntil} día${daysUntil === 1 ? "" : "s"} (${formatDate(dFollow)})`,
+              type: isPastDue ? "danger" : "info",
+              priority: 5
+            });
           }
 
-          // 5. Column 5: Tentativas Urgentes (< 25 días para la llegada)
-          if (isTentative && entryDate && !seenTentative.has(resId)) {
-            if (entryDate >= startOfToday && entryDate <= twentyFiveDaysFromNow) {
-              seenTentative.add(resId);
-              const diffDays = Math.ceil((entryDate - startOfToday) / (1000 * 60 * 60 * 24));
-              const urgency = diffDays <= 7 ? "danger" : diffDays <= 14 ? "warning" : "info";
-              tentativeAlerts.push({
-                group: g,
-                icon: "calendar-clock",
-                label: diffDays <= 7 ? "Llegada Crítica" : diffDays <= 14 ? "Confirmar Pronto" : "Confirmar Antes de Plazo",
-                detail: `Entrada en ${diffDays} día${diffDays !== 1 ? 's' : ''} (${formatDate(entryDate)}) — aún en Tentativa`,
-                type: urgency
+          if (groupAlerts.length === 0) return;
+
+          // Ordenar por prioridad: el grupo se ubicará en la columna de mayor urgencia
+          groupAlerts.sort((a, b) => a.priority - b.priority);
+          const primary = groupAlerts[0];
+
+          // Construir lista unificada de avisos para la tarjeta
+          const combinedDetails = [];
+          groupAlerts.forEach(a => {
+            if (a.subDetails && a.subDetails.length > 0) {
+              a.subDetails.forEach(sd => {
+                combinedDetails.push({
+                  icon: sd.icon || a.icon,
+                  category: a.categoryName,
+                  text: groupAlerts.length > 1 ? `[${a.categoryName}] ${sd.text}` : sd.text,
+                  rawText: sd.text,
+                  type: a.type
+                });
+              });
+            } else {
+              combinedDetails.push({
+                icon: a.icon,
+                category: a.categoryName,
+                text: groupAlerts.length > 1 ? `[${a.categoryName}] ${a.text}` : a.text,
+                rawText: a.text,
+                type: a.type
               });
             }
+          });
+
+          const consolidatedCard = {
+            group: g,
+            primaryCategory: primary.categoryKey,
+            icon: primary.icon,
+            label: primary.label,
+            detail: primary.detail,
+            details: combinedDetails,
+            allAlerts: groupAlerts,
+            alertCount: groupAlerts.length,
+            type: primary.type
+          };
+
+          // Ubicar el grupo EXCLUSIVAMENTE en su columna principal (sin duplicar)
+          if (primary.categoryKey === "financial") {
+            financialAlerts.push(consolidatedCard);
+          } else if (primary.categoryKey === "release") {
+            releaseAlerts.push(consolidatedCard);
+          } else if (primary.categoryKey === "tentative") {
+            tentativeAlerts.push(consolidatedCard);
+          } else if (primary.categoryKey === "logistics") {
+            logisticsAlerts.push(consolidatedCard);
+          } else if (primary.categoryKey === "crm") {
+            crmAlerts.push(consolidatedCard);
           }
         });
 
@@ -1462,19 +1687,23 @@
                 "text/plain": blobText
               })
             ]).then(() => {
+              recordInternalReportInFirestore(reportData);
               setToastInfo("✨ ¡Informe visual copiado! Pégalo en Outlook o Gmail con formato y tablas.");
             }).catch(() => {
               navigator.clipboard.writeText(fullPlain).then(() => {
+                recordInternalReportInFirestore(reportData);
                 setToastInfo("📋 Informe en texto copiado al portapapeles.");
               });
             });
           } catch (e) {
             navigator.clipboard.writeText(fullPlain).then(() => {
+              recordInternalReportInFirestore(reportData);
               setToastInfo("📋 Informe en texto copiado al portapapeles.");
             });
           }
         } else {
           navigator.clipboard.writeText(fullPlain).then(() => {
+            recordInternalReportInFirestore(reportData);
             setToastInfo("📋 Informe en texto copiado al portapapeles.");
           });
         }
@@ -1485,6 +1714,7 @@
         const bodyText = internalReportModal?.customBody || internalReportText;
         const fullPlain = `Para: ${internalReportModal?.emailTo || ""}\nAsunto: ${internalReportModal?.subject || ""}\n\n${bodyText}`;
         navigator.clipboard.writeText(fullPlain).then(() => {
+          recordInternalReportInFirestore(reportData);
           setToastInfo("📋 Texto del informe copiado al portapapeles.");
         }).catch(() => {
           setToastInfo("❌ Error al copiar texto.");
@@ -1501,7 +1731,53 @@
         window.location.href = mailtoUrl;
 
         setToastInfo("🚀 Gestor de correo abierto con el informe interno por secciones.");
+        recordInternalReportInFirestore(reportData);
         setInternalReportModal(null);
+      };
+
+      const recordInternalReportInFirestore = async (repData) => {
+        if (!repData || !window.db) return;
+        try {
+          const now = new Date();
+          const nowIso = now.toISOString();
+          const recipient = internalReportModal?.emailTo || "comunicaciones@hotelguadiana.es";
+          const updatedInternal = { ...notifiedInternalAlerts };
+
+          const groupsToRecord = [];
+          const seen = new Set();
+          (repData.sections || []).forEach(sec => {
+            (sec.alerts || []).forEach(a => {
+              const g = a.group || {};
+              const resId = String(g.Reserva || g.Com_Id || g._docId || "").replace(/^#/, "");
+              if (resId && !seen.has(resId)) {
+                seen.add(resId);
+                groupsToRecord.push({ group: g, resId, title: sec.shortTitle || sec.title });
+                updatedInternal[resId] = nowIso;
+              }
+            });
+          });
+
+          setNotifiedInternalAlerts(updatedInternal);
+          try {
+            localStorage.setItem("nexus_notified_internal_alerts", JSON.stringify(updatedInternal));
+          } catch (e) {}
+
+          for (const item of groupsToRecord) {
+            recordNotificationInFirestore({
+              resId: item.resId,
+              grupoName: item.group["Nombre del Grupo"] || "",
+              mode: "internal",
+              isInternal: true,
+              columnTitle: `Informe Interno (${item.title})`,
+              subject: internalReportModal?.subject || "Informe Interno de Control Operativo",
+              emailTo: recipient,
+              group: item.group,
+              body: `Grupo incluido en Informe General de Alertas Operativas enviado a ${recipient}`
+            }, "informe_interno");
+          }
+        } catch (e) {
+          console.error("Error al registrar informe interno:", e);
+        }
       };
 
       const generateRichHtmlEmail = (data) => {
@@ -1660,7 +1936,7 @@
 </center>`;
       };
 
-      const handleOpenEmailModal = (alert, columnTitle, mode = "internal") => {
+      const handleOpenEmailModal = (alert, columnTitle, mode = "client") => {
         const g = alert.group || {};
         const resId = String(g.Reserva || g.Com_Id || "").replace(/^#/, "");
         const grupoName = g["Nombre del Grupo"] || "Grupo sin nombre";
@@ -1709,7 +1985,9 @@ DATOS DE LA RESERVA:
 
 ACTUACIÓN REQUERIDA (${columnTitle.toUpperCase()}):
 ═══════════════════════════════════════════════════════════
-${alert.detail || "Revisión operativa de la situación acordada."}
+${alert.details && alert.details.length > 1
+  ? alert.details.map(d => `• ${d.text}`).join("\n")
+  : (alert.detail || "Revisión operativa de la situación acordada.")}
 
 ESTADO ECONÓMICO:
 ═══════════════════════════════════════════════════════════
@@ -1875,19 +2153,181 @@ ${comercial}`;
         });
       };
 
+      const recordNotificationInFirestore = async (data, channel = "email") => {
+        if (!data || !window.db) return;
+        try {
+          const now = new Date();
+          const fmtDate = now.getFullYear() + '-' +
+            String(now.getMonth() + 1).padStart(2, '0') + '-' +
+            String(now.getDate()).padStart(2, '0') + ' ' +
+            String(now.getHours()).padStart(2, '0') + ':' +
+            String(now.getMinutes()).padStart(2, '0');
+          const dateShort = String(now.getDate()).padStart(2, '0') + '/' +
+            String(now.getMonth() + 1).padStart(2, '0') + '/' +
+            now.getFullYear();
+
+          const isClient = data.mode === "client" || (!data.mode && !data.isInternal);
+          const notifType = data.columnTitle || "Aviso Operativo";
+          const notifSubject = data.subject || "Notificación de Alerta";
+          const notifRecipient = data.emailTo || "Cliente";
+
+          const logText = isClient
+            ? `✉️ Notificación al Cliente [${notifType}]: ${notifSubject}\nPara: ${notifRecipient || "(No especificado)"}`
+            : `🔒 Control Interno [${notifType}]: ${notifSubject}\nPara: ${notifRecipient || "(No especificado)"}`;
+
+          const newTrackingEntry = {
+            id: Date.now(),
+            date: fmtDate,
+            type: isClient ? "notificacion_cliente" : "control_interno",
+            channel: channel,
+            subject: notifSubject,
+            recipient: notifRecipient,
+            columnTitle: notifType,
+            text: logText
+          };
+
+          const newNotifItem = {
+            id: Date.now(),
+            fecha: now.toISOString(),
+            dateFormatted: fmtDate,
+            dateShort: dateShort,
+            tipo: notifType,
+            asunto: notifSubject,
+            destinatario: notifRecipient,
+            canal: channel,
+            modo: data.mode || "client",
+            resumen: data.body ? (data.body.length > 250 ? data.body.slice(0, 250) + "..." : data.body) : ""
+          };
+
+          // Identificar todos los posibles IDs del documento en Firestore
+          const targetDocIds = new Set();
+          const g = data.group || {};
+          if (g._docId) targetDocIds.add(String(g._docId).trim());
+          if (data.resId) {
+            targetDocIds.add(String(data.resId).trim().replace(/^#/, ''));
+          }
+          if (g.Reserva) {
+            targetDocIds.add(String(g.Reserva).trim().replace(/^#/, ''));
+          }
+          if (g.Com_Id) {
+            targetDocIds.add(String(g.Com_Id).trim().replace(/^#/, ''));
+          }
+
+          let matchedDocs = [];
+          for (const docId of targetDocIds) {
+            try {
+              const snap = await db.collection("groups").doc(docId).get();
+              if (snap.exists) matchedDocs.push(snap);
+            } catch (e) {}
+          }
+
+          if (matchedDocs.length === 0 && data.resId) {
+            try {
+              const qSnap = await db.collection("groups").where("Reserva", "==", data.resId).get();
+              qSnap.forEach(d => matchedDocs.push(d));
+            } catch (e) {}
+          }
+
+          if (matchedDocs.length > 0) {
+            const batch = db.batch();
+            matchedDocs.forEach(snap => {
+              const existingData = snap.data() || {};
+              let existingTracking = [];
+              try {
+                const raw = existingData.tracking || existingData.Com_CRM_History || '[]';
+                existingTracking = Array.isArray(raw) ? raw : JSON.parse(raw);
+              } catch (e) { existingTracking = []; }
+
+              let existingNotifs = [];
+              try {
+                const rawN = existingData.Notificaciones_Cliente || '[]';
+                existingNotifs = Array.isArray(rawN) ? rawN : JSON.parse(rawN);
+              } catch (e) {}
+
+              let existingInternalNotifs = [];
+              try {
+                const rawI = existingData.Notificaciones_Internas || '[]';
+                existingInternalNotifs = Array.isArray(rawI) ? rawI : JSON.parse(rawI);
+              } catch (e) {}
+
+              const updatedTracking = [newTrackingEntry, ...existingTracking.filter(t => t.id !== newTrackingEntry.id)];
+              const updatedClientNotifs = isClient
+                ? [newNotifItem, ...existingNotifs.filter(n => n.id !== newNotifItem.id)]
+                : existingNotifs;
+              const updatedInternalNotifs = !isClient
+                ? [newNotifItem, ...existingInternalNotifs.filter(n => n.id !== newNotifItem.id)]
+                : existingInternalNotifs;
+
+              const payload = {
+                tracking: JSON.stringify(updatedTracking),
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+              };
+
+              if (isClient) {
+                payload.Notificaciones_Cliente = JSON.stringify(updatedClientNotifs);
+                payload.Ultima_Notificacion_Cliente = newNotifItem;
+                payload.notificadoClienteAt = now.toISOString();
+              } else {
+                payload.Notificaciones_Internas = JSON.stringify(updatedInternalNotifs);
+                payload.Ultima_Alerta_Interna = newNotifItem;
+                payload.notificadoInternoAt = now.toISOString();
+              }
+
+              batch.set(snap.ref, payload, { merge: true });
+            });
+            await batch.commit();
+          } else if (data.resId) {
+            const targetId = String(data.resId).trim().replace(/^#/, '');
+            const payload = {
+              tracking: JSON.stringify([newTrackingEntry]),
+              updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            };
+            if (isClient) {
+              payload.Notificaciones_Cliente = JSON.stringify([newNotifItem]);
+              payload.Ultima_Notificacion_Cliente = newNotifItem;
+              payload.notificadoClienteAt = now.toISOString();
+            } else {
+              payload.Notificaciones_Internas = JSON.stringify([newNotifItem]);
+              payload.Ultima_Alerta_Interna = newNotifItem;
+              payload.notificadoInternoAt = now.toISOString();
+            }
+            await db.collection("groups").doc(targetId).set(payload, { merge: true });
+          }
+        } catch (err) {
+          console.error("Error al registrar notificación en Firestore:", err);
+        }
+      };
+
       const handleExecuteOpenEmail = (data) => {
         if (!data) return;
         const mailtoUrl = `mailto:${encodeURIComponent(data.emailTo || "")}?subject=${encodeURIComponent(data.subject || "")}&body=${encodeURIComponent(data.body || "")}`;
         
-        const updated = { ...notifiedAlerts, [data.resId]: new Date().toISOString() };
-        setNotifiedAlerts(updated);
-        try {
-          localStorage.setItem("nexus_notified_alerts", JSON.stringify(updated));
-        } catch (e) {}
+        const isInternal = data.mode === "internal";
+        const nowIso = new Date().toISOString();
+
+        if (isInternal) {
+          const updated = { ...notifiedInternalAlerts, [data.resId]: nowIso };
+          setNotifiedInternalAlerts(updated);
+          try {
+            localStorage.setItem("nexus_notified_internal_alerts", JSON.stringify(updated));
+          } catch (e) {}
+        } else {
+          const updated = { ...notifiedAlerts, [data.resId]: nowIso };
+          setNotifiedAlerts(updated);
+          try {
+            localStorage.setItem("nexus_notified_alerts", JSON.stringify(updated));
+          } catch (e) {}
+        }
+
+        // Registrar en base de datos para la ficha del grupo
+        recordNotificationInFirestore(data, "email");
 
         window.location.href = mailtoUrl;
 
-        setToastInfo(`✅ Gestor de correo abierto para #${data.resId} (${data.grupoName}). Notificación confirmada.`);
+        setToastInfo(isInternal
+          ? `🔒 Alerta interna enviada y registrada para #${data.resId} (${data.grupoName}).`
+          : `✅ Gestor de correo abierto para #${data.resId} (${data.grupoName}). Registrado en la ficha del grupo.`
+        );
         setSelectedEmailAlert(null);
       };
 
@@ -1897,11 +2337,23 @@ ${comercial}`;
         const plainText = `Para: ${data.emailTo || "(No especificado)"}\nAsunto: ${data.subject}\n\n${data.body}`;
 
         const markAsNotified = () => {
-          const updated = { ...notifiedAlerts, [data.resId]: new Date().toISOString() };
-          setNotifiedAlerts(updated);
-          try {
-            localStorage.setItem("nexus_notified_alerts", JSON.stringify(updated));
-          } catch (e) {}
+          const isInternal = data.mode === "internal";
+          const nowIso = new Date().toISOString();
+          if (isInternal) {
+            const updated = { ...notifiedInternalAlerts, [data.resId]: nowIso };
+            setNotifiedInternalAlerts(updated);
+            try {
+              localStorage.setItem("nexus_notified_internal_alerts", JSON.stringify(updated));
+            } catch (e) {}
+          } else {
+            const updated = { ...notifiedAlerts, [data.resId]: nowIso };
+            setNotifiedAlerts(updated);
+            try {
+              localStorage.setItem("nexus_notified_alerts", JSON.stringify(updated));
+            } catch (e) {}
+          }
+          // Registrar en base de datos para la ficha del grupo
+          recordNotificationInFirestore(data, "email");
         };
 
         if (window.ClipboardItem && navigator.clipboard && navigator.clipboard.write) {
@@ -1941,13 +2393,29 @@ ${comercial}`;
         if (!data) return;
         const fullText = `Para: ${data.emailTo || "(No especificado)"}\nAsunto: ${data.subject}\n\n${data.body}`;
         navigator.clipboard.writeText(fullText).then(() => {
-          const updated = { ...notifiedAlerts, [data.resId]: new Date().toISOString() };
-          setNotifiedAlerts(updated);
-          try {
-            localStorage.setItem("nexus_notified_alerts", JSON.stringify(updated));
-          } catch (e) {}
+          const isInternal = data.mode === "internal";
+          const nowIso = new Date().toISOString();
+          if (isInternal) {
+            const updated = { ...notifiedInternalAlerts, [data.resId]: nowIso };
+            setNotifiedInternalAlerts(updated);
+            try {
+              localStorage.setItem("nexus_notified_internal_alerts", JSON.stringify(updated));
+            } catch (e) {}
+          } else {
+            const updated = { ...notifiedAlerts, [data.resId]: nowIso };
+            setNotifiedAlerts(updated);
+            try {
+              localStorage.setItem("nexus_notified_alerts", JSON.stringify(updated));
+            } catch (e) {}
+          }
 
-          setToastInfo(`📋 Texto copiado al portapapeles y registrado para #${data.resId}.`);
+          // Registrar en base de datos para la ficha del grupo
+          recordNotificationInFirestore(data, "email");
+
+          setToastInfo(isInternal
+            ? `📋 Alerta interna copiada y registrada para #${data.resId}.`
+            : `📋 Texto copiado al portapapeles y registrado en la ficha de #${data.resId}.`
+          );
         }).catch(() => {
           setToastInfo("❌ No se pudo copiar al portapapeles automáticamente.");
         });
@@ -2045,6 +2513,7 @@ ${comercial}`;
               {alerts.map((alert, idx) => {
                 const g = alert.group;
                 const isCumbria = (g.Hotel_Asignado || g.Hotel || "").toLowerCase().includes("cumb");
+                const notifStatus = getGroupNotificationStatus(g, notifiedAlerts, notifiedInternalAlerts);
                 
                 const entryDate = parseDate(g.Entrada);
                 let daysToArrival = null;
@@ -2103,9 +2572,19 @@ ${comercial}`;
                     </div>
 
                     <div className="mt-1">
-                      <h4 className="font-bold text-slate-800 text-xs leading-snug group-hover:text-emerald-700 transition-colors uppercase line-clamp-2" title={g["Nombre del Grupo"]}>
-                        {g["Nombre del Grupo"] || "Grupo sin nombre"}
-                      </h4>
+                      <div className="flex items-start justify-between gap-1.5">
+                        <h4 className="font-bold text-slate-800 text-xs leading-snug group-hover:text-emerald-700 transition-colors uppercase line-clamp-2" title={g["Nombre del Grupo"]}>
+                          {g["Nombre del Grupo"] || "Grupo sin nombre"}
+                        </h4>
+                        {alert.alertCount > 1 && (
+                          <span
+                            className="shrink-0 px-2 py-0.5 rounded-full text-[8.5px] font-black bg-amber-500 text-white shadow-2xs whitespace-nowrap"
+                            title={`Este grupo tiene ${alert.alertCount} avisos acumulados combinados en esta ficha`}
+                          >
+                            {alert.alertCount} avisos
+                          </span>
+                        )}
+                      </div>
                       <div className="flex justify-between items-center mt-1">
                         <span className="text-[8px] font-black text-slate-300 uppercase tracking-widest bg-slate-50 border border-slate-100 px-1.5 py-0.5 rounded">
                           #{g.Reserva}
@@ -2121,20 +2600,54 @@ ${comercial}`;
                     <div className="mt-2 border-t border-slate-50 pt-2 flex flex-col gap-1.5">
                       {alert.details ? (
                         alert.details.map((det, dIdx) => (
-                          <div key={dIdx} className="flex items-center gap-1.5 text-[9px] font-bold text-slate-600 leading-tight">
-                            <LucideIcon name={det.icon} size={10} className={theme.text} strokeWidth={2.5} />
-                            <span className="truncate">{det.text}</span>
+                          <div key={dIdx} className="flex items-start gap-1.5 text-[9px] font-bold text-slate-600 leading-tight">
+                            <LucideIcon name={det.icon} size={11} className={`${theme.text} shrink-0 mt-0.5`} strokeWidth={2.5} />
+                            <span className="line-clamp-2" title={det.text}>{det.text}</span>
                           </div>
                         ))
                       ) : (
-                        <div className="flex items-center gap-1.5 text-[9px] font-bold text-slate-600 leading-tight">
-                          <LucideIcon name={alert.icon} size={10} className={theme.text} strokeWidth={2.5} />
+                        <div className="flex items-start gap-1.5 text-[9px] font-bold text-slate-600 leading-tight">
+                          <LucideIcon name={alert.icon} size={11} className={`${theme.text} shrink-0 mt-0.5`} strokeWidth={2.5} />
                           <span className="line-clamp-2" title={alert.detail}>
                             {alert.detail}
                           </span>
                         </div>
                       )}
                     </div>
+
+                    {/* Bloque visual de fechas de notificación (Cliente y Alertas Internas) */}
+                    {(notifStatus.client || notifStatus.internal) && (
+                      <div className="mt-1 pt-1.5 border-t border-slate-100 flex flex-col gap-1">
+                        {notifStatus.client && (
+                          <div
+                            className="flex items-center justify-between gap-1.5 px-2 py-1 rounded-lg bg-emerald-50/80 border border-emerald-200/70 text-emerald-800 text-[8.5px] font-bold shadow-2xs transition hover:bg-emerald-100/70"
+                            title={`Notificación enviada al cliente: ${notifStatus.client.formatted}${notifStatus.client.detail?.destinatario ? ` • Para: ${notifStatus.client.detail.destinatario}` : ''}`}
+                          >
+                            <span className="flex items-center gap-1 shrink-0">
+                              <LucideIcon name="mail-check" size={11} className="text-emerald-600 shrink-0" />
+                              <span className="uppercase tracking-wider">Cliente Notificado:</span>
+                            </span>
+                            <span className="font-black text-emerald-900 tabular-nums truncate text-right">
+                              {notifStatus.client.formatted}
+                            </span>
+                          </div>
+                        )}
+                        {notifStatus.internal && (
+                          <div
+                            className="flex items-center justify-between gap-1.5 px-2 py-1 rounded-lg bg-indigo-50/80 border border-indigo-200/70 text-indigo-800 text-[8.5px] font-bold shadow-2xs transition hover:bg-indigo-100/70"
+                            title={`Alerta interna enviada: ${notifStatus.internal.formatted}${notifStatus.internal.detail?.destinatario ? ` • Para: ${notifStatus.internal.detail.destinatario}` : ''}`}
+                          >
+                            <span className="flex items-center gap-1 shrink-0">
+                              <LucideIcon name="bell-ring" size={11} className="text-indigo-600 shrink-0" />
+                              <span className="uppercase tracking-wider">Alerta Interna:</span>
+                            </span>
+                            <span className="font-black text-indigo-900 tabular-nums truncate text-right">
+                              {notifStatus.internal.formatted}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    )}
 
                     {/* Botón para Enviar Notificación por Email */}
                     <div className="mt-2 pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
@@ -2145,18 +2658,42 @@ ${comercial}`;
                           handleOpenEmailModal(alert, title);
                         }}
                         className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-black text-[9px] uppercase tracking-wider border transition-all duration-200 shadow-2xs group/btn cursor-pointer ${
-                          notifiedAlerts[String(g.Reserva || g.Com_Id || "").replace(/^#/, "")]
+                          notifStatus.client
                             ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
+                            : notifStatus.internal
+                            ? "bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100"
                             : "bg-slate-50 hover:bg-slate-900 hover:text-white text-slate-700 border-slate-200/80 hover:border-slate-900 hover:shadow-xs"
                         }`}
-                        title="Redactar y abrir email con detalles confirmados y pagos"
+                        title={
+                          notifStatus.client && notifStatus.internal
+                            ? `Cliente: ${notifStatus.client.formatted} | Interna: ${notifStatus.internal.formatted}. Clic para redactar nuevo email.`
+                            : notifStatus.client
+                            ? `Cliente notificado el ${notifStatus.client.formatted}. Clic para redactar nuevo email.`
+                            : notifStatus.internal
+                            ? `Alerta interna enviada el ${notifStatus.internal.formatted}. Clic para redactar email.`
+                            : "Redactar y abrir email con detalles confirmados y pagos"
+                        }
                       >
                         <LucideIcon
-                          name={notifiedAlerts[String(g.Reserva || g.Com_Id || "").replace(/^#/, "")] ? "check-circle" : "mail"}
+                          name={notifStatus.client ? "check-circle" : notifStatus.internal ? "bell" : "mail"}
                           size={12}
-                          className={notifiedAlerts[String(g.Reserva || g.Com_Id || "").replace(/^#/, "")] ? "text-emerald-600" : "text-slate-500 group-hover/btn:text-white transition-colors"}
+                          className={
+                            notifStatus.client
+                              ? "text-emerald-600"
+                              : notifStatus.internal
+                              ? "text-indigo-600"
+                              : "text-slate-500 group-hover/btn:text-white transition-colors"
+                          }
                         />
-                        <span>{notifiedAlerts[String(g.Reserva || g.Com_Id || "").replace(/^#/, "")] ? "Notificado" : "Enviar Email"}</span>
+                        <span>
+                          {notifStatus.client && notifStatus.internal
+                            ? "Notificado (Todo)"
+                            : notifStatus.client
+                            ? "Notificado"
+                            : notifStatus.internal
+                            ? "Alerta Enviada"
+                            : "Enviar Email"}
+                        </span>
                       </button>
                       <span className="text-[9px] font-bold text-slate-400 group-hover:text-slate-600 transition-colors">
                         #{g.Reserva}
@@ -2427,6 +2964,29 @@ ${comercial}`;
 
                 {/* Barra de Metadatos: Destinatario, Modo y Asunto */}
                 <div className="bg-slate-50 border-b border-slate-200/80 px-6 py-3 space-y-2.5">
+                  {/* Resumen de Notificaciones previas registradas */}
+                  {(() => {
+                    const g = selectedEmailAlert.group || {};
+                    const status = getGroupNotificationStatus(g, notifiedAlerts, notifiedInternalAlerts);
+                    if (!status.client && !status.internal) return null;
+                    return (
+                      <div className="flex items-center gap-2 flex-wrap text-[10px] pb-1">
+                        {status.client && (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-100/90 text-emerald-800 font-bold border border-emerald-300 shadow-2xs">
+                            <LucideIcon name="mail-check" size={11} className="text-emerald-600" />
+                            <span>Cliente notificado el: <strong>{status.client.formatted}</strong></span>
+                          </span>
+                        )}
+                        {status.internal && (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-100/90 text-indigo-800 font-bold border border-indigo-300 shadow-2xs">
+                            <LucideIcon name="bell-ring" size={11} className="text-indigo-600" />
+                            <span>Alerta interna enviada el: <strong>{status.internal.formatted}</strong></span>
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })()}
+
                   {/* Selector de Modo: Control Interno vs Notificación Cliente */}
                   <div className="flex items-center justify-between gap-2 flex-wrap">
                     <div className="flex items-center gap-1.5 bg-slate-200/80 p-1 rounded-xl">
@@ -3967,6 +4527,8 @@ ${comercial}`;
           const parsed = [];
           snapshot.forEach((doc) => {
             const row = doc.data();
+            row._docId = doc.id;
+            if (!row.Reserva) row.Reserva = doc.id;
             // Normalización de Segmentos
             let seg = (row["Segment."] || "").toString().trim().toUpperCase();
             if (seg === "GRTANTEO" || seg === "GRUPO TANTEO") {
