@@ -63,12 +63,16 @@
 
     function getGroupEconomicItems(group) {
         if (!group) return [];
-        let jsonStr = group.RoomingList_JSON;
-        if (!jsonStr && group.records && group.records.length > 0) {
+        let jsonStr = "";
+        if (group.records && group.records.length > 0) {
             const validRecord = group.records.find(r => r.RoomingList_JSON && r.RoomingList_JSON !== "[]");
             if (validRecord) jsonStr = validRecord.RoomingList_JSON;
         }
+        if (!jsonStr) jsonStr = group.RoomingList_JSON;
         const items = parseAccommodationEconomicItems(jsonStr);
+        items.forEach(it => {
+            if (!it.id && it.sourceBudgetItemId) it.id = it.sourceBudgetItemId;
+        });
         return deduplicateEconomicItems(items);
     }
 

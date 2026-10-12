@@ -45,6 +45,51 @@
 
     const { useState, useEffect, useMemo, useRef } = React;
 
+    const InlineNumberInput = ({ value, min = 1, onCommit, className, title }) => {
+      const [localVal, setLocalVal] = useState(String(value ?? ""));
+
+      useEffect(() => {
+        setLocalVal(String(value ?? ""));
+      }, [value]);
+
+      const commitValue = (valToCommit) => {
+        const num = parseInt(valToCommit, 10);
+        if (!isNaN(num) && num >= min) {
+          if (num !== value) {
+            onCommit(num);
+          }
+        } else {
+          setLocalVal(String(value ?? min));
+        }
+      };
+
+      return (
+        <input
+          type="number"
+          min={min}
+          className={className}
+          value={localVal}
+          title={title}
+          onChange={(e) => {
+            const nextVal = e.target.value;
+            setLocalVal(nextVal);
+            const parsed = parseInt(nextVal, 10);
+            if (!isNaN(parsed) && parsed >= min) {
+              onCommit(parsed);
+            }
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.currentTarget.blur();
+            }
+          }}
+          onBlur={(e) => {
+            commitValue(e.target.value);
+          }}
+        />
+      );
+    };
+
     const {
 
       BarChart,
@@ -12218,6 +12263,10 @@ const [customBudgetIdInput, setCustomBudgetIdInput] = useState("");
 
             ...prev,
 
+            ...(updates.RoomingList_JSON ? { RoomingList_JSON: updates.RoomingList_JSON } : {}),
+
+            ...(updates.DailyDistribution_JSON ? { DailyDistribution_JSON: updates.DailyDistribution_JSON } : {}),
+
             records: updatedRecords,
 
             totalPax: newTotalPax,
@@ -12756,16 +12805,56 @@ const [customBudgetIdInput, setCustomBudgetIdInput] = useState("");
         }
         if (!Array.isArray(currentList) || currentList.length === 0) return;
 
-        const targetIds = new Set(normalizeRoomIds(item.ids || item.id));
+        // Desglosar elementos multi-noche si existen para edición diaria independiente
+        const hasMulti = currentList.some(i => !i.isService && (parseInt(i.nights, 10) || 1) > 1);
+        if (hasMulti) {
+          currentList = expandRoomListByDays(currentList);
+        }
+        currentList = cleanRoomingListIds(currentList);
+
+        const targetIds = new Set([
+          ...normalizeRoomIds(item.ids || item.id),
+          ...normalizeRoomIds(item.originalMultiNightId)
+        ]);
+        Array.from(targetIds).forEach((id) => {
+          const base = id.replace(/_d\d+$/, "");
+          if (base) targetIds.add(base);
+        });
 
         // Encontrar todos los elementos que coinciden en currentList
-        const matchedIndices = [];
+        let matchedIndices = [];
         currentList.forEach((r, idx) => {
-          const rIds = normalizeRoomIds(r.id);
-          if (rIds.some((id) => targetIds.has(id))) {
+          const rIds = normalizeRoomIds([r.id, r.originalMultiNightId]);
+          const hasMatch = rIds.some((id) => {
+            if (targetIds.has(id)) return true;
+            const base = id.replace(/_d\d+$/, "");
+            return targetIds.has(base);
+          });
+          if (hasMatch) {
             matchedIndices.push(idx);
           }
         });
+
+        // Fallback por fecha y tipo de producto si no hubo match por ID
+        if (matchedIndices.length === 0) {
+          const targetDate = toInputDate(item.dateIn || item.date || item.fecha);
+          const targetType = String(item.type || item.roomType || "").trim().toUpperCase();
+          const targetHotel = normalizeHotelNameLocal(item.hotel, "");
+
+          currentList.forEach((r, idx) => {
+            const rDate = toInputDate(r.dateIn || r.date || r.fecha);
+            const rType = String(r.type || r.roomType || "").trim().toUpperCase();
+            const rHotel = normalizeHotelNameLocal(r.hotel, "");
+
+            const dateMatch = !targetDate || !rDate || rDate === targetDate;
+            const typeMatch = targetType && rType === targetType;
+            const hotelMatch = !targetHotel || !rHotel || rHotel === targetHotel;
+
+            if (dateMatch && typeMatch && hotelMatch) {
+              matchedIndices.push(idx);
+            }
+          });
+        }
 
         if (matchedIndices.length === 0) return;
 
@@ -23879,51 +23968,33 @@ const [customBudgetIdInput, setCustomBudgetIdInput] = useState("");
 
                                         {/* NOCHES */}
                                         <td className="py-1.5 px-2 text-center">
-                                          <input
-                                            type="number"
-                                            min="1"
+                                          <InlineNumberInput
+                                            min={1}
                                             className="w-12 text-center bg-blue-50/70 hover:bg-white focus:bg-white border border-blue-200 focus:border-blue-400 rounded px-1 py-0.5 text-[11px] font-bold text-blue-700 outline-none transition shadow-2xs"
                                             value={item.nights || 1}
-                                            onChange={(e) => {
-                                              const val = parseInt(e.target.value, 10);
-                                              if (!isNaN(val) && val >= 1) {
-                                                handleInlineRoomItemUpdate(item, "nights", val);
-                                              }
-                                            }}
+                                            onCommit={(val) => handleInlineRoomItemUpdate(item, "nights", val)}
                                             title="Editar número de noches"
                                           />
                                         </td>
 
                                         {/* CANTIDAD */}
                                         <td className="py-1.5 px-2 text-center">
-                                          <input
-                                            type="number"
-                                            min="1"
+                                          <InlineNumberInput
+                                            min={1}
                                             className="w-12 text-center bg-white/80 hover:bg-white focus:bg-white border border-slate-200 focus:border-blue-400 rounded px-1 py-0.5 text-[11px] font-bold text-slate-800 outline-none transition shadow-2xs"
                                             value={item.qty || 1}
-                                            onChange={(e) => {
-                                              const val = parseInt(e.target.value, 10);
-                                              if (!isNaN(val) && val >= 1) {
-                                                handleInlineRoomItemUpdate(item, "qty", val);
-                                              }
-                                            }}
+                                            onCommit={(val) => handleInlineRoomItemUpdate(item, "qty", val)}
                                             title="Editar cantidad de habitaciones o unidades"
                                           />
                                         </td>
 
                                         {/* PAX */}
                                         <td className="py-1.5 px-2 text-center">
-                                          <input
-                                            type="number"
-                                            min="1"
+                                          <InlineNumberInput
+                                            min={1}
                                             className="w-12 text-center bg-white/80 hover:bg-white focus:bg-white border border-slate-200 focus:border-blue-400 rounded px-1 py-0.5 text-[11px] font-bold text-slate-600 outline-none transition shadow-2xs"
                                             value={item.pax !== undefined && item.pax !== null && item.pax !== "" ? item.pax : getPaxByRoomType(item.type)}
-                                            onChange={(e) => {
-                                              const val = parseInt(e.target.value, 10);
-                                              if (!isNaN(val) && val >= 1) {
-                                                handleInlineRoomItemUpdate(item, "pax", val);
-                                              }
-                                            }}
+                                            onCommit={(val) => handleInlineRoomItemUpdate(item, "pax", val)}
                                             title="Editar pax por habitación"
                                           />
                                         </td>
