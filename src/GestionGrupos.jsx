@@ -6696,9 +6696,14 @@ const [customBudgetIdInput, setCustomBudgetIdInput] = useState("");
 
         // ── LEER GRATUIDADES EXISTENTES DEL ROOMINGLIST PARA ESTA FECHA ──────
         const targetResId = normalizeId(dailyItem.reserva);
+        const targetGroup = (groupedData || []).find(g => normalizeId(g.id) === targetResId || normalizeId(g.reserva) === targetResId);
         const matchRow = (data || []).find(r => normalizeId(r["Reserva"]) === targetResId);
-        const existingRL = matchRow?.RoomingList_JSON 
-          ? parseRoomingListSafe(matchRow.RoomingList_JSON, "open-dist-modal") 
+        const rawRL = targetGroup?.roomingList ||
+          targetGroup?.records?.find(r => r.RoomingList_JSON && r.RoomingList_JSON !== "[]")?.RoomingList_JSON ||
+          (data || []).find(r => normalizeId(r["Reserva"]) === targetResId && r.RoomingList_JSON && r.RoomingList_JSON !== "[]")?.RoomingList_JSON ||
+          matchRow?.RoomingList_JSON;
+        const existingRL = rawRL 
+          ? parseRoomingListSafe(rawRL, "open-dist-modal") 
           : [];
         let initialFreeInd = 0;
         let initialFreeDbl = 0;
@@ -6707,11 +6712,14 @@ const [customBudgetIdInput, setCustomBudgetIdInput] = useState("");
 
         // Intentar leer gratuidades guardadas previamente en DailyDistribution_JSON
         let distGratuities = null;
-        if (matchRow?.DailyDistribution_JSON) {
+        const targetDistMapRaw = targetGroup?.dailyDistribution ||
+          targetGroup?.records?.find(r => r.DailyDistribution_JSON && r.DailyDistribution_JSON !== "{}" && r.DailyDistribution_JSON !== "[]")?.DailyDistribution_JSON ||
+          matchRow?.DailyDistribution_JSON;
+        if (targetDistMapRaw) {
           try {
-            const distMap = typeof matchRow.DailyDistribution_JSON === "string"
-              ? JSON.parse(matchRow.DailyDistribution_JSON)
-              : matchRow.DailyDistribution_JSON;
+            const distMap = typeof targetDistMapRaw === "string"
+              ? JSON.parse(targetDistMapRaw)
+              : targetDistMapRaw;
             distGratuities = distMap?.[dailyItem.fecha]?.gratuities;
           } catch(e) {}
         }
@@ -6877,11 +6885,11 @@ const [customBudgetIdInput, setCustomBudgetIdInput] = useState("");
             resolvedRegimen = roomingThisDate.regime;
           } else if (dailyItem.regimen && dailyItem.regimen !== "---" && dailyItem.regimen !== "-") {
             resolvedRegimen = dailyItem.regimen;
-          } else if (matchRow?.DailyDistribution_JSON) {
+          } else if (targetDistMapRaw) {
             try {
-              const distMap = typeof matchRow.DailyDistribution_JSON === "string"
-                ? JSON.parse(matchRow.DailyDistribution_JSON)
-                : matchRow.DailyDistribution_JSON;
+              const distMap = typeof targetDistMapRaw === "string"
+                ? JSON.parse(targetDistMapRaw)
+                : targetDistMapRaw;
               if (distMap?.[dailyItem.fecha]?.regimen) {
                 resolvedRegimen = distMap[dailyItem.fecha].regimen;
               }
@@ -6896,13 +6904,21 @@ const [customBudgetIdInput, setCustomBudgetIdInput] = useState("");
           }
         }
 
+        const savedRoomsPax = (currentInd * 1) + (currentDbl * 2) + (currentTpl * 3) + (currentCua * 4);
+        let resolvedPax = dailyItem.pax;
+        if (hasFichaRooms && rlPax > 0) {
+          resolvedPax = rlPax;
+        } else if (savedRoomsPax > 0 && (dailyItem.isDefinitive || dailyItem.distributionStatus === "confirmada" || dailyItem.distributionStatus === "modificada")) {
+          resolvedPax = savedRoomsPax;
+        }
+
         setDistributionFormError(null);
         setEditingDistribution({
           hotel: dailyItem.hotel,
           reserva: dailyItem.reserva,
           nombreGrupo: dailyItem.nombreGrupo,
           fecha: dailyItem.fecha,
-          pax: hasFichaRooms ? rlPax : dailyItem.pax,
+          pax: resolvedPax,
           regimen: resolvedRegimen,
           proposal: proposal,
           individuales: currentInd,

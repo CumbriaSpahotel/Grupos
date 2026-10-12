@@ -416,6 +416,23 @@
     savedDistributionsByReserva = savedDistributionsByReserva || {};
     var matrixMap = new Map(); // Key: `${hotel}|||${reserva}|||${fecha}`
 
+    // Mapa auxiliar para asociar RoomingList_JSON a nivel de reserva si alguna fila lo tiene
+    var roomingByReservaMap = new Map();
+    (rawLines || []).forEach(function (l) {
+      var res = String(l["Reserva"] || l["id"] || "").trim().replace(/\.0$/, "");
+      if (res) {
+        var raw = l["RoomingList_JSON"] || l["roomingList"];
+        var str = typeof raw === "string" ? raw.trim() : (raw ? JSON.stringify(raw) : "");
+        if (str && str !== "[]" && str !== "{}" && str !== "null") {
+          var normR = (typeof window !== "undefined" && window.NexusUtils && typeof window.NexusUtils.normalizeId === "function")
+            ? window.NexusUtils.normalizeId(res)
+            : res.toLowerCase().replace(/\s+/g, "");
+          if (!roomingByReservaMap.has(normR)) roomingByReservaMap.set(normR, raw);
+          if (!roomingByReservaMap.has(res)) roomingByReservaMap.set(res, raw);
+        }
+      }
+    });
+
     (rawLines || []).forEach(function (line, lineIdx) {
       var reserva = String(line["Reserva"] || line["id"] || "").trim().replace(/\.0$/, "");
       if (!reserva || reserva === "-" || reserva.toUpperCase().includes("TOTAL")) return;
@@ -471,6 +488,15 @@
       var estado = String(line["Estado"] || "Confirmada").trim();
       var lineaId = String(line["precios"] || line["_linea"] || line["_rowNum"] || (lineIdx + 1)).trim();
 
+      var lineDesc = String(line["Descripción"] || line["Descripcion"] || line["Tipo"] || line["Concepto"] || "").toLowerCase();
+      var isServiceLine = line.isService === true || line.isService === "true" || line.isAccommodation === false;
+      if (!isServiceLine && lineDesc) {
+        if (/almuerzo|cena|desayuno|buffet|coffee|sal[oó]n|coctel|men[uú]|traslado|transfer|gu[ií]a|audiovisual|parking|garaje|spa|masaje|tasa/i.test(lineDesc)) {
+          var isExplicitRoom = /^(hab\.?|habitaci[oó]n|doble|dbl|dui|twin|individual|single|triple|tpl|cu[aá]druple|cuad|suite|junior|apartamento|familiar)\b/i.test(lineDesc);
+          if (!isExplicitRoom) isServiceLine = true;
+        }
+      }
+
       var stayNights = generateStayNights(inDate, outDate);
 
       stayNights.forEach(function (nightDate) {
@@ -483,13 +509,21 @@
             fecha: nightDate,
             regimenSet: new Set(),
             pax: 0,
+            hasAccommodationLines: false,
+            maxSinglePax: 0,
             estado: estado,
             contributingLines: [],
             warnings: []
           });
         }
         var entry = matrixMap.get(key);
-        entry.pax += paxLine;
+        if (!isServiceLine) {
+          entry.pax += paxLine;
+          entry.hasAccommodationLines = true;
+        }
+        if (paxLine > (entry.maxSinglePax || 0)) {
+          entry.maxSinglePax = paxLine;
+        }
         if (regimen) entry.regimenSet.add(regimen);
         if (estado.toLowerCase().includes("anul")) entry.estado = "Anulada";
 
@@ -506,7 +540,8 @@
           descripcion: line["Descripción"] || line["Descripcion"],
           cant: line["Cant."] || line["Cant"],
           roomingList: line["RoomingList_JSON"] || line["roomingList"] || null,
-          acceptedDifferences: line["AcceptedDifferences_JSON"] || line["acceptedDifferences"] || null
+          acceptedDifferences: line["AcceptedDifferences_JSON"] || line["acceptedDifferences"] || null,
+          isService: isServiceLine
         });
       });
     });
@@ -635,88 +670,95 @@
       var seenRoomingLists = new Set();
       var seenItemKeys = new Set();
 
+      var allCandidateRoomingLists = [];
       (entry.contributingLines || []).forEach(function (cl) {
-        if (cl.roomingList) {
-          var rlKey = typeof cl.roomingList === "string" ? cl.roomingList.trim() : JSON.stringify(cl.roomingList);
-          if (!rlKey || rlKey === "[]" || rlKey === "{}" || rlKey === "null") return;
-          if (seenRoomingLists.has(rlKey)) return;
-          seenRoomingLists.add(rlKey);
+        if (cl.roomingList) allCandidateRoomingLists.push(cl.roomingList);
+      });
+      if (allCandidateRoomingLists.length === 0) {
+        var fallbackRL = roomingByReservaMap.get(normId) || roomingByReservaMap.get(normKey) || roomingByReservaMap.get(entry.reserva);
+        if (fallbackRL) allCandidateRoomingLists.push(fallbackRL);
+      }
 
-          try {
-            var rlItems = typeof cl.roomingList === "string" ? JSON.parse(cl.roomingList) : cl.roomingList;
-            if (Array.isArray(rlItems)) {
-              rlItems.forEach(function (item, itemIdx) {
-                var itemReg = item.regime || item.regimen || item["Régimen"] || item["Regimen"] || item.reg;
-                if (itemReg && typeof itemReg === "string") {
-                  itemReg = itemReg.trim();
-                  if (itemReg === "AD") itemReg = "HD";
-                  if (itemReg === "SA") itemReg = "HA";
+      allCandidateRoomingLists.forEach(function (rawRL) {
+        var rlKey = typeof rawRL === "string" ? rawRL.trim() : JSON.stringify(rawRL);
+        if (!rlKey || rlKey === "[]" || rlKey === "{}" || rlKey === "null") return;
+        if (seenRoomingLists.has(rlKey)) return;
+        seenRoomingLists.add(rlKey);
+
+        try {
+          var rlItems = typeof rawRL === "string" ? JSON.parse(rawRL) : rawRL;
+          if (Array.isArray(rlItems)) {
+            rlItems.forEach(function (item, itemIdx) {
+              var itemReg = item.regime || item.regimen || item["Régimen"] || item["Regimen"] || item.reg;
+              if (itemReg && typeof itemReg === "string") {
+                itemReg = itemReg.trim();
+                if (itemReg === "AD") itemReg = "HD";
+                if (itemReg === "SA") itemReg = "HA";
+              }
+              if (!anyRoomingReg && itemReg && itemReg !== "-" && itemReg !== "---") {
+                anyRoomingReg = itemReg;
+              }
+              if (item.isService && (!itemReg || itemReg === "-" || itemReg === "---")) return;
+
+              var dIn = normDateIso(item.dateIn || item.date || item.fecha || item.fechaCargo);
+              var dOut = normDateIso(item.dateOut);
+              var itemNights = parseInt(item.nights, 10) || 1;
+              if ((!dOut || dOut <= dIn) && itemNights > 1 && dIn) {
+                var dInDate = new Date(dIn + "T12:00:00Z");
+                if (!isNaN(dInDate.getTime())) {
+                  dInDate.setUTCDate(dInDate.getUTCDate() + itemNights);
+                  dOut = dInDate.toISOString().split("T")[0];
                 }
-                if (!anyRoomingReg && itemReg && itemReg !== "-" && itemReg !== "---") {
-                  anyRoomingReg = itemReg;
+              }
+              var covers = (dOut && dOut > dIn)
+                ? (entry.fecha >= dIn && entry.fecha < dOut)
+                : (entry.fecha === dIn);
+
+              if (covers) {
+                var itemKey = item.id || (item.roomNo ? (item.roomNo + "_" + (item.type || "") + "_" + dIn) : null) || ((item.type || item.roomType) + "_" + dIn + "_" + itemIdx);
+                if (itemKey && seenItemKeys.has(itemKey)) return;
+                if (itemKey) seenItemKeys.add(itemKey);
+
+                var t = String(item.type || item.roomType || "").toUpperCase();
+                var tClean = t.replace(/^(HAB\.|HABITACIÓN|HABITACION|HAB)\s+/i, "").trim();
+                var isPureService = item.isService === true && !(/IND|DUI|SINGLE|DOB|DBL|TWIN|TRI|TPL|CUA|SUI|HAB/i.test(tClean));
+                if (isPureService) return;
+
+                hasRoomingDayLodging = true;
+
+                if (!foundRoomingReg && itemReg && itemReg !== "-" && itemReg !== "---") {
+                  foundRoomingReg = itemReg;
                 }
-                if (item.isService && (!itemReg || itemReg === "-" || itemReg === "---")) return;
-
-                var dIn = normDateIso(item.dateIn || item.date || item.fecha || item.fechaCargo);
-                var dOut = normDateIso(item.dateOut);
-                var itemNights = parseInt(item.nights, 10) || 1;
-                if ((!dOut || dOut <= dIn) && itemNights > 1 && dIn) {
-                  var dInDate = new Date(dIn + "T12:00:00Z");
-                  if (!isNaN(dInDate.getTime())) {
-                    dInDate.setUTCDate(dInDate.getUTCDate() + itemNights);
-                    dOut = dInDate.toISOString().split("T")[0];
-                  }
+                var p = parseFloat(item.price) || 0;
+                var q = parseInt(item.qty, 10) || 1;
+                var isGratItem = t.includes("GRATUIDAD") || p === 0;
+                if (!isGratItem) {
+                  roomingDaySum += (p * q);
                 }
-                var covers = (dOut && dOut > dIn)
-                  ? (entry.fecha >= dIn && entry.fecha < dOut)
-                  : (entry.fecha === dIn);
 
-                if (covers) {
-                  var itemKey = item.id || (item.roomNo ? (item.roomNo + "_" + (item.type || "") + "_" + dIn) : null) || ((item.type || item.roomType) + "_" + dIn + "_" + itemIdx);
-                  if (itemKey && seenItemKeys.has(itemKey)) return;
-                  if (itemKey) seenItemKeys.add(itemKey);
+                var roomClass = classifyRoomByOccupancy(tClean, q);
+                var itemPax = parseInt(item.pax, 10);
+                var effPax = !isNaN(itemPax) && itemPax > 0 ? itemPax : roomClass.persPerRoom;
+                roomingPax += (q * effPax);
+                roomingTotalRooms += q;
 
-                  var t = String(item.type || item.roomType || "").toUpperCase();
-                  var tClean = t.replace(/^(HAB\.|HABITACIÓN|HABITACION|HAB)\s+/i, "").trim();
-                  var isPureService = item.isService === true && !(/IND|DUI|SINGLE|DOB|DBL|TWIN|TRI|TPL|CUA|SUI|HAB/i.test(tClean));
-                  if (isPureService) return;
-
-                  hasRoomingDayLodging = true;
-
-                  if (!foundRoomingReg && itemReg && itemReg !== "-" && itemReg !== "---") {
-                    foundRoomingReg = itemReg;
-                  }
-                  var p = parseFloat(item.price) || 0;
-                  var q = parseInt(item.qty, 10) || 1;
-                  var isGratItem = t.includes("GRATUIDAD") || p === 0;
-                  if (!isGratItem) {
-                    roomingDaySum += (p * q);
-                  }
-
-                  var roomClass = classifyRoomByOccupancy(tClean, q);
-                  var itemPax = parseInt(item.pax, 10);
-                  var effPax = !isNaN(itemPax) && itemPax > 0 ? itemPax : roomClass.persPerRoom;
-                  roomingPax += (q * effPax);
-                  roomingTotalRooms += q;
-
-                  if (roomClass.category === "individual") {
-                    roomingInd += q;
-                    if (isGratItem) roomingFreeInd += q;
-                  } else if (roomClass.category === "triple") {
-                    roomingTpl += q;
-                    if (isGratItem) roomingFreeTpl += q;
-                  } else if (roomClass.category === "cuadruple") {
-                    roomingCua += q;
-                    if (isGratItem) roomingFreeCua += q;
-                  } else {
-                    roomingDbl += q;
-                    if (isGratItem) roomingFreeDbl += q;
-                  }
+                if (roomClass.category === "individual") {
+                  roomingInd += q;
+                  if (isGratItem) roomingFreeInd += q;
+                } else if (roomClass.category === "triple") {
+                  roomingTpl += q;
+                  if (isGratItem) roomingFreeTpl += q;
+                } else if (roomClass.category === "cuadruple") {
+                  roomingCua += q;
+                  if (isGratItem) roomingFreeCua += q;
+                } else {
+                  roomingDbl += q;
+                  if (isGratItem) roomingFreeDbl += q;
                 }
-              });
-            }
-          } catch (e) {}
-        }
+              }
+            });
+          }
+        } catch (e) {}
       });
 
       if (hasRoomingDayLodging && roomingTotalRooms > 0) {
@@ -738,6 +780,18 @@
         isDefinitive = true;
         revisionReasons = [];
         previousDistribution = null;
+      } else if (dateSaved && (dateSaved.dobles !== undefined || dateSaved.individuales !== undefined) && dateSaved.status !== "pendiente") {
+        var savedInd = parseInt(dateSaved.individuales, 10) || 0;
+        var savedDbl = parseInt(dateSaved.dobles, 10) || 0;
+        var savedTpl = parseInt(dateSaved.triples, 10) || 0;
+        var savedCua = parseInt(dateSaved.cuadruples, 10) || 0;
+        var savedRoomsPax = (savedInd * 1) + (savedDbl * 2) + (savedTpl * 3) + (savedCua * 4);
+        var savedTotalRooms = savedInd + savedDbl + savedTpl + savedCua;
+        if (savedRoomsPax > 0 && savedTotalRooms > 0) {
+          entry.pax = savedRoomsPax;
+        }
+      } else if (entry.pax === 0 && (entry.maxSinglePax || 0) > 0) {
+        entry.pax = entry.maxSinglePax;
       }
 
       var finalRegimen = "---";
