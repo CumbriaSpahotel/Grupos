@@ -723,6 +723,8 @@ var Dashboard = function Dashboard(_ref2) {
     fiveDaysFromNow.setDate(fiveDaysFromNow.getDate() + 5);
     var fifteenDaysFromNow = new Date(startOfToday);
     fifteenDaysFromNow.setDate(fifteenDaysFromNow.getDate() + 15);
+    var twentyFiveDaysFromNow = new Date(startOfToday);
+    twentyFiveDaysFromNow.setDate(twentyFiveDaysFromNow.getDate() + 25);
     filteredGroups.forEach(function (g) {
       var resId = g.Reserva || g.Com_Id || "";
       var status = ((g.Com_Estado_Interno || g["Segment."] || "") + " " + (g.Estado || "")).toUpperCase();
