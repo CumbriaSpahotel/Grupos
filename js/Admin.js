@@ -1,12 +1,12 @@
 "use strict";
 
-function _createForOfIteratorHelper(r, e) { var t = "undefined" != typeof Symbol && r[Symbol.iterator] || r["@@iterator"]; if (!t) { if (Array.isArray(r) || (t = _unsupportedIterableToArray(r)) || e && r && "number" == typeof r.length) { t && (r = t); var _n = 0, F = function F() {}; return { s: F, n: function n() { return _n >= r.length ? { done: !0 } : { done: !1, value: r[_n++] }; }, e: function e(r) { throw r; }, f: F }; } throw new TypeError("Invalid attempt to iterate non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method."); } var o, a = !0, u = !1; return { s: function s() { t = t.call(r); }, n: function n() { var r = t.next(); return a = r.done, r; }, e: function e(r) { u = !0, o = r; }, f: function f() { try { a || null == t.return || t.return(); } finally { if (u) throw o; } } }; }
-function _regenerator() { /*! regenerator-runtime -- Copyright (c) 2014-present, Facebook, Inc. -- license (MIT): https://github.com/babel/babel/blob/main/packages/babel-helpers/LICENSE */ var e, t, r = "function" == typeof Symbol ? Symbol : {}, n = r.iterator || "@@iterator", o = r.toStringTag || "@@toStringTag"; function i(r, n, o, i) { var c = n && n.prototype instanceof Generator ? n : Generator, u = Object.create(c.prototype); return _regeneratorDefine2(u, "_invoke", function (r, n, o) { var i, c, u, f = 0, p = o || [], y = !1, G = { p: 0, n: 0, v: e, a: d, f: d.bind(e, 4), d: function d(t, r) { return i = t, c = 0, u = e, G.n = r, a; } }; function d(r, n) { for (c = r, u = n, t = 0; !y && f && !o && t < p.length; t++) { var o, i = p[t], d = G.p, l = i[2]; r > 3 ? (o = l === n) && (u = i[(c = i[4]) ? 5 : (c = 3, 3)], i[4] = i[5] = e) : i[0] <= d && ((o = r < 2 && d < i[1]) ? (c = 0, G.v = n, G.n = i[1]) : d < l && (o = r < 3 || i[0] > n || n > l) && (i[4] = r, i[5] = n, G.n = l, c = 0)); } if (o || r > 1) return a; throw y = !0, n; } return function (o, p, l) { if (f > 1) throw TypeError("Generator is already running"); for (y && 1 === p && d(p, l), c = p, u = l; (t = c < 2 ? e : u) || !y;) { i || (c ? c < 3 ? (c > 1 && (G.n = -1), d(c, u)) : G.n = u : G.v = u); try { if (f = 2, i) { if (c || (o = "next"), t = i[o]) { if (!(t = t.call(i, u))) throw TypeError("iterator result is not an object"); if (!t.done) return t; u = t.value, c < 2 && (c = 0); } else 1 === c && (t = i.return) && t.call(i), c < 2 && (u = TypeError("The iterator does not provide a '" + o + "' method"), c = 1); i = e; } else if ((t = (y = G.n < 0) ? u : r.call(n, G)) !== a) break; } catch (t) { i = e, c = 1, u = t; } finally { f = 1; } } return { value: t, done: y }; }; }(r, o, i), !0), u; } var a = {}; function Generator() {} function GeneratorFunction() {} function GeneratorFunctionPrototype() {} t = Object.getPrototypeOf; var c = [][n] ? t(t([][n]())) : (_regeneratorDefine2(t = {}, n, function () { return this; }), t), u = GeneratorFunctionPrototype.prototype = Generator.prototype = Object.create(c); function f(e) { return Object.setPrototypeOf ? Object.setPrototypeOf(e, GeneratorFunctionPrototype) : (e.__proto__ = GeneratorFunctionPrototype, _regeneratorDefine2(e, o, "GeneratorFunction")), e.prototype = Object.create(u), e; } return GeneratorFunction.prototype = GeneratorFunctionPrototype, _regeneratorDefine2(u, "constructor", GeneratorFunctionPrototype), _regeneratorDefine2(GeneratorFunctionPrototype, "constructor", GeneratorFunction), GeneratorFunction.displayName = "GeneratorFunction", _regeneratorDefine2(GeneratorFunctionPrototype, o, "GeneratorFunction"), _regeneratorDefine2(u), _regeneratorDefine2(u, o, "Generator"), _regeneratorDefine2(u, n, function () { return this; }), _regeneratorDefine2(u, "toString", function () { return "[object Generator]"; }), (_regenerator = function _regenerator() { return { w: i, m: f }; })(); }
-function _regeneratorDefine2(e, r, n, t) { var i = Object.defineProperty; try { i({}, "", {}); } catch (e) { i = 0; } _regeneratorDefine2 = function _regeneratorDefine(e, r, n, t) { function o(r, n) { _regeneratorDefine2(e, r, function (e) { return this._invoke(r, n, e); }); } r ? i ? i(e, r, { value: n, enumerable: !t, configurable: !t, writable: !t }) : e[r] = n : (o("next", 0), o("throw", 1), o("return", 2)); }, _regeneratorDefine2(e, r, n, t); }
 function _toConsumableArray(r) { return _arrayWithoutHoles(r) || _iterableToArray(r) || _unsupportedIterableToArray(r) || _nonIterableSpread(); }
 function _nonIterableSpread() { throw new TypeError("Invalid attempt to spread non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method."); }
 function _iterableToArray(r) { if ("undefined" != typeof Symbol && null != r[Symbol.iterator] || null != r["@@iterator"]) return Array.from(r); }
 function _arrayWithoutHoles(r) { if (Array.isArray(r)) return _arrayLikeToArray(r); }
+function _createForOfIteratorHelper(r, e) { var t = "undefined" != typeof Symbol && r[Symbol.iterator] || r["@@iterator"]; if (!t) { if (Array.isArray(r) || (t = _unsupportedIterableToArray(r)) || e && r && "number" == typeof r.length) { t && (r = t); var _n = 0, F = function F() {}; return { s: F, n: function n() { return _n >= r.length ? { done: !0 } : { done: !1, value: r[_n++] }; }, e: function e(r) { throw r; }, f: F }; } throw new TypeError("Invalid attempt to iterate non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method."); } var o, a = !0, u = !1; return { s: function s() { t = t.call(r); }, n: function n() { var r = t.next(); return a = r.done, r; }, e: function e(r) { u = !0, o = r; }, f: function f() { try { a || null == t.return || t.return(); } finally { if (u) throw o; } } }; }
+function _regenerator() { /*! regenerator-runtime -- Copyright (c) 2014-present, Facebook, Inc. -- license (MIT): https://github.com/babel/babel/blob/main/packages/babel-helpers/LICENSE */ var e, t, r = "function" == typeof Symbol ? Symbol : {}, n = r.iterator || "@@iterator", o = r.toStringTag || "@@toStringTag"; function i(r, n, o, i) { var c = n && n.prototype instanceof Generator ? n : Generator, u = Object.create(c.prototype); return _regeneratorDefine2(u, "_invoke", function (r, n, o) { var i, c, u, f = 0, p = o || [], y = !1, G = { p: 0, n: 0, v: e, a: d, f: d.bind(e, 4), d: function d(t, r) { return i = t, c = 0, u = e, G.n = r, a; } }; function d(r, n) { for (c = r, u = n, t = 0; !y && f && !o && t < p.length; t++) { var o, i = p[t], d = G.p, l = i[2]; r > 3 ? (o = l === n) && (u = i[(c = i[4]) ? 5 : (c = 3, 3)], i[4] = i[5] = e) : i[0] <= d && ((o = r < 2 && d < i[1]) ? (c = 0, G.v = n, G.n = i[1]) : d < l && (o = r < 3 || i[0] > n || n > l) && (i[4] = r, i[5] = n, G.n = l, c = 0)); } if (o || r > 1) return a; throw y = !0, n; } return function (o, p, l) { if (f > 1) throw TypeError("Generator is already running"); for (y && 1 === p && d(p, l), c = p, u = l; (t = c < 2 ? e : u) || !y;) { i || (c ? c < 3 ? (c > 1 && (G.n = -1), d(c, u)) : G.n = u : G.v = u); try { if (f = 2, i) { if (c || (o = "next"), t = i[o]) { if (!(t = t.call(i, u))) throw TypeError("iterator result is not an object"); if (!t.done) return t; u = t.value, c < 2 && (c = 0); } else 1 === c && (t = i.return) && t.call(i), c < 2 && (u = TypeError("The iterator does not provide a '" + o + "' method"), c = 1); i = e; } else if ((t = (y = G.n < 0) ? u : r.call(n, G)) !== a) break; } catch (t) { i = e, c = 1, u = t; } finally { f = 1; } } return { value: t, done: y }; }; }(r, o, i), !0), u; } var a = {}; function Generator() {} function GeneratorFunction() {} function GeneratorFunctionPrototype() {} t = Object.getPrototypeOf; var c = [][n] ? t(t([][n]())) : (_regeneratorDefine2(t = {}, n, function () { return this; }), t), u = GeneratorFunctionPrototype.prototype = Generator.prototype = Object.create(c); function f(e) { return Object.setPrototypeOf ? Object.setPrototypeOf(e, GeneratorFunctionPrototype) : (e.__proto__ = GeneratorFunctionPrototype, _regeneratorDefine2(e, o, "GeneratorFunction")), e.prototype = Object.create(u), e; } return GeneratorFunction.prototype = GeneratorFunctionPrototype, _regeneratorDefine2(u, "constructor", GeneratorFunctionPrototype), _regeneratorDefine2(GeneratorFunctionPrototype, "constructor", GeneratorFunction), GeneratorFunction.displayName = "GeneratorFunction", _regeneratorDefine2(GeneratorFunctionPrototype, o, "GeneratorFunction"), _regeneratorDefine2(u), _regeneratorDefine2(u, o, "Generator"), _regeneratorDefine2(u, n, function () { return this; }), _regeneratorDefine2(u, "toString", function () { return "[object Generator]"; }), (_regenerator = function _regenerator() { return { w: i, m: f }; })(); }
+function _regeneratorDefine2(e, r, n, t) { var i = Object.defineProperty; try { i({}, "", {}); } catch (e) { i = 0; } _regeneratorDefine2 = function _regeneratorDefine(e, r, n, t) { function o(r, n) { _regeneratorDefine2(e, r, function (e) { return this._invoke(r, n, e); }); } r ? i ? i(e, r, { value: n, enumerable: !t, configurable: !t, writable: !t }) : e[r] = n : (o("next", 0), o("throw", 1), o("return", 2)); }, _regeneratorDefine2(e, r, n, t); }
 function _typeof(o) { "@babel/helpers - typeof"; return _typeof = "function" == typeof Symbol && "symbol" == typeof Symbol.iterator ? function (o) { return typeof o; } : function (o) { return o && "function" == typeof Symbol && o.constructor === Symbol && o !== Symbol.prototype ? "symbol" : typeof o; }, _typeof(o); }
 function ownKeys(e, r) { var t = Object.keys(e); if (Object.getOwnPropertySymbols) { var o = Object.getOwnPropertySymbols(e); r && (o = o.filter(function (r) { return Object.getOwnPropertyDescriptor(e, r).enumerable; })), t.push.apply(t, o); } return t; }
 function _objectSpread(e) { for (var r = 1; r < arguments.length; r++) { var t = null != arguments[r] ? arguments[r] : {}; r % 2 ? ownKeys(Object(t), !0).forEach(function (r) { _defineProperty(e, r, t[r]); }) : Object.getOwnPropertyDescriptors ? Object.defineProperties(e, Object.getOwnPropertyDescriptors(t)) : ownKeys(Object(t)).forEach(function (r) { Object.defineProperty(e, r, Object.getOwnPropertyDescriptor(t, r)); }); } return e; }
@@ -373,46 +373,50 @@ var Dashboard = function Dashboard(_ref2) {
     _React$useState2 = _slicedToArray(_React$useState, 2),
     selectedHotel = _React$useState2[0],
     setSelectedHotel = _React$useState2[1];
-  var _React$useState3 = React.useState(null),
+  var _React$useState3 = React.useState("todos"),
     _React$useState4 = _slicedToArray(_React$useState3, 2),
-    selectedEmailAlert = _React$useState4[0],
-    setSelectedEmailAlert = _React$useState4[1];
-  var _React$useState5 = React.useState("preview"),
+    selectedComercial = _React$useState4[0],
+    setSelectedComercial = _React$useState4[1];
+  var _React$useState5 = React.useState(null),
     _React$useState6 = _slicedToArray(_React$useState5, 2),
-    emailModalTab = _React$useState6[0],
-    setEmailModalTab = _React$useState6[1];
-  var _React$useState7 = React.useState(null),
+    selectedEmailAlert = _React$useState6[0],
+    setSelectedEmailAlert = _React$useState6[1];
+  var _React$useState7 = React.useState("preview"),
     _React$useState8 = _slicedToArray(_React$useState7, 2),
-    internalReportModal = _React$useState8[0],
-    setInternalReportModal = _React$useState8[1];
-  var _React$useState9 = React.useState("preview"),
+    emailModalTab = _React$useState8[0],
+    setEmailModalTab = _React$useState8[1];
+  var _React$useState9 = React.useState(null),
     _React$useState0 = _slicedToArray(_React$useState9, 2),
-    internalReportTab = _React$useState0[0],
-    setInternalReportTab = _React$useState0[1];
-  var _React$useState1 = React.useState(null),
+    internalReportModal = _React$useState0[0],
+    setInternalReportModal = _React$useState0[1];
+  var _React$useState1 = React.useState("preview"),
     _React$useState10 = _slicedToArray(_React$useState1, 2),
-    toastInfo = _React$useState10[0],
-    setToastInfo = _React$useState10[1];
-  var _React$useState11 = React.useState(function () {
+    internalReportTab = _React$useState10[0],
+    setInternalReportTab = _React$useState10[1];
+  var _React$useState11 = React.useState(null),
+    _React$useState12 = _slicedToArray(_React$useState11, 2),
+    toastInfo = _React$useState12[0],
+    setToastInfo = _React$useState12[1];
+  var _React$useState13 = React.useState(function () {
       try {
         return JSON.parse(localStorage.getItem("nexus_notified_alerts") || "{}");
       } catch (e) {
         return {};
       }
     }),
-    _React$useState12 = _slicedToArray(_React$useState11, 2),
-    notifiedAlerts = _React$useState12[0],
-    setNotifiedAlerts = _React$useState12[1];
-  var _React$useState13 = React.useState(function () {
+    _React$useState14 = _slicedToArray(_React$useState13, 2),
+    notifiedAlerts = _React$useState14[0],
+    setNotifiedAlerts = _React$useState14[1];
+  var _React$useState15 = React.useState(function () {
       try {
         return JSON.parse(localStorage.getItem("nexus_notified_internal_alerts") || "{}");
       } catch (e) {
         return {};
       }
     }),
-    _React$useState14 = _slicedToArray(_React$useState13, 2),
-    notifiedInternalAlerts = _React$useState14[0],
-    setNotifiedInternalAlerts = _React$useState14[1];
+    _React$useState16 = _slicedToArray(_React$useState15, 2),
+    notifiedInternalAlerts = _React$useState16[0],
+    setNotifiedInternalAlerts = _React$useState16[1];
 
   // Sincronizar notificaciones al cliente y alertas internas con Firestore y data
   React.useEffect(function () {
@@ -643,6 +647,14 @@ var Dashboard = function Dashboard(_ref2) {
     var twentyFiveDaysFromNow = new Date(startOfToday);
     twentyFiveDaysFromNow.setDate(twentyFiveDaysFromNow.getDate() + 25);
     (data || []).forEach(function (g) {
+      if (selectedComercial !== "todos") {
+        var cName = (g.Com_Comercial || g.Comercial || "").trim().toUpperCase();
+        if (selectedComercial === "sin_asignar") {
+          if (cName) return;
+        } else if (cName !== selectedComercial.trim().toUpperCase()) {
+          return;
+        }
+      }
       var status = ((g.Com_Estado_Interno || g["Segment."] || "") + " " + (g.Estado || "")).toUpperCase();
       var isCancelled = ["CANCEL", "ANUL", "BAJA", "DESESTIMADO", "GASTOS", "DESGLOSADO"].some(function (s) {
         return status.includes(s);
@@ -707,18 +719,13 @@ var Dashboard = function Dashboard(_ref2) {
       cumbria: cumbria,
       guadiana: guadiana
     };
-  }, [data]);
+  }, [data, selectedComercial]);
 
-  // Cálculo de alertas en 5 columnas
-  var columnsData = React.useMemo(function () {
-    var financialAlerts = [];
-    var releaseAlerts = [];
-    var logisticsAlerts = [];
-    var crmAlerts = [];
-    var tentativeAlerts = [];
+  // 1. Todas las alertas consolidadas para el hotel seleccionado (sin duplicar grupos)
+  var allHotelAlerts = React.useMemo(function () {
+    var alertsList = [];
     var now = new Date();
     var startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    var endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
     var fiveDaysFromNow = new Date(startOfToday);
     fiveDaysFromNow.setDate(fiveDaysFromNow.getDate() + 5);
     var fifteenDaysFromNow = new Date(startOfToday);
@@ -738,8 +745,6 @@ var Dashboard = function Dashboard(_ref2) {
       var isConfirmed = !isTentative && (status.includes("CONF") || status.includes("OK") || status.includes("GARANT") || status.includes("RESERVA") || status.includes("GRUPO"));
       var entryDate = parseDate(g.Entrada);
       var fin = getGroupFinancialInfo(g);
-      var total = fin.total;
-      var paid = fin.paid;
       var pending = fin.pending;
       var isCredito = _isCreditoGroup(g);
 
@@ -891,7 +896,7 @@ var Dashboard = function Dashboard(_ref2) {
           });
         }
       });
-      var consolidatedCard = {
+      alertsList.push({
         group: g,
         primaryCategory: primary.categoryKey,
         icon: primary.icon,
@@ -901,25 +906,65 @@ var Dashboard = function Dashboard(_ref2) {
         allAlerts: groupAlerts,
         alertCount: groupAlerts.length,
         type: primary.type
-      };
+      });
+    });
+    return alertsList;
+  }, [filteredGroups]);
 
-      // Ubicar el grupo EXCLUSIVAMENTE en su columna principal (sin duplicar)
-      if (primary.categoryKey === "financial") {
-        financialAlerts.push(consolidatedCard);
-      } else if (primary.categoryKey === "release") {
-        releaseAlerts.push(consolidatedCard);
-      } else if (primary.categoryKey === "tentative") {
-        tentativeAlerts.push(consolidatedCard);
-      } else if (primary.categoryKey === "logistics") {
-        logisticsAlerts.push(consolidatedCard);
-      } else if (primary.categoryKey === "crm") {
-        crmAlerts.push(consolidatedCard);
-      }
+  // 2. Lista de comerciales y contador de alertas por comercial para el hotel actual
+  var _React$useMemo = React.useMemo(function () {
+      var countsMap = {
+        total: allHotelAlerts.length,
+        _sin_asignar: 0
+      };
+      var nameSet = new Set();
+      allHotelAlerts.forEach(function (item) {
+        var com = (item.group.Com_Comercial || item.group.Comercial || "").trim().toUpperCase();
+        if (!com) {
+          countsMap["_sin_asignar"] = (countsMap["_sin_asignar"] || 0) + 1;
+        } else {
+          countsMap[com] = (countsMap[com] || 0) + 1;
+          nameSet.add(com);
+        }
+      });
+
+      // Asegurar que comerciales existentes en los datos también estén disponibles en la lista
+      (data || []).forEach(function (g) {
+        var com = (g.Com_Comercial || g.Comercial || "").trim().toUpperCase();
+        if (com) nameSet.add(com);
+      });
+      var list = Array.from(nameSet).sort(function (a, b) {
+        return a.localeCompare(b, "es", {
+          sensitivity: "base"
+        });
+      });
+      return {
+        commercialList: list,
+        commercialCounts: countsMap
+      };
+    }, [allHotelAlerts, data]),
+    commercialList = _React$useMemo.commercialList,
+    commercialCounts = _React$useMemo.commercialCounts;
+
+  // 3. Cálculo de las 5 columnas filtradas según el comercial seleccionado
+  var columnsData = React.useMemo(function () {
+    var financialAlerts = [];
+    var releaseAlerts = [];
+    var logisticsAlerts = [];
+    var crmAlerts = [];
+    var tentativeAlerts = [];
+    var filtered = allHotelAlerts.filter(function (item) {
+      if (selectedComercial === "todos") return true;
+      var com = (item.group.Com_Comercial || item.group.Comercial || "").trim().toUpperCase();
+      if (selectedComercial === "sin_asignar") return !com;
+      return com === selectedComercial.trim().toUpperCase();
+    });
+    filtered.forEach(function (item) {
+      if (item.primaryCategory === "financial") financialAlerts.push(item);else if (item.primaryCategory === "release") releaseAlerts.push(item);else if (item.primaryCategory === "tentative") tentativeAlerts.push(item);else if (item.primaryCategory === "logistics") logisticsAlerts.push(item);else if (item.primaryCategory === "crm") crmAlerts.push(item);
     });
 
     // Ordenamiento por prioridad/fecha
     financialAlerts.sort(function (a, b) {
-      // Use cached entry date instead of re-parsing JSON inside the comparator
       var aDate = parseDate(a.group.Entrada);
       var bDate = parseDate(b.group.Entrada);
       if (!aDate) return 1;
@@ -961,7 +1006,7 @@ var Dashboard = function Dashboard(_ref2) {
       crmAlerts: crmAlerts,
       tentativeAlerts: tentativeAlerts
     };
-  }, [filteredGroups]);
+  }, [allHotelAlerts, selectedComercial]);
   var STAFF_PRESETS = [{
     label: "🏢 Administración",
     email: "comunicaciones@hotelguadiana.es",
@@ -991,15 +1036,7 @@ var Dashboard = function Dashboard(_ref2) {
     if (n.includes("diana")) return "dianahotelguadiana@gmail.com";
     return "";
   };
-  var availableCommercials = React.useMemo(function () {
-    var set = new Set();
-    var allAlerts = [].concat(_toConsumableArray(columnsData.financialAlerts || []), _toConsumableArray(columnsData.releaseAlerts || []), _toConsumableArray(columnsData.logisticsAlerts || []), _toConsumableArray(columnsData.crmAlerts || []), _toConsumableArray(columnsData.tentativeAlerts || []));
-    allAlerts.forEach(function (a) {
-      var com = a.group && a.group.Com_Comercial ? a.group.Com_Comercial.trim() : "";
-      if (com) set.add(com);
-    });
-    return Array.from(set).sort();
-  }, [columnsData]);
+  var availableCommercials = commercialList;
   var handleOpenInternalReportModal = function handleOpenInternalReportModal() {
     var initialSectionKey = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : null;
     var defaultSections = {
@@ -1016,10 +1053,12 @@ var Dashboard = function Dashboard(_ref2) {
       year: "numeric"
     });
     setInternalReportTab("preview");
+    var activeCom = selectedComercial !== "todos" && selectedComercial !== "sin_asignar" ? selectedComercial : "todos";
+    var defaultRecipient = activeCom !== "todos" ? getStaffEmail(activeCom) || "comunicaciones@hotelguadiana.es" : "comunicaciones@hotelguadiana.es";
     setInternalReportModal({
-      filterComercial: "todos",
+      filterComercial: activeCom,
       sections: defaultSections,
-      emailTo: "comunicaciones@hotelguadiana.es",
+      emailTo: defaultRecipient,
       subject: "[CONTROL INTERNO] Resumen de Alertas Operativas - ".concat(hotelLabel, " - ").concat(todayStr),
       customBody: null
     });
@@ -2346,6 +2385,8 @@ var Dashboard = function Dashboard(_ref2) {
   }, "Supervisa vencimientos financieros, plazos de confirmaci\xF3n, informaci\xF3n log\xEDstica ausente y tareas CRM pendientes. Filtra por establecimiento y abre las fichas correspondientes con un clic."))), /*#__PURE__*/React.createElement("div", {
     className: "flex flex-wrap items-center justify-between gap-3"
   }, /*#__PURE__*/React.createElement("div", {
+    className: "flex flex-wrap items-center gap-2"
+  }, /*#__PURE__*/React.createElement("div", {
     className: "flex bg-slate-100/80 p-1.5 rounded-[2rem] border border-slate-200/50 w-fit gap-1.5 shadow-sm"
   }, [{
     id: "todos",
@@ -2377,7 +2418,49 @@ var Dashboard = function Dashboard(_ref2) {
     }), hotel.label, /*#__PURE__*/React.createElement("span", {
       className: "text-[9px] px-1.5 py-0.5 rounded-full font-bold ml-1.5 ".concat(active ? "bg-slate-900 text-white" : "bg-slate-200 text-slate-600")
     }, hotel.id === "todos" ? counts.total : hotel.id === "guadiana" ? counts.guadiana : counts.cumbria));
-  })), /*#__PURE__*/React.createElement("button", {
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center bg-slate-100/80 p-1.5 rounded-[2rem] border border-slate-200/50 w-fit gap-1 shadow-sm flex-wrap"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-1.5 px-3 py-1 text-slate-400 select-none"
+  }, /*#__PURE__*/React.createElement(LucideIcon, {
+    name: "user",
+    size: 13,
+    className: "text-indigo-600"
+  }), /*#__PURE__*/React.createElement("span", {
+    className: "text-[10px] font-black uppercase tracking-wider text-slate-600 hidden sm:inline"
+  }, "Comercial:")), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: function onClick() {
+      return setSelectedComercial("todos");
+    },
+    className: "flex items-center gap-1.5 px-3 py-1.5 rounded-[1.5rem] text-[10px] font-black uppercase tracking-wider transition-all duration-200 cursor-pointer ".concat(selectedComercial === "todos" ? "bg-slate-900 text-white shadow-md scale-102" : "text-slate-600 hover:text-slate-900 hover:bg-white/60"),
+    title: "Mostrar alertas de todos los comerciales"
+  }, /*#__PURE__*/React.createElement("span", null, "Todos"), /*#__PURE__*/React.createElement("span", {
+    className: "text-[9px] px-1.5 py-0.2 rounded-full font-bold ml-0.5 ".concat(selectedComercial === "todos" ? "bg-white/20 text-white" : "bg-slate-200 text-slate-600")
+  }, commercialCounts.total)), commercialList.map(function (comName) {
+    var active = selectedComercial.toUpperCase() === comName.toUpperCase();
+    var count = commercialCounts[comName.toUpperCase()] || 0;
+    return /*#__PURE__*/React.createElement("button", {
+      key: comName,
+      type: "button",
+      onClick: function onClick() {
+        return setSelectedComercial(active ? "todos" : comName);
+      },
+      className: "flex items-center gap-1.5 px-3 py-1.5 rounded-[1.5rem] text-[10px] font-black uppercase tracking-wider transition-all duration-200 cursor-pointer ".concat(active ? "bg-indigo-600 text-white shadow-md scale-102" : count > 0 ? "text-slate-700 hover:text-slate-950 hover:bg-white/60" : "text-slate-400 hover:text-slate-700 hover:bg-white/40 opacity-75"),
+      title: "Filtrar alertas de ".concat(comName, " (").concat(count, " alertas activas)")
+    }, /*#__PURE__*/React.createElement("span", null, comName), /*#__PURE__*/React.createElement("span", {
+      className: "text-[9px] px-1.5 py-0.2 rounded-full font-bold ml-0.5 ".concat(active ? "bg-white/20 text-white" : count > 0 ? "bg-indigo-100 text-indigo-700" : "bg-slate-200 text-slate-400")
+    }, count));
+  }), commercialCounts["_sin_asignar"] > 0 && /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: function onClick() {
+      return setSelectedComercial(selectedComercial === "sin_asignar" ? "todos" : "sin_asignar");
+    },
+    className: "flex items-center gap-1.5 px-3 py-1.5 rounded-[1.5rem] text-[10px] font-black uppercase tracking-wider transition-all duration-200 cursor-pointer ".concat(selectedComercial === "sin_asignar" ? "bg-rose-600 text-white shadow-md scale-102" : "text-rose-700 hover:bg-rose-50"),
+    title: "Filtrar grupos sin comercial asignado"
+  }, /*#__PURE__*/React.createElement("span", null, "Sin Asignar"), /*#__PURE__*/React.createElement("span", {
+    className: "text-[9px] px-1.5 py-0.2 rounded-full font-bold ml-0.5 ".concat(selectedComercial === "sin_asignar" ? "bg-white/20 text-white" : "bg-rose-100 text-rose-800")
+  }, commercialCounts["_sin_asignar"])))), /*#__PURE__*/React.createElement("button", {
     type: "button",
     onClick: function onClick() {
       return handleOpenInternalReportModal();
@@ -3144,10 +3227,10 @@ var GroupsManager = function GroupsManager(_ref6) {
   var data = _ref6.data,
     onUpdateStatus = _ref6.onUpdateStatus,
     onDeleteGroup = _ref6.onDeleteGroup;
-  var _React$useState15 = React.useState(""),
-    _React$useState16 = _slicedToArray(_React$useState15, 2),
-    searchTerm = _React$useState16[0],
-    setSearchTerm = _React$useState16[1];
+  var _React$useState17 = React.useState(""),
+    _React$useState18 = _slicedToArray(_React$useState17, 2),
+    searchTerm = _React$useState18[0],
+    setSearchTerm = _React$useState18[1];
   var filteredData = data.filter(function (group) {
     var res = String(group["Reserva"] || "").toUpperCase();
     var uid = String(group.uid || group.id || "").toUpperCase();
@@ -3367,14 +3450,14 @@ var BudgetManager = function BudgetManager(_ref7) {
   var data = _ref7.data,
     onUpdateStatus = _ref7.onUpdateStatus,
     onDeleteGroup = _ref7.onDeleteGroup;
-  var _React$useState17 = React.useState(""),
-    _React$useState18 = _slicedToArray(_React$useState17, 2),
-    searchTerm = _React$useState18[0],
-    setSearchTerm = _React$useState18[1];
-  var _React$useState19 = React.useState("TODOS"),
+  var _React$useState19 = React.useState(""),
     _React$useState20 = _slicedToArray(_React$useState19, 2),
-    statusFilter = _React$useState20[0],
-    setStatusFilter = _React$useState20[1];
+    searchTerm = _React$useState20[0],
+    setSearchTerm = _React$useState20[1];
+  var _React$useState21 = React.useState("TODOS"),
+    _React$useState22 = _slicedToArray(_React$useState21, 2),
+    statusFilter = _React$useState22[0],
+    setStatusFilter = _React$useState22[1];
   var budgetData = data.filter(function (g) {
     var isBudget = String(g.Reserva || "").startsWith("PRES-") || (g.Estado || "").toUpperCase().includes("PRESUPUESTO") || (g.Com_Estado_Interno || "").toUpperCase().includes("PRESUPUESTO") || (g.Com_Estado_Interno || "").toUpperCase().includes("ENVIADO") || (g.Com_Estado_Interno || "").toUpperCase().includes("SEGUIMIENTO");
     if (!isBudget) return false;

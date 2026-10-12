@@ -338,6 +338,7 @@
       data,
     }) => {
       const [selectedHotel, setSelectedHotel] = React.useState("todos");
+      const [selectedComercial, setSelectedComercial] = React.useState("todos");
       const [selectedEmailAlert, setSelectedEmailAlert] = React.useState(null);
       const [emailModalTab, setEmailModalTab] = React.useState("preview");
       const [internalReportModal, setInternalReportModal] = React.useState(null);
@@ -593,6 +594,14 @@
         twentyFiveDaysFromNow.setDate(twentyFiveDaysFromNow.getDate() + 25);
 
         (data || []).forEach(g => {
+          if (selectedComercial !== "todos") {
+            const cName = (g.Com_Comercial || g.Comercial || "").trim().toUpperCase();
+            if (selectedComercial === "sin_asignar") {
+              if (cName) return;
+            } else if (cName !== selectedComercial.trim().toUpperCase()) {
+              return;
+            }
+          }
           const status = ((g.Com_Estado_Interno || g["Segment."] || "") + " " + (g.Estado || "")).toUpperCase();
           const isCancelled = ["CANCEL", "ANUL", "BAJA", "DESESTIMADO", "GASTOS", "DESGLOSADO"].some(s => status.includes(s)) || g.excludeFromStatistics === true;
           const departureDate = parseDate(g.Salida || g.Entrada);
@@ -659,19 +668,13 @@
         });
 
         return { total, cumbria, guadiana };
-      }, [data]);
+      }, [data, selectedComercial]);
 
-      // Cálculo de alertas en 5 columnas
-      const columnsData = React.useMemo(() => {
-        const financialAlerts = [];
-        const releaseAlerts = [];
-        const logisticsAlerts = [];
-        const crmAlerts = [];
-        const tentativeAlerts = [];
-
+      // 1. Todas las alertas consolidadas para el hotel seleccionado (sin duplicar grupos)
+      const allHotelAlerts = React.useMemo(() => {
+        const alertsList = [];
         const now = new Date();
         const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-        const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
         const fiveDaysFromNow = new Date(startOfToday);
         fiveDaysFromNow.setDate(fiveDaysFromNow.getDate() + 5);
         const fifteenDaysFromNow = new Date(startOfToday);
@@ -694,10 +697,7 @@
           const entryDate = parseDate(g.Entrada);
 
           const fin = getGroupFinancialInfo(g);
-          const total = fin.total;
-          const paid = fin.paid;
           const pending = fin.pending;
-
           const isCredito = isCreditoGroup(g);
 
           // Recopilar TODOS los avisos que aplican a este grupo
@@ -849,7 +849,7 @@
             }
           });
 
-          const consolidatedCard = {
+          alertsList.push({
             group: g,
             primaryCategory: primary.categoryKey,
             icon: primary.icon,
@@ -859,25 +859,62 @@
             allAlerts: groupAlerts,
             alertCount: groupAlerts.length,
             type: primary.type
-          };
+          });
+        });
 
-          // Ubicar el grupo EXCLUSIVAMENTE en su columna principal (sin duplicar)
-          if (primary.categoryKey === "financial") {
-            financialAlerts.push(consolidatedCard);
-          } else if (primary.categoryKey === "release") {
-            releaseAlerts.push(consolidatedCard);
-          } else if (primary.categoryKey === "tentative") {
-            tentativeAlerts.push(consolidatedCard);
-          } else if (primary.categoryKey === "logistics") {
-            logisticsAlerts.push(consolidatedCard);
-          } else if (primary.categoryKey === "crm") {
-            crmAlerts.push(consolidatedCard);
+        return alertsList;
+      }, [filteredGroups]);
+
+      // 2. Lista de comerciales y contador de alertas por comercial para el hotel actual
+      const { commercialList, commercialCounts } = React.useMemo(() => {
+        const countsMap = { total: allHotelAlerts.length, _sin_asignar: 0 };
+        const nameSet = new Set();
+
+        allHotelAlerts.forEach(item => {
+          const com = (item.group.Com_Comercial || item.group.Comercial || "").trim().toUpperCase();
+          if (!com) {
+            countsMap["_sin_asignar"] = (countsMap["_sin_asignar"] || 0) + 1;
+          } else {
+            countsMap[com] = (countsMap[com] || 0) + 1;
+            nameSet.add(com);
           }
+        });
+
+        // Asegurar que comerciales existentes en los datos también estén disponibles en la lista
+        (data || []).forEach(g => {
+          const com = (g.Com_Comercial || g.Comercial || "").trim().toUpperCase();
+          if (com) nameSet.add(com);
+        });
+
+        const list = Array.from(nameSet).sort((a, b) => a.localeCompare(b, "es", { sensitivity: "base" }));
+        return { commercialList: list, commercialCounts: countsMap };
+      }, [allHotelAlerts, data]);
+
+      // 3. Cálculo de las 5 columnas filtradas según el comercial seleccionado
+      const columnsData = React.useMemo(() => {
+        const financialAlerts = [];
+        const releaseAlerts = [];
+        const logisticsAlerts = [];
+        const crmAlerts = [];
+        const tentativeAlerts = [];
+
+        const filtered = allHotelAlerts.filter(item => {
+          if (selectedComercial === "todos") return true;
+          const com = (item.group.Com_Comercial || item.group.Comercial || "").trim().toUpperCase();
+          if (selectedComercial === "sin_asignar") return !com;
+          return com === selectedComercial.trim().toUpperCase();
+        });
+
+        filtered.forEach(item => {
+          if (item.primaryCategory === "financial") financialAlerts.push(item);
+          else if (item.primaryCategory === "release") releaseAlerts.push(item);
+          else if (item.primaryCategory === "tentative") tentativeAlerts.push(item);
+          else if (item.primaryCategory === "logistics") logisticsAlerts.push(item);
+          else if (item.primaryCategory === "crm") crmAlerts.push(item);
         });
 
         // Ordenamiento por prioridad/fecha
         financialAlerts.sort((a, b) => {
-          // Use cached entry date instead of re-parsing JSON inside the comparator
           const aDate = parseDate(a.group.Entrada);
           const bDate = parseDate(b.group.Entrada);
           if (!aDate) return 1;
@@ -924,7 +961,7 @@
           crmAlerts,
           tentativeAlerts
         };
-      }, [filteredGroups]);
+      }, [allHotelAlerts, selectedComercial]);
 
       const STAFF_PRESETS = [
         { label: "🏢 Administración", email: "comunicaciones@hotelguadiana.es", desc: "Administración / Control" },
@@ -943,21 +980,7 @@
         return "";
       };
 
-      const availableCommercials = React.useMemo(() => {
-        const set = new Set();
-        const allAlerts = [
-          ...(columnsData.financialAlerts || []),
-          ...(columnsData.releaseAlerts || []),
-          ...(columnsData.logisticsAlerts || []),
-          ...(columnsData.crmAlerts || []),
-          ...(columnsData.tentativeAlerts || [])
-        ];
-        allAlerts.forEach(a => {
-          const com = (a.group && a.group.Com_Comercial) ? a.group.Com_Comercial.trim() : "";
-          if (com) set.add(com);
-        });
-        return Array.from(set).sort();
-      }, [columnsData]);
+      const availableCommercials = commercialList;
 
       const handleOpenInternalReportModal = (initialSectionKey = null) => {
         const defaultSections = {
@@ -972,10 +995,13 @@
         const todayStr = new Date().toLocaleDateString("es-ES", { day: "2-digit", month: "2-digit", year: "numeric" });
 
         setInternalReportTab("preview");
+        const activeCom = selectedComercial !== "todos" && selectedComercial !== "sin_asignar" ? selectedComercial : "todos";
+        const defaultRecipient = activeCom !== "todos" ? (getStaffEmail(activeCom) || "comunicaciones@hotelguadiana.es") : "comunicaciones@hotelguadiana.es";
+
         setInternalReportModal({
-          filterComercial: "todos",
+          filterComercial: activeCom,
           sections: defaultSections,
-          emailTo: "comunicaciones@hotelguadiana.es",
+          emailTo: defaultRecipient,
           subject: `[CONTROL INTERNO] Resumen de Alertas Operativas - ${hotelLabel} - ${todayStr}`,
           customBody: null
         });
@@ -2743,34 +2769,126 @@ ${comercial}`;
             </div>
           </div>
 
-          {/* Barra de Controles: Selector de Hotel y Botón de Informe Interno */}
+          {/* Barra de Controles: Selector de Hotel, Selector de Comercial y Botón de Informe Interno */}
           <div className="flex flex-wrap items-center justify-between gap-3">
-            {/* Selector de Hotel */}
-            <div className="flex bg-slate-100/80 p-1.5 rounded-[2rem] border border-slate-200/50 w-fit gap-1.5 shadow-sm">
-              {[
-                { id: "todos", label: "Todos los Hoteles", icon: "hotel" },
-                { id: "guadiana", label: "Sercotel Guadiana", logo: "Logos/Sercotel Guadiana.jpg" },
-                { id: "cumbria", label: "Cumbria Spa & Hotel", logo: "Logos/Cumbria Spa&Hotel.jpg" }
-              ].map(hotel => {
-                const active = selectedHotel === hotel.id;
-                return (
-                  <button
-                    key={hotel.id}
-                    onClick={() => setSelectedHotel(hotel.id)}
-                    className={`flex items-center gap-2 px-4 py-2.5 rounded-[1.5rem] text-[10px] font-black uppercase tracking-wider transition-all duration-300 ${active ? "bg-white text-slate-900 shadow-md scale-102 border border-slate-100" : "text-slate-500 hover:text-slate-800 hover:bg-white/40"}`}
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Selector de Hotel */}
+              <div className="flex bg-slate-100/80 p-1.5 rounded-[2rem] border border-slate-200/50 w-fit gap-1.5 shadow-sm">
+                {[
+                  { id: "todos", label: "Todos los Hoteles", icon: "hotel" },
+                  { id: "guadiana", label: "Sercotel Guadiana", logo: "Logos/Sercotel Guadiana.jpg" },
+                  { id: "cumbria", label: "Cumbria Spa & Hotel", logo: "Logos/Cumbria Spa&Hotel.jpg" }
+                ].map(hotel => {
+                  const active = selectedHotel === hotel.id;
+                  return (
+                    <button
+                      key={hotel.id}
+                      onClick={() => setSelectedHotel(hotel.id)}
+                      className={`flex items-center gap-2 px-4 py-2.5 rounded-[1.5rem] text-[10px] font-black uppercase tracking-wider transition-all duration-300 ${active ? "bg-white text-slate-900 shadow-md scale-102 border border-slate-100" : "text-slate-500 hover:text-slate-800 hover:bg-white/40"}`}
+                    >
+                      {hotel.logo ? (
+                        <img src={hotel.logo} className="h-4 object-contain" alt={hotel.label} />
+                      ) : (
+                        <LucideIcon name={hotel.icon} size={14} />
+                      )}
+                      {hotel.label}
+                      <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold ml-1.5 ${active ? "bg-slate-900 text-white" : "bg-slate-200 text-slate-600"}`}>
+                        {hotel.id === "todos" ? counts.total : hotel.id === "guadiana" ? counts.guadiana : counts.cumbria}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Selector de Comercial */}
+              <div className="flex items-center bg-slate-100/80 p-1.5 rounded-[2rem] border border-slate-200/50 w-fit gap-1 shadow-sm flex-wrap">
+                <div className="flex items-center gap-1.5 px-3 py-1 text-slate-400 select-none">
+                  <LucideIcon name="user" size={13} className="text-indigo-600" />
+                  <span className="text-[10px] font-black uppercase tracking-wider text-slate-600 hidden sm:inline">
+                    Comercial:
+                  </span>
+                </div>
+
+                {/* Opción: Todos */}
+                <button
+                  type="button"
+                  onClick={() => setSelectedComercial("todos")}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[1.5rem] text-[10px] font-black uppercase tracking-wider transition-all duration-200 cursor-pointer ${
+                    selectedComercial === "todos"
+                      ? "bg-slate-900 text-white shadow-md scale-102"
+                      : "text-slate-600 hover:text-slate-900 hover:bg-white/60"
+                  }`}
+                  title="Mostrar alertas de todos los comerciales"
+                >
+                  <span>Todos</span>
+                  <span
+                    className={`text-[9px] px-1.5 py-0.2 rounded-full font-bold ml-0.5 ${
+                      selectedComercial === "todos"
+                        ? "bg-white/20 text-white"
+                        : "bg-slate-200 text-slate-600"
+                    }`}
                   >
-                    {hotel.logo ? (
-                      <img src={hotel.logo} className="h-4 object-contain" alt={hotel.label} />
-                    ) : (
-                      <LucideIcon name={hotel.icon} size={14} />
-                    )}
-                    {hotel.label}
-                    <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold ml-1.5 ${active ? "bg-slate-900 text-white" : "bg-slate-200 text-slate-600"}`}>
-                      {hotel.id === "todos" ? counts.total : hotel.id === "guadiana" ? counts.guadiana : counts.cumbria}
+                    {commercialCounts.total}
+                  </span>
+                </button>
+
+                {/* Chips de cada Comercial */}
+                {commercialList.map((comName) => {
+                  const active = selectedComercial.toUpperCase() === comName.toUpperCase();
+                  const count = commercialCounts[comName.toUpperCase()] || 0;
+                  return (
+                    <button
+                      key={comName}
+                      type="button"
+                      onClick={() => setSelectedComercial(active ? "todos" : comName)}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[1.5rem] text-[10px] font-black uppercase tracking-wider transition-all duration-200 cursor-pointer ${
+                        active
+                          ? "bg-indigo-600 text-white shadow-md scale-102"
+                          : count > 0
+                          ? "text-slate-700 hover:text-slate-950 hover:bg-white/60"
+                          : "text-slate-400 hover:text-slate-700 hover:bg-white/40 opacity-75"
+                      }`}
+                      title={`Filtrar alertas de ${comName} (${count} alertas activas)`}
+                    >
+                      <span>{comName}</span>
+                      <span
+                        className={`text-[9px] px-1.5 py-0.2 rounded-full font-bold ml-0.5 ${
+                          active
+                            ? "bg-white/20 text-white"
+                            : count > 0
+                            ? "bg-indigo-100 text-indigo-700"
+                            : "bg-slate-200 text-slate-400"
+                        }`}
+                      >
+                        {count}
+                      </span>
+                    </button>
+                  );
+                })}
+
+                {/* Opción Sin Asignar si hay grupos sin comercial */}
+                {commercialCounts["_sin_asignar"] > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedComercial(selectedComercial === "sin_asignar" ? "todos" : "sin_asignar")}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[1.5rem] text-[10px] font-black uppercase tracking-wider transition-all duration-200 cursor-pointer ${
+                      selectedComercial === "sin_asignar"
+                        ? "bg-rose-600 text-white shadow-md scale-102"
+                        : "text-rose-700 hover:bg-rose-50"
+                    }`}
+                    title="Filtrar grupos sin comercial asignado"
+                  >
+                    <span>Sin Asignar</span>
+                    <span
+                      className={`text-[9px] px-1.5 py-0.2 rounded-full font-bold ml-0.5 ${
+                        selectedComercial === "sin_asignar" ? "bg-white/20 text-white" : "bg-rose-100 text-rose-800"
+                      }`}
+                    >
+                      {commercialCounts["_sin_asignar"]}
                     </span>
                   </button>
-                );
-              })}
+                )}
+              </div>
             </div>
 
             {/* Botón Principal: Informe Interno de Alertas para Comerciales / Administración */}
