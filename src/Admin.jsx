@@ -100,7 +100,7 @@
       });
 
       const manualPaid = records.reduce((max, r) => Math.max(max, safeParseAmount(r.Com_Pagado || 0)), 0);
-      const paid = Math.max(manualPaid, planPaid);
+      const paid = hasMilestones ? planPaid : manualPaid;
 
       let total = 0;
       if (roomingTotal > 0) {

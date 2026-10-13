@@ -4863,6 +4863,20 @@ const [customBudgetIdInput, setCustomBudgetIdInput] = useState("");
           }
         });
 
+        if (pendingIndices.length === 0 && totalCobrado < total - 0.05 && total > 0) {
+          planCopy.push({
+            id: Date.now(),
+            label: "Pago Final",
+            percent: parseFloat(((remainingPending / total) * 100).toFixed(2)),
+            amount: remainingPending.toFixed(2),
+            releaseDays: 15,
+            date: arrivalDate ? toInputDate(arrivalDate) : new Date().toISOString().split("T")[0],
+            status: "Pendiente",
+            manual: false
+          });
+          pendingIndices.push(planCopy.length - 1);
+        }
+
         // 2. Gestionar filas pendientes (se sincronizan automáticamente cuando cambia el importe total)
         if (pendingIndices.length === 1) {
           // Una única fila pendiente (ej: Depósito cobrado 300€ + Resto pendiente)
@@ -5830,17 +5844,19 @@ const [customBudgetIdInput, setCustomBudgetIdInput] = useState("");
 
               const manualPaidVal = parseNum(row["Com_Pagado"] || "0");
               let paidFromPlan = 0;
-              if (row.PaymentPlan_JSON) {
+              let hasPlan = false;
+              if (row.PaymentPlan_JSON && row.PaymentPlan_JSON !== "[]") {
                 try {
                   const plan = JSON.parse(row.PaymentPlan_JSON);
-                  if (Array.isArray(plan)) {
+                  if (Array.isArray(plan) && plan.length > 0) {
+                    hasPlan = true;
                     paidFromPlan = plan
-                      .filter((p) => p.status === "Cobrado")
+                      .filter((p) => p.status === "Cobrado" || p.status === "Pagado")
                       .reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
                   }
                 } catch (e) {}
               }
-              const totalPaid = Math.max(manualPaidVal, paidFromPlan);
+              const totalPaid = hasPlan ? paidFromPlan : manualPaidVal;
               const currentForecast = parseNum(row["Importe(*)"]);
               const isFullyPaid = currentForecast > 0 && totalPaid >= currentForecast - 0.05;
               if (isFullyPaid) return false;
@@ -6371,14 +6387,15 @@ const [customBudgetIdInput, setCustomBudgetIdInput] = useState("");
               try {
                 const pList = JSON.parse(hRec.PaymentPlan_JSON);
                 if (Array.isArray(pList)) {
-                  calculatedGroupPaid += pList.filter(p => p.status === "Cobrado").reduce((acc, p) => acc + (parseFloat(p.amount) || 0), 0);
+                  calculatedGroupPaid += pList.filter(p => p.status === "Cobrado" || p.status === "Pagado").reduce((acc, p) => acc + (parseFloat(p.amount) || 0), 0);
                 }
               } catch(e) {}
             }
           });
 
           const legacyPaid = parseNum(group.records[0]?.["Com_Pagado"] || 0);
-          group.totalPaid = Math.max(legacyPaid, calculatedGroupPaid);
+          const hasGroupPlan = processedGroupPlans.size > 0;
+          group.totalPaid = hasGroupPlan ? calculatedGroupPaid : legacyPaid;
 
           // Consolidar group.totalPax y group.totalRooms canónicamente (pico diario simultáneo)
           // evitando sumar repetidamente personas-noche o habitaciones-noche por cada fila diaria
@@ -9843,17 +9860,19 @@ const [customBudgetIdInput, setCustomBudgetIdInput] = useState("");
               if (!isCreditoRow) {
                 const manualPaidVal = parseNum(row["Com_Pagado"] || "0");
                 let paidFromPlan = 0;
-                if (row.PaymentPlan_JSON) {
+                let hasPlan = false;
+                if (row.PaymentPlan_JSON && row.PaymentPlan_JSON !== "[]") {
                   try {
                     const plan = JSON.parse(row.PaymentPlan_JSON);
-                    if (Array.isArray(plan)) {
+                    if (Array.isArray(plan) && plan.length > 0) {
+                      hasPlan = true;
                       paidFromPlan = plan
-                        .filter((p) => p.status === "Cobrado")
+                        .filter((p) => p.status === "Cobrado" || p.status === "Pagado")
                         .reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
                     }
                   } catch (e) {}
                 }
-                const totalPaid = Math.max(manualPaidVal, paidFromPlan);
+                const totalPaid = hasPlan ? paidFromPlan : manualPaidVal;
                 const currentForecast = parseNum(row["Importe(*)"]);
                 const isFullyPaid = currentForecast > 0 && totalPaid >= currentForecast - 0.05;
 
@@ -12698,6 +12717,10 @@ const [customBudgetIdInput, setCustomBudgetIdInput] = useState("");
               payload.tracking = JSON.stringify([...oldTrack, logEntry]);
             }
 
+            Object.keys(payload).forEach((k) => {
+              if (payload[k] === undefined) delete payload[k];
+            });
+
             batch.set(docRef, payload, { merge: true });
           });
 
@@ -13486,7 +13509,7 @@ const [customBudgetIdInput, setCustomBudgetIdInput] = useState("");
               const plan = JSON.parse(r.PaymentPlan_JSON);
               if (Array.isArray(plan)) {
                 plan.forEach((p) => {
-                  if (p.status === "Cobrado") {
+                  if (p.status === "Cobrado" || p.status === "Pagado") {
                     paidFromPlan += parseFloat(p.amount) || 0;
                   }
                 });
@@ -13494,8 +13517,9 @@ const [customBudgetIdInput, setCustomBudgetIdInput] = useState("");
             } catch (e) {}
           }
         });
+        const hasPlan = processedPlans.size > 0;
         const manualPaid = parseNum(record["Com_Pagado"] || 0);
-        const paid = Math.max(manualPaid, paidFromPlan);
+        const paid = hasPlan ? paidFromPlan : manualPaid;
 
         const isGroupCredito = Boolean(
           record["Es_Credito"] === true ||
@@ -14816,18 +14840,19 @@ const [customBudgetIdInput, setCustomBudgetIdInput] = useState("");
 
         }
 
+        const planPaid = updatedPlan
+          .filter((p) => p.status === "Cobrado" || p.status === "Pagado")
+          .reduce((acc, p) => acc + (parseFloat(p.amount) || 0), 0);
+
         updateGroupMetadata(
-
           resId,
-
-          "PaymentPlan_JSON",
-
-          JSON.stringify(updatedPlan),
-
+          {
+            PaymentPlan_JSON: JSON.stringify(updatedPlan),
+            Com_Pagado: planPaid.toFixed(2),
+          },
+          null,
           hotelFilter,
-
         );
-
       };
 
       const addNewRow = () => {
@@ -21212,7 +21237,7 @@ const [customBudgetIdInput, setCustomBudgetIdInput] = useState("");
                           const plan = JSON.parse(hRec.PaymentPlan_JSON);
                           if (Array.isArray(plan)) {
                             plan.forEach((p) => {
-                              if (p.status === "Cobrado")
+                              if (p.status === "Cobrado" || p.status === "Pagado")
                                 totalPaidFromPlan += parseFloat(p.amount) || 0;
                             });
                           }
@@ -21224,7 +21249,8 @@ const [customBudgetIdInput, setCustomBudgetIdInput] = useState("");
                       selectedGroupFicha.records[0]?.["Com_Pagado"] || "0",
                     );
 
-                    const totalPaid = Math.max(manualPaid, totalPaidFromPlan);
+                    const hasPaymentPlan = processedFichaPlans.size > 0;
+                    const totalPaid = hasPaymentPlan ? totalPaidFromPlan : manualPaid;
 
                     const pendingAmount = Math.max(0, netTotal - totalPaid);
 
@@ -26119,13 +26145,16 @@ const [customBudgetIdInput, setCustomBudgetIdInput] = useState("");
                                     }
                                     const firstValidRegime = (Array.isArray(currentRL) ? currentRL.find(r => !r.isService && r.regime && r.regime !== "-")?.regime : null) || currentRec["Régimen"] || "MP";
                                     const finalRevenue = selectedGroupFicha.totalRevenue !== undefined ? Number(selectedGroupFicha.totalRevenue) : parseNum(currentRec["Importe(*)"] || "0");
-                                    let reconciledPlanForSave = currentRec.PaymentPlan_JSON;
+                                    let reconciledPlanForSave = currentRec.PaymentPlan_JSON || "[]";
+                                    let planPaidForSave = 0;
                                     try {
                                       const pList = JSON.parse(currentRec.PaymentPlan_JSON || "[]");
                                       if (pList && pList.length > 0) {
                                         let comm = (currentRL || []).reduce((acc, i) => acc + (parseFloat(i.comision?.total_comision) || 0), 0);
                                         let netRev = Math.max(0, finalRevenue - comm);
-                                        reconciledPlanForSave = JSON.stringify(reconcileReactPaymentPlan(pList, netRev, currentRec.Entrada, { preserveZeroRows: true }));
+                                        const recPlan = reconcileReactPaymentPlan(pList, netRev, currentRec.Entrada, { preserveZeroRows: true });
+                                        reconciledPlanForSave = JSON.stringify(recPlan);
+                                        planPaidForSave = recPlan.filter(p => p.status === "Cobrado" || p.status === "Pagado").reduce((acc, p) => acc + (parseFloat(p.amount) || 0), 0);
                                       }
                                     } catch(e) {}
 
@@ -26135,7 +26164,8 @@ const [customBudgetIdInput, setCustomBudgetIdInput] = useState("");
                                       "Pax.": String(selectedGroupFicha.totalPax || 0),
                                       "Cant.": String(selectedGroupFicha.totalRooms || 0),
                                       "Importe(*)": String(finalRevenue.toFixed(2)),
-                                      PaymentPlan_JSON: reconciledPlanForSave
+                                      PaymentPlan_JSON: reconciledPlanForSave,
+                                      Com_Pagado: planPaidForSave.toFixed(2)
                                     };
                                     if (firstValidRegime) {
                                       savePayload["Régimen"] = firstValidRegime;

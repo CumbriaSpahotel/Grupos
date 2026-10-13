@@ -3843,16 +3843,20 @@ function App() {
     }, processedGroups.map(function (g) {
       var totalAmount = g._totalAmount;
       var totalPaidFromPlan = 0;
+      var hasPlan = false;
       try {
         var plan = JSON.parse(g.PaymentPlan_JSON || "[]");
-        totalPaidFromPlan = plan.filter(function (item) {
-          return item.status === "Cobrado";
-        }).reduce(function (sum, item) {
-          return sum + (parseFloat(item.amount) || 0);
-        }, 0);
+        if (Array.isArray(plan) && plan.length > 0) {
+          hasPlan = true;
+          totalPaidFromPlan = plan.filter(function (item) {
+            return item.status === "Cobrado" || item.status === "Pagado";
+          }).reduce(function (sum, item) {
+            return sum + (parseFloat(item.amount) || 0);
+          }, 0);
+        }
       } catch (e) {}
       var manualPaid = parseFloat(g.Com_Pagado || 0);
-      var totalPaid = Math.max(manualPaid, totalPaidFromPlan);
+      var totalPaid = hasPlan ? totalPaidFromPlan : manualPaid;
       var pendingAmount = Math.max(0, totalAmount - totalPaid);
       var hotelName = g.Hotel_Asignado || g.Hotel || "N/A";
       var isCumbria = hotelName.toLowerCase().includes("cumbria");

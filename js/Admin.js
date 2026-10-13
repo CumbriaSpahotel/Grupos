@@ -127,7 +127,7 @@ var getGroupFinancialInfo = function getGroupFinancialInfo(g) {
   var manualPaid = records.reduce(function (max, r) {
     return Math.max(max, safeParseAmount(r.Com_Pagado || 0));
   }, 0);
-  var paid = Math.max(manualPaid, planPaid);
+  var paid = hasMilestones ? planPaid : manualPaid;
   var total = 0;
   if (roomingTotal > 0) {
     total = roomingTotal;

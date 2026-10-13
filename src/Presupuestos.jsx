@@ -3139,14 +3139,18 @@ ${emailContent}`;
                     const totalAmount = g._totalAmount;
                     
                     let totalPaidFromPlan = 0;
+                    let hasPlan = false;
                     try {
                       const plan = JSON.parse(g.PaymentPlan_JSON || "[]");
-                      totalPaidFromPlan = plan
-                        .filter(item => item.status === "Cobrado")
-                        .reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
+                      if (Array.isArray(plan) && plan.length > 0) {
+                        hasPlan = true;
+                        totalPaidFromPlan = plan
+                          .filter(item => item.status === "Cobrado" || item.status === "Pagado")
+                          .reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
+                      }
                     } catch(e) {}
                     const manualPaid = parseFloat(g.Com_Pagado || 0);
-                    const totalPaid = Math.max(manualPaid, totalPaidFromPlan);
+                    const totalPaid = hasPlan ? totalPaidFromPlan : manualPaid;
                     const pendingAmount = Math.max(0, totalAmount - totalPaid);
 
                     const hotelName = g.Hotel_Asignado || g.Hotel || "N/A";
