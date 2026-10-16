@@ -220,10 +220,13 @@
    */
   function isGroupCancelled(groupRecord) {
     if (!groupRecord) return false;
-    if (groupRecord._diff === "cancelled" || groupRecord.isCancelled === true) return true;
+    var primaryRec = (groupRecord.records && Array.isArray(groupRecord.records) && groupRecord.records[0]) ? groupRecord.records[0] : {};
+    if (groupRecord._diff === "cancelled" || groupRecord.isCancelled === true || primaryRec._diff === "cancelled" || primaryRec.isCancelled === true) return true;
     var st = String(
       groupRecord.Com_Estado_Interno ||
+      primaryRec.Com_Estado_Interno ||
       groupRecord.Estado ||
+      primaryRec.Estado ||
       groupRecord.estado ||
       groupRecord.status ||
       ""
@@ -254,28 +257,38 @@
     if (!groupRecord) return false;
     if (isGroupCancelled(groupRecord)) return false;
 
-    var interno = String(groupRecord.Com_Estado_Interno || "").toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
-    if (interno) {
-      if (interno.includes("CONFIRM") || interno.includes("ACEPTAD") || interno.includes("DEFINITIV") || interno === "OK") {
-        return true;
-      }
-      return false;
-    }
-
-    var resId = String(groupRecord.reserva || groupRecord.Reserva || groupRecord.id || groupRecord.numReserva || "").toUpperCase().trim();
-    if (resId.startsWith("PRES-") || resId.startsWith("COT-")) {
-      return false;
-    }
-
-    var segmento = String(groupRecord["Segment."] || groupRecord.segmento || groupRecord.Segmento || "").toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
-    if (
+    var primaryRec = (groupRecord.records && Array.isArray(groupRecord.records) && groupRecord.records[0]) ? groupRecord.records[0] : {};
+    var interno = String(groupRecord.Com_Estado_Interno || primaryRec.Com_Estado_Interno || "").toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+    var segmento = String(
+      groupRecord["Segment."] || groupRecord.segmento || groupRecord.Segmento ||
+      primaryRec["Segment."] || primaryRec.segmento || primaryRec.Segmento || ""
+    ).toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+    var isTentativeSegment = (
       segmento.includes("TANTEO") ||
       segmento.includes("TENTA") ||
       segmento.includes("BLOQ") ||
       segmento.includes("OPCI") ||
       segmento.includes("PRESUP") ||
       segmento.includes("PROSPECT")
-    ) {
+    );
+
+    if (interno) {
+      // Si por un guardado previo se volcó el Estado del Excel ("Confirmada") en Com_Estado_Interno pero el segmento es TANTEO/TENTATIVA, es tentativa
+      if (interno === "CONFIRMADA" && isTentativeSegment) {
+        return false;
+      }
+      if (interno.includes("CONFIRM") || interno.includes("ACEPTAD") || interno.includes("DEFINITIV") || interno === "OK") {
+        return true;
+      }
+      return false;
+    }
+
+    var resId = String(groupRecord.reserva || groupRecord.Reserva || groupRecord.id || groupRecord.numReserva || primaryRec.Reserva || "").toUpperCase().trim();
+    if (resId.startsWith("PRES-") || resId.startsWith("COT-")) {
+      return false;
+    }
+
+    if (isTentativeSegment) {
       return false;
     }
 
@@ -286,6 +299,8 @@
       groupRecord.Grupo ||
       groupRecord.nombre ||
       groupRecord.cliente ||
+      primaryRec["Nombre del Grupo"] ||
+      primaryRec.Grupo ||
       ""
     ).toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
 
@@ -301,7 +316,7 @@
       return false;
     }
 
-    var rawStatus = String(groupRecord.Estado || groupRecord.estado || groupRecord.status || "").toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+    var rawStatus = String(groupRecord.Estado || groupRecord.estado || groupRecord.status || primaryRec.Estado || "").toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
     if (rawStatus.includes("CONFIRM") || rawStatus.includes("ACEPTAD") || rawStatus.includes("DEFINITIV") || rawStatus === "OK") {
       return true;
     }

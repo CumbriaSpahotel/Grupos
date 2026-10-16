@@ -877,6 +877,16 @@
           } catch(e) {}
         }
       });
+      var isMissingDayAccepted = Boolean(
+        acceptedApprovals["missing_day:" + entry.fecha] ||
+        acceptedApprovals["missing_day"] ||
+        Object.values(acceptedApprovals).some(function(v){
+          return v && (v.category === "missing_day:" + entry.fecha || (v.type === "missing_day" && (!v.day || v.day === entry.fecha)));
+        })
+      );
+      if (!hasRoomingDayLodging && isMissingDayAccepted) {
+        return;
+      }
       var isRegimenAccepted = Boolean(
         acceptedApprovals["excel_regimen_mismatch"] ||
         Object.values(acceptedApprovals).some(function(v){

@@ -10770,18 +10770,28 @@ const [customBudgetIdInput, setCustomBudgetIdInput] = useState("");
       const [isSaving, setIsSaving] = useState(false); // Spinner mientras acceptChanges guarda
       const [mesachefUnlinkedServices, setMesachefUnlinkedServices] = useState([]);
 
-      // Detección de servicios desvinculados manualmente en MesaChef
+      // Detección de servicios desvinculados manualmente en MesaChef y alineación de estado
       useEffect(() => {
-        if (showFichaModal && selectedGroupFicha && selectedGroupFicha.id && window.MesaChefService && typeof window.MesaChefService.checkUnlinkedServices === "function") {
-          window.MesaChefService.checkUnlinkedServices(selectedGroupFicha.id).then((res) => {
-            if (res && res.hasUnlinked) {
-              setMesachefUnlinkedServices(res.unlinkedDocs || []);
-            } else {
+        if (showFichaModal && selectedGroupFicha && selectedGroupFicha.id && window.MesaChefService) {
+          if (typeof window.MesaChefService.syncGroupToMesachef === "function" && selectedGroupFicha.records?.[0]) {
+            const rec0 = selectedGroupFicha.records[0];
+            window.MesaChefService.syncGroupToMesachef({
+              ...rec0,
+              id: selectedGroupFicha.id,
+              reserva: selectedGroupFicha.id
+            }).catch(() => {});
+          }
+          if (typeof window.MesaChefService.checkUnlinkedServices === "function") {
+            window.MesaChefService.checkUnlinkedServices(selectedGroupFicha.id).then((res) => {
+              if (res && res.hasUnlinked) {
+                setMesachefUnlinkedServices(res.unlinkedDocs || []);
+              } else {
+                setMesachefUnlinkedServices([]);
+              }
+            }).catch(() => {
               setMesachefUnlinkedServices([]);
-            }
-          }).catch(() => {
-            setMesachefUnlinkedServices([]);
-          });
+            });
+          }
         } else if (!showFichaModal) {
           setMesachefUnlinkedServices([]);
         }
@@ -12814,9 +12824,11 @@ const [customBudgetIdInput, setCustomBudgetIdInput] = useState("");
           "Segmento": targetSegment,
         };
 
-        // Salvaguarda: si no tenía Com_Estado_Interno explícito fijado, preservamos su estado actual
-        // para que cambiar el segmento no altere de forma inadvertida el estado de seguimiento del grupo
-        if (!currentRec["Com_Estado_Interno"]) {
+        // Salvaguarda: si el nuevo segmento es de tanteo/bloqueo/tentativa, establecer TENTATIVA
+        const isTargetTentative = /TANTEO|TENTA|BLOQ|OPCI|PRESUP|PROSPECT/i.test(targetSegment);
+        if (isTargetTentative) {
+          updates["Com_Estado_Interno"] = "TENTATIVA";
+        } else if (!currentRec["Com_Estado_Interno"]) {
           const rawSt = currentRec["Com_Estado_Interno"] || currentRec["Segment."] || currentRec["Estado"] || "PROSPECTO";
           const stProps = getStatusProps(rawSt, selectedGroupFicha.arrival, currentRec["Estado"]);
           updates["Com_Estado_Interno"] = stProps.label || "PROSPECTO";
@@ -13872,6 +13884,9 @@ const [customBudgetIdInput, setCustomBudgetIdInput] = useState("");
         const getDifferenceCategory = (entry) => {
           const t = entry?.type || "";
           const msg = entry?.message || "";
+          if ((t === "missing_day" || t === "extra_day_outside_stay") && entry?.day) {
+            return `${t}:${entry.day}`;
+          }
           if (t === "excel_amount_mismatch" || t === "amount_mismatch" || /importe/i.test(msg) || /descuadre.*excel.*alojamiento/i.test(msg)) {
             return "excel_amount_mismatch";
           }
@@ -13891,11 +13906,14 @@ const [customBudgetIdInput, setCustomBudgetIdInput] = useState("");
           const cat = getDifferenceCategory(entry);
           if (approvals[cat]) return approvals[cat];
           if (entry.acceptanceKey && approvals[entry.acceptanceKey]) return approvals[entry.acceptanceKey];
+          const isPerDayType = (entry?.type === "missing_day" || entry?.type === "extra_day_outside_stay") && Boolean(entry?.day);
           for (const [k, v] of Object.entries(approvals)) {
-            if (k === cat || k === entry.type || v?.category === cat || v?.type === entry.type) return v;
+            if (k === cat || v?.category === cat) return v;
+            if (!isPerDayType && (k === entry.type || v?.type === entry.type)) return v;
+            if (isPerDayType && v?.type === entry.type && (!v?.day || v?.day === entry.day)) return v;
             try {
               const p = JSON.parse(k);
-              if (p.type === entry.type || getDifferenceCategory(p) === cat) return v;
+              if (getDifferenceCategory(p) === cat || (!isPerDayType && p.type === entry.type)) return v;
             } catch (e) {}
           }
           return null;
@@ -13945,6 +13963,9 @@ const [customBudgetIdInput, setCustomBudgetIdInput] = useState("");
         const getDifferenceCategory = (entry) => {
           const t = entry?.type || "";
           const msg = entry?.message || "";
+          if ((t === "missing_day" || t === "extra_day_outside_stay") && entry?.day) {
+            return `${t}:${entry.day}`;
+          }
           if (t === "excel_amount_mismatch" || t === "amount_mismatch" || /importe/i.test(msg) || /descuadre.*excel.*alojamiento/i.test(msg)) {
             return "excel_amount_mismatch";
           }
@@ -13967,21 +13988,23 @@ const [customBudgetIdInput, setCustomBudgetIdInput] = useState("");
             acceptedAt: new Date().toISOString(),
             message: difference.message,
             type: difference.type,
+            ...(difference.day ? { day: difference.day } : {}),
             category: cat
           };
           if (difference.acceptanceKey && difference.acceptanceKey !== cat) {
             approvals[difference.acceptanceKey] = approvals[cat];
           }
         } else {
+          const isPerDayType = (difference?.type === "missing_day" || difference?.type === "extra_day_outside_stay") && Boolean(difference?.day);
           delete approvals[cat];
           if (difference.acceptanceKey) delete approvals[difference.acceptanceKey];
           Object.keys(approvals).forEach(k => {
-            if (k === cat || approvals[k]?.category === cat || approvals[k]?.type === difference.type) {
+            if (k === cat || approvals[k]?.category === cat || (!isPerDayType && approvals[k]?.type === difference.type) || (isPerDayType && approvals[k]?.type === difference.type && approvals[k]?.day === difference.day)) {
               delete approvals[k];
             } else {
               try {
                 const parsed = JSON.parse(k);
-                if (parsed.type === difference.type || getDifferenceCategory(parsed) === cat) {
+                if (getDifferenceCategory(parsed) === cat || (!isPerDayType && parsed.type === difference.type)) {
                   delete approvals[k];
                 }
               } catch (e) {}
@@ -23025,7 +23048,7 @@ const [customBudgetIdInput, setCustomBudgetIdInput] = useState("");
                                           <span className="text-red-500 mt-0.5 flex-shrink-0">●</span>
                                           <span className="text-[10px] font-bold text-red-800">{issue.message}</span>
                                         </div>
-                                        {(issue.type.includes('mismatch') || issue.type === 'excel_diff_reason' || issue.type === 'zero_price') && (
+                                        {(issue.type.includes('mismatch') || issue.type === 'excel_diff_reason' || issue.type === 'zero_price' || issue.type === 'missing_day' || issue.type === 'extra_day_outside_stay') && (
                                           <button type="button" onClick={() => setDifferenceAccepted(issue, true)} className="shrink-0 text-[10px] font-bold px-2 py-1 bg-white border border-slate-300 rounded text-slate-700">Estoy de acuerdo con la diferencia</button>
                                         )}
                                         {issue.type === "excel_amount_mismatch" && (
@@ -26199,7 +26222,7 @@ const [customBudgetIdInput, setCustomBudgetIdInput] = useState("");
                                         "Régimen": savePayload["Régimen"] || currentRec["Régimen"] || "MP",
                                         RoomingList_JSON: JSON.stringify(currentRL || []),
                                         DailyDistribution_JSON: JSON.stringify(distMap || {}),
-                                        Com_Estado_Interno: currentRec.Com_Estado_Interno || currentRec.Estado || selectedGroupFicha.status
+                                        Com_Estado_Interno: currentRec.Com_Estado_Interno || ""
                                       };
                                       const syncRes = await window.MesaChefService.syncGroupToMesachef(fullSyncObj);
                                       if (!syncRes || syncRes.success === false) {
