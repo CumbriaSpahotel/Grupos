@@ -4864,13 +4864,29 @@ const [customBudgetIdInput, setCustomBudgetIdInput] = useState("");
         });
 
         if (pendingIndices.length === 0 && totalCobrado < total - 0.05 && total > 0) {
+          const defaultReleaseDays = 15;
+          let autoDate = arrivalDate ? toInputDate(arrivalDate) : new Date().toISOString().split("T")[0];
+          if (arrivalDate) {
+            const numDate = parseFloat(arrivalDate);
+            let d;
+            if (!isNaN(numDate) && numDate > 40000 && numDate < 60000) {
+              d = new Date(Math.round((numDate - 25569) * 86400 * 1000));
+            } else {
+              const dateStr = toInputDate(arrivalDate);
+              d = dateStr ? new Date(dateStr + "T12:00:00") : new Date(NaN);
+            }
+            if (d && !isNaN(d.getTime())) {
+              d.setDate(d.getDate() - defaultReleaseDays);
+              autoDate = d.toISOString().split("T")[0];
+            }
+          }
           planCopy.push({
-            id: Date.now(),
+            id: "auto-pending-final",
             label: "Pago Final",
             percent: parseFloat(((remainingPending / total) * 100).toFixed(2)),
             amount: remainingPending.toFixed(2),
-            releaseDays: 15,
-            date: arrivalDate ? toInputDate(arrivalDate) : new Date().toISOString().split("T")[0],
+            releaseDays: defaultReleaseDays,
+            date: autoDate,
             status: "Pendiente",
             manual: false
           });
@@ -12410,7 +12426,7 @@ const [customBudgetIdInput, setCustomBudgetIdInput] = useState("");
         if (currentGroupRows.length === 0) return;
 
         // --- SYNC PAYMENT PLAN LOGIC (Apply to all affected rows) ---
-        if (updates["Com_Pagado"] !== undefined) {
+        if (updates["Com_Pagado"] !== undefined && updates["PaymentPlan_JSON"] === undefined) {
           try {
             const firstRow = currentGroupRows[0];
             const manualPaid = parseNum(updates["Com_Pagado"]);
@@ -12432,47 +12448,39 @@ const [customBudgetIdInput, setCustomBudgetIdInput] = useState("");
               currentPlan = [];
             }
 
-            // Remove old manual entries to avoid duplicates
-            let filteredPlan = currentPlan.filter(
+            const existingManual = currentPlan.find(
               (p) =>
-                !p.id.toString().startsWith("manual-") &&
-                p.label !== "Pago a Cuenta",
+                (p.id && p.id.toString().startsWith("manual-")) ||
+                p.label === "Pago a Cuenta",
+            );
+
+            // Keep pending rows so reconcileReactPaymentPlan adjusts their amounts without losing releaseDays/date
+            const pendingRows = currentPlan.filter(
+              (p) =>
+                !(p.id && p.id.toString().startsWith("manual-")) &&
+                p.label !== "Pago a Cuenta" &&
+                p.status !== "Cobrado" &&
+                p.status !== "Pagado"
             );
 
             const newPlan = [];
             if (manualPaid > 0) {
               newPlan.push({
-                id: "manual-" + Date.now(),
-                label: "Pago a Cuenta",
-                percent: ((manualPaid / (netRevenue || 1)) * 100).toFixed(1),
+                id: existingManual?.id || ("manual-" + Date.now()),
+                label: existingManual?.label || "Pago a Cuenta",
+                percent: ((manualPaid / (netRevenue || 1)) * 100).toFixed(2),
                 amount: manualPaid.toFixed(2),
-                releaseDays: 0,
-                date: new Date().toISOString().split("T")[0],
+                releaseDays: existingManual?.releaseDays ?? 0,
+                date: existingManual?.date || new Date().toISOString().split("T")[0],
                 status: "Cobrado",
               });
             }
 
-            // Adjust remaining segments
-            let remainingToSubtract = manualPaid;
-            filteredPlan.forEach((p) => {
-              let amt = parseNum(p.amount);
-              if (remainingToSubtract > 0) {
-                if (remainingToSubtract >= amt) {
-                  remainingToSubtract -= amt;
-                  return;
-                } else {
-                  amt -= remainingToSubtract;
-                  remainingToSubtract = 0;
-                }
-              }
-              if (amt > 0.01) {
-                newPlan.push({
-                  ...p,
-                  amount: amt.toFixed(2),
-                  percent: ((amt / (netRevenue || 1)) * 100).toFixed(1),
-                });
-              }
-            });
+            if (netRevenue - manualPaid > 0.01) {
+              pendingRows.forEach((p) => {
+                newPlan.push({ ...p });
+              });
+            }
             updates["PaymentPlan_JSON"] = JSON.stringify(reconcileReactPaymentPlan(newPlan, netRevenue, firstRow.Entrada, { preserveZeroRows: true }));
 
           } catch (err) {
@@ -24896,10 +24904,12 @@ const [customBudgetIdInput, setCustomBudgetIdInput] = useState("");
                                           ).toFixed(2) : "0.00";
                                           newPlan[idx].manual = false;
                                         } else if (field === "releaseDays") {
-                                          const days =
-                                            parseInt(
-                                              newPlan[idx].releaseDays,
-                                            ) || 0;
+                                          const parsedDays = parseInt(
+                                            newPlan[idx].releaseDays,
+                                            10,
+                                          );
+                                          const days = isNaN(parsedDays) ? 0 : parsedDays;
+                                          newPlan[idx].releaseDays = days;
                                           let d;
                                           const sDate = arrivalDate;
                                           const numDate = parseFloat(sDate);
@@ -24918,7 +24928,7 @@ const [customBudgetIdInput, setCustomBudgetIdInput] = useState("");
                                           } else {
                                             const dateStr =
                                               toInputDate(sDate);
-                                            d = new Date(dateStr);
+                                            d = dateStr ? new Date(dateStr + "T12:00:00") : new Date(NaN);
                                           }
                                           if (d && !isNaN(d.getTime())) {
                                             d.setDate(d.getDate() - days);
@@ -24978,11 +24988,11 @@ const [customBudgetIdInput, setCustomBudgetIdInput] = useState("");
 
                                               toInputDate(sDate);
 
-                                            arrD = new Date(dateStr);
+                                            arrD = dateStr ? new Date(dateStr + "T12:00:00") : new Date(NaN);
 
                                           }
 
-                                          const editD = new Date(updatedVal);
+                                          const editD = updatedVal ? new Date(updatedVal + "T12:00:00") : new Date(NaN);
 
                                           if (arrD && !isNaN(arrD.getTime()) && editD && !isNaN(editD.getTime())) {
 
@@ -25351,6 +25361,9 @@ const [customBudgetIdInput, setCustomBudgetIdInput] = useState("");
                                                     <div className="flex items-center justify-center bg-blue-50/70 rounded h-5 border border-blue-100 w-full px-1">
                                                       <input
                                                         type="number"
+                                                        onKeyDown={(e) => {
+                                                          if (e.key === "Enter") e.target.blur();
+                                                        }}
                                                         key={idx + "-" + dep.releaseDays}
                                                         className="bg-transparent border-none text-[10px] font-black text-blue-700 w-full text-center outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                                         defaultValue={dep.releaseDays}
