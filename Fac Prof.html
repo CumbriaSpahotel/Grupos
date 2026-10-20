@@ -1275,6 +1275,13 @@
                 if (p2Num) p2Num.innerText = val;
                 const p2Concept = document.getElementById('p2-proforma-concept-val');
                 if (p2Concept) p2Concept.innerText = val;
+                try {
+                    const grp = JSON.parse(localStorage.getItem('selectedGroup') || '{}');
+                    grp.Numero_Factura = val;
+                    if (!grp.ProformaCustomFields) grp.ProformaCustomFields = {};
+                    grp.ProformaCustomFields.numero_factura = val;
+                    localStorage.setItem('selectedGroup', JSON.stringify(grp));
+                } catch(e) {}
             }
             if (!event.target.closest('#tpl-policies .editable-clause')) return;
             const saved = localStorage.getItem('selectedGroup');
@@ -1338,6 +1345,17 @@
                     }
                 });
 
+                // Capturar número de factura real de la celda reserva-id-2 ("Nº Factura")
+                const rid2El = document.getElementById('reserva-id-2');
+                const rawFacturaInput = rid2El ? (rid2El.innerText || rid2El.value || '').trim() : '';
+                if (rawFacturaInput && rawFacturaInput !== '---' && rawFacturaInput !== 'Prof. ---') {
+                    customFields['numero_factura'] = rawFacturaInput;
+                } else if (group.Numero_Factura) {
+                    customFields['numero_factura'] = group.Numero_Factura;
+                } else if (group.ProformaCustomFields && group.ProformaCustomFields.numero_factura) {
+                    customFields['numero_factura'] = group.ProformaCustomFields.numero_factura;
+                }
+
                 if (!isIndep) {
                     customFields["reserva-id"] = String(id).trim().replace(/\.0$/, "");
                 }
@@ -1367,6 +1385,7 @@
                 const payload = {
                     "ProformaItems": items,
                     "ProformaCustomFields": customFields,
+                    "Numero_Factura": customFields['numero_factura'] || "",
                     "PaymentPlan_JSON": JSON.stringify(paymentPlan), // Save the payment plan/advances
                     "updatedAt": firebase.firestore.FieldValue.serverTimestamp(),
                     "total": total || 0,
@@ -1399,6 +1418,7 @@
                 // Actualizar localmente
                 group.ProformaItems = items;
                 group.ProformaCustomFields = customFields;
+                group.Numero_Factura = customFields['numero_factura'] || "";
                 if (savedPax && !isNaN(parseInt(savedPax, 10))) {
                     group["Pax."] = parseInt(savedPax, 10).toString();
                     group["Pax"] = parseInt(savedPax, 10).toString();
@@ -1766,34 +1786,36 @@
 
                     if (id === 'reserva-id') {
                         const rid2 = document.getElementById('reserva-id-2');
-                        if (rid2) rid2.innerText = 'Prof. ' + finalVal;
+                        if (rid2) {
+                            // Si ya tiene número de factura guardado, mantenerlo exactamente sin forzar 'Prof.'
+                            const savedFactura = group.Numero_Factura || customFields['numero_factura'] || group.Factura || '';
+                            if (savedFactura && savedFactura.trim() !== '' && savedFactura.trim() !== '---' && savedFactura.trim() !== 'Prof. ---') {
+                                rid2.innerText = savedFactura.trim();
+                            } else {
+                                rid2.innerText = finalVal ? (finalVal.startsWith('Prof.') ? finalVal : 'Prof. ' + finalVal) : 'Prof. ---';
+                            }
+                        }
                         const ridU = document.getElementById('reserva-id-universal');
                         if (ridU) ridU.innerText = finalVal;
                     }
                 });
 
-                if (!isIndependentProforma()) {
-                    const rid2 = document.getElementById('reserva-id-2');
-                    if (rid2) {
-                        rid2.contentEditable = "false";
-                        rid2.classList.remove('editable');
-                        rid2.title = "No se puede editar el número de reserva de un grupo enlazado.";
-                    }
-                    const ridU = document.getElementById('reserva-id-universal');
-                    if (ridU) {
+                // El campo Nº Factura (reserva-id-2) es SIEMPRE editable para permitir fijar número de factura real
+                const rid2 = document.getElementById('reserva-id-2');
+                if (rid2) {
+                    rid2.contentEditable = "true";
+                    rid2.classList.add('editable');
+                    rid2.removeAttribute('title');
+                }
+
+                // El Nº de Reserva general de cabecera solo se bloquea si está enlazado a un grupo real
+                const ridU = document.getElementById('reserva-id-universal');
+                if (ridU) {
+                    if (!isIndependentProforma()) {
                         ridU.contentEditable = "false";
                         ridU.classList.remove('editable');
                         ridU.title = "No se puede editar el número de reserva de un grupo enlazado.";
-                    }
-                } else {
-                    const rid2 = document.getElementById('reserva-id-2');
-                    if (rid2) {
-                        rid2.contentEditable = "true";
-                        rid2.classList.add('editable');
-                        rid2.removeAttribute('title');
-                    }
-                    const ridU = document.getElementById('reserva-id-universal');
-                    if (ridU) {
+                    } else {
                         ridU.contentEditable = "true";
                         ridU.classList.add('editable');
                         ridU.removeAttribute('title');
@@ -2775,7 +2797,7 @@
                         </div>
                     `;
 
-                    const invoiceNumber = (document.getElementById('reserva-id-2')?.innerText || (groupData.Reserva ? `Prof. ${groupData.Reserva}` : (groupData.id ? `Prof. ${groupData.id}` : 'Prof. ---'))).trim();
+                    const invoiceNumber = (document.getElementById('reserva-id-2')?.innerText || groupData.Numero_Factura || (groupData.Reserva ? `Prof. ${groupData.Reserva}` : (groupData.id ? `Prof. ${groupData.id}` : 'Prof. ---'))).trim();
                     const hotelEmail = (document.getElementById('header-email-val')?.innerText || h.email || 'info@encumbria.es').trim();
                     const clientName = (document.getElementById('solicitante-org-2')?.innerText || groupData.Solicitante || groupData.Organismo || '').trim();
 
@@ -3031,18 +3053,12 @@
             if (!btn || !btnText) return;
 
             const isIndep = isIndependentProforma();
+            const ridU = document.getElementById('reserva-id-universal');
+
             if (isIndep) {
                 btnText.innerText = 'Enviar a Registro: ON';
                 btn.className = 'flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg text-[10px] font-black uppercase tracking-wider transition-all';
                 
-                // Enable editing for reserva-id
-                const rid2 = document.getElementById('reserva-id-2');
-                if (rid2) {
-                    rid2.contentEditable = "true";
-                    rid2.classList.add('editable');
-                    rid2.removeAttribute('title');
-                }
-                const ridU = document.getElementById('reserva-id-universal');
                 if (ridU) {
                     ridU.contentEditable = "true";
                     ridU.classList.add('editable');
@@ -3052,19 +3068,19 @@
                 btnText.innerText = 'Enviar a Registro: OFF';
                 btn.className = 'flex items-center gap-2 px-4 py-2 rounded-xl bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 shadow-sm text-[10px] font-bold uppercase tracking-wider transition-all';
                 
-                // Disable editing for reserva-id
-                const rid2 = document.getElementById('reserva-id-2');
-                if (rid2) {
-                    rid2.contentEditable = "false";
-                    rid2.classList.remove('editable');
-                    rid2.title = "No se puede editar el número de reserva de un grupo enlazado.";
-                }
-                const ridU = document.getElementById('reserva-id-universal');
                 if (ridU) {
                     ridU.contentEditable = "false";
                     ridU.classList.remove('editable');
                     ridU.title = "No se puede editar el número de reserva de un grupo enlazado.";
                 }
+            }
+
+            // El Nº Factura siempre debe ser editable
+            const rid2 = document.getElementById('reserva-id-2');
+            if (rid2) {
+                rid2.contentEditable = "true";
+                rid2.classList.add('editable');
+                rid2.removeAttribute('title');
             }
         }
 
