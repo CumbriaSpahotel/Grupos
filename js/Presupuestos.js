@@ -502,6 +502,15 @@ var generateSeriesDates = NexusUtils.generateSeriesDates;
 var formatDate = NexusUtils.formatDate;
 var formatNum = NexusUtils.formatNum;
 var toInputDate = NexusUtils.toInputDate;
+var isCompleteDate = NexusUtils.isCompleteDate || function (val) {
+  if (!val) return false;
+  var str = toInputDate(val);
+  if (!str) return false;
+  var parts = str.split("-");
+  if (parts.length !== 3 || parts[0].length !== 4) return false;
+  var y = parseInt(parts[0], 10);
+  return !isNaN(y) && y >= 1990 && y <= 2150;
+};
 var calcStayDays = function calcStayDays(inVal, outVal) {
   var inStr = toInputDate(inVal);
   var outStr = toInputDate(outVal);
@@ -509,16 +518,21 @@ var calcStayDays = function calcStayDays(inVal, outVal) {
   var dIn = new Date(inStr + "T00:00:00");
   var dOut = new Date(outStr + "T00:00:00");
   if (isNaN(dIn.getTime()) || isNaN(dOut.getTime())) return 1;
+  var yIn = dIn.getFullYear();
+  var yOut = dOut.getFullYear();
+  if (yIn < 1990 || yIn > 2150 || yOut < 1990 || yOut > 2150) return 1;
   var diff = Math.round((dOut.getTime() - dIn.getTime()) / (1000 * 60 * 60 * 24));
-  return diff >= 1 ? diff : 1;
+  return diff >= 1 && diff <= 366 ? diff : 1;
 };
 var addStayDays = function addStayDays(inVal, days) {
   var inStr = toInputDate(inVal) || new Date().toISOString().split("T")[0];
   var d = new Date(inStr + "T00:00:00");
   if (isNaN(d.getTime())) return "";
-  var validDays = Math.max(1, parseInt(days, 10) || 1);
+  var yIn = d.getFullYear();
+  if (yIn < 1990 || yIn > 2150) return "";
+  var validDays = Math.max(1, Math.min(366, parseInt(days, 10) || 1));
   d.setDate(d.getDate() + validDays);
-  var y = d.getFullYear();
+  var y = String(d.getFullYear()).padStart(4, "0");
   var m = String(d.getMonth() + 1).padStart(2, "0");
   var day = String(d.getDate()).padStart(2, "0");
   return "".concat(y, "-").concat(m, "-").concat(day);
@@ -2081,7 +2095,7 @@ function App() {
       });
       if (!hasGridPrices && formData.Hotel_Asignado) {
         var parsedY = formData.Entrada ? new Date(toInputDate(formData.Entrada)).getFullYear() : 2027;
-        var targetY = isNaN(parsedY) ? 2027 : parsedY;
+        var targetY = !isNaN(parsedY) && parsedY >= 2020 && parsedY <= 2100 ? parsedY : 2027;
         grid = getOfficialTariffsGrid(formData.Hotel_Asignado, targetY);
         changed = true;
       }
@@ -2140,7 +2154,7 @@ function App() {
         var boardKey = currentBoard.split(' ')[0]; // e.g. "AD", "PC"
         var roomTypes = getRoomTypesForHotel(formData.Hotel_Asignado);
         var parsedY = date ? new Date(toInputDate(date)).getFullYear() : formData.Entrada ? new Date(toInputDate(formData.Entrada)).getFullYear() : 2027;
-        var targetY = isNaN(parsedY) ? 2027 : parsedY;
+        var targetY = !isNaN(parsedY) && parsedY >= 2020 && parsedY <= 2100 ? parsedY : 2027;
         var officialGrid = getOfficialTariffsGrid(formData.Hotel_Asignado, targetY);
         var boardPrices = formData.isRatesOnly && grid && grid[boardKey] ? grid[boardKey] : officialGrid[boardKey] || {};
         var updatedPrices = _objectSpread({}, dayConf.prices || {});
@@ -2198,6 +2212,45 @@ function App() {
         }
       }).catch(function (err) {
         return console.warn("Error sincronizando groupTariffs en Presupuestos:", err);
+      });
+    }
+  }, []);
+
+  // Sincronizar inteligencia de tarifas y PVP CapaSuite desde Firestore (settings/calendar_data)
+  useEffect(function () {
+    if (window.db && typeof window.db.collection === "function") {
+      window.db.collection("settings").doc("calendar_data").get().then(function (snap) {
+        if (snap.exists) {
+          var d = snap.data();
+          if (window.CapaSuitePricingService && typeof window.CapaSuitePricingService.setCalendarData === "function") {
+            window.CapaSuitePricingService.setCalendarData(d);
+          } else {
+            if (d.revenueData) {
+              try {
+                localStorage.setItem("v3_revenue_data_v2", JSON.stringify(d.revenueData));
+                localStorage.setItem("revenue_data_v2", JSON.stringify(d.revenueData));
+              } catch (e) {}
+            }
+            if (d.hotelManagerDb) {
+              try {
+                localStorage.setItem("v3_hotel_manager_db_v2", JSON.stringify(d.hotelManagerDb));
+                localStorage.setItem("hotel_manager_db_v2", JSON.stringify(d.hotelManagerDb));
+              } catch (e) {}
+            }
+            if (d.customEvents) {
+              try {
+                localStorage.setItem("v3_custom_events", JSON.stringify(d.customEvents));
+                localStorage.setItem("custom_events", JSON.stringify(d.customEvents));
+              } catch (e) {}
+            }
+          }
+          window.dispatchEvent(new CustomEvent('capasuite-data-synced'));
+          refreshAvailability(function (v) {
+            return v + 1;
+          });
+        }
+      }).catch(function (err) {
+        return console.warn("Error sincronizando calendar_data en Presupuestos:", err);
       });
     }
   }, []);
@@ -2344,7 +2397,8 @@ function App() {
     var discount = (_prev$capaSuiteDiscou = prev.capaSuiteDiscountPercent) !== null && _prev$capaSuiteDiscou !== void 0 ? _prev$capaSuiteDiscou : 15;
     var average = !!prev.averageStayCondition;
     var recommendedGrid = prev.gridTariffMode === 'recommended';
-    var year = Number(toInputDate(next.Entrada).slice(0, 4)) || 2027;
+    var rawY = Number(toInputDate(next.Entrada).slice(0, 4));
+    var year = !isNaN(rawY) && rawY >= 2020 && rawY <= 2100 ? rawY : 2027;
     next.ratesOnlyGrid = {};
     ['HA', 'HD', 'MP', 'PC'].forEach(function (board) {
       next.ratesOnlyGrid[board] = {};
@@ -4346,12 +4400,29 @@ function App() {
       value: toInputDate(formData.Entrada),
       onChange: function onChange(e) {
         var newIn = e.target.value;
-        var currentDays = calcStayDays(formData.Entrada, formData.Salida);
-        var newOut = newIn ? addStayDays(newIn, currentDays) : formData.Salida;
+        var newOut = formData.Salida;
+        if (isCompleteDate(newIn)) {
+          var currentDays = calcStayDays(formData.Entrada, formData.Salida);
+          var calculatedOut = addStayDays(newIn, currentDays);
+          if (calculatedOut) newOut = calculatedOut;
+        }
         setFormData(_objectSpread(_objectSpread({}, formData), {}, {
           Entrada: newIn,
           Salida: newOut
         }));
+      },
+      onBlur: function onBlur() {
+        if (isCompleteDate(formData.Entrada)) {
+          var currentDays = calcStayDays(formData.Entrada, formData.Salida);
+          var validOut = addStayDays(formData.Entrada, currentDays);
+          if (validOut && validOut !== formData.Salida) {
+            setFormData(function (prev) {
+              return _objectSpread(_objectSpread({}, prev), {}, {
+                Salida: validOut
+              });
+            });
+          }
+        }
       },
       className: "bg-white border border-slate-200 focus:border-indigo-500 rounded-lg px-2.5 py-1 text-xs font-bold text-slate-800 outline-none shadow-2xs w-[145px]"
     })), /*#__PURE__*/React.createElement("div", {
@@ -4363,11 +4434,12 @@ function App() {
     }, /*#__PURE__*/React.createElement("input", {
       type: "number",
       min: "1",
-      value: formData.Entrada && formData.Salida ? calcStayDays(formData.Entrada, formData.Salida) : formData.Entrada ? 1 : '',
+      max: "365",
+      value: formData.Entrada && formData.Salida && isCompleteDate(formData.Entrada) && isCompleteDate(formData.Salida) ? calcStayDays(formData.Entrada, formData.Salida) : formData.Entrada ? 1 : '',
       onChange: function onChange(e) {
         var val = e.target.value;
-        var days = Math.max(1, parseInt(val, 10) || 1);
-        var inDate = formData.Entrada || toInputDate(new Date());
+        var days = Math.max(1, Math.min(365, parseInt(val, 10) || 1));
+        var inDate = isCompleteDate(formData.Entrada) ? formData.Entrada : toInputDate(new Date());
         var newOut = addStayDays(inDate, days);
         setFormData(_objectSpread(_objectSpread({}, formData), {}, {
           Entrada: inDate,
@@ -4386,16 +4458,23 @@ function App() {
     }, "Salida:"), /*#__PURE__*/React.createElement("input", {
       type: "date",
       value: toInputDate(formData.Salida),
-      min: formData.Entrada ? addStayDays(formData.Entrada, 1) : undefined,
+      min: isCompleteDate(formData.Entrada) ? addStayDays(formData.Entrada, 1) : undefined,
       onChange: function onChange(e) {
-        var newOut = e.target.value;
-        var validOut = newOut;
-        if (formData.Entrada && newOut && toInputDate(newOut) <= toInputDate(formData.Entrada)) {
-          validOut = addStayDays(formData.Entrada, 1);
-        }
         setFormData(_objectSpread(_objectSpread({}, formData), {}, {
-          Salida: validOut
+          Salida: e.target.value
         }));
+      },
+      onBlur: function onBlur() {
+        if (isCompleteDate(formData.Entrada) && isCompleteDate(formData.Salida)) {
+          if (toInputDate(formData.Salida) <= toInputDate(formData.Entrada)) {
+            var validOut = addStayDays(formData.Entrada, 1);
+            setFormData(function (prev) {
+              return _objectSpread(_objectSpread({}, prev), {}, {
+                Salida: validOut
+              });
+            });
+          }
+        }
       },
       className: "bg-white border border-slate-200 focus:border-indigo-500 rounded-lg px-2.5 py-1 text-xs font-bold text-slate-800 outline-none shadow-2xs w-[145px]"
     })), /*#__PURE__*/React.createElement("div", {
@@ -4626,8 +4705,12 @@ function App() {
         value: toInputDate(seg.in),
         onChange: function onChange(e) {
           var val = e.target.value;
-          var currentDays = calcStayDays(seg.in, seg.out);
-          var newOut = val ? addStayDays(val, currentDays) : seg.out;
+          var newOut = seg.out;
+          if (isCompleteDate(val)) {
+            var currentDays = calcStayDays(seg.in, seg.out);
+            var calculatedOut = addStayDays(val, currentDays);
+            if (calculatedOut) newOut = calculatedOut;
+          }
           var updated = _toConsumableArray(formData.segments || []);
           updated[idx] = _objectSpread(_objectSpread({}, updated[idx]), {}, {
             in: val,
@@ -4637,16 +4720,34 @@ function App() {
             segments: updated
           }));
         },
+        onBlur: function onBlur() {
+          if (isCompleteDate(seg.in)) {
+            var currentDays = calcStayDays(seg.in, seg.out);
+            var validOut = addStayDays(seg.in, currentDays);
+            if (validOut && validOut !== seg.out) {
+              var updated = _toConsumableArray(formData.segments || []);
+              updated[idx] = _objectSpread(_objectSpread({}, updated[idx]), {}, {
+                out: validOut
+              });
+              setFormData(function (prev) {
+                return _objectSpread(_objectSpread({}, prev), {}, {
+                  segments: updated
+                });
+              });
+            }
+          }
+        },
         className: "w-full bg-slate-50 border border-slate-100 rounded-lg p-2 text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500"
       })), /*#__PURE__*/React.createElement("td", {
         className: "p-2"
       }, /*#__PURE__*/React.createElement("input", {
         type: "number",
         min: "1",
-        value: seg.in && seg.out ? calcStayDays(seg.in, seg.out) : seg.in ? 1 : '',
+        max: "365",
+        value: seg.in && seg.out && isCompleteDate(seg.in) && isCompleteDate(seg.out) ? calcStayDays(seg.in, seg.out) : seg.in ? 1 : '',
         onChange: function onChange(e) {
-          var days = Math.max(1, parseInt(e.target.value, 10) || 1);
-          var inDate = seg.in || toInputDate(new Date());
+          var days = Math.max(1, Math.min(365, parseInt(e.target.value, 10) || 1));
+          var inDate = isCompleteDate(seg.in) ? seg.in : toInputDate(new Date());
           var newOut = addStayDays(inDate, days);
           var updated = _toConsumableArray(formData.segments || []);
           updated[idx] = _objectSpread(_objectSpread({}, updated[idx]), {}, {
@@ -4665,20 +4766,32 @@ function App() {
       }, /*#__PURE__*/React.createElement("input", {
         type: "date",
         value: toInputDate(seg.out),
-        min: seg.in ? addStayDays(seg.in, 1) : undefined,
+        min: isCompleteDate(seg.in) ? addStayDays(seg.in, 1) : undefined,
         onChange: function onChange(e) {
           var val = e.target.value;
-          var validOut = val;
-          if (seg.in && val && toInputDate(val) <= toInputDate(seg.in)) {
-            validOut = addStayDays(seg.in, 1);
-          }
           var updated = _toConsumableArray(formData.segments || []);
           updated[idx] = _objectSpread(_objectSpread({}, updated[idx]), {}, {
-            out: validOut
+            out: val
           });
           setFormData(_objectSpread(_objectSpread({}, formData), {}, {
             segments: updated
           }));
+        },
+        onBlur: function onBlur() {
+          if (isCompleteDate(seg.in) && isCompleteDate(seg.out)) {
+            if (toInputDate(seg.out) <= toInputDate(seg.in)) {
+              var validOut = addStayDays(seg.in, 1);
+              var updated = _toConsumableArray(formData.segments || []);
+              updated[idx] = _objectSpread(_objectSpread({}, updated[idx]), {}, {
+                out: validOut
+              });
+              setFormData(function (prev) {
+                return _objectSpread(_objectSpread({}, prev), {}, {
+                  segments: updated
+                });
+              });
+            }
+          }
         },
         className: "w-full bg-slate-50 border border-slate-100 rounded-lg p-2 text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500"
       })), /*#__PURE__*/React.createElement("td", {

@@ -352,6 +352,16 @@
     const formatNum = NexusUtils.formatNum;
     const toInputDate = NexusUtils.toInputDate;
 
+    const isCompleteDate = NexusUtils.isCompleteDate || ((val) => {
+      if (!val) return false;
+      const str = toInputDate(val);
+      if (!str) return false;
+      const parts = str.split("-");
+      if (parts.length !== 3 || parts[0].length !== 4) return false;
+      const y = parseInt(parts[0], 10);
+      return !isNaN(y) && y >= 1990 && y <= 2150;
+    });
+
     const calcStayDays = (inVal, outVal) => {
       const inStr = toInputDate(inVal);
       const outStr = toInputDate(outVal);
@@ -359,17 +369,22 @@
       const dIn = new Date(inStr + "T00:00:00");
       const dOut = new Date(outStr + "T00:00:00");
       if (isNaN(dIn.getTime()) || isNaN(dOut.getTime())) return 1;
+      const yIn = dIn.getFullYear();
+      const yOut = dOut.getFullYear();
+      if (yIn < 1990 || yIn > 2150 || yOut < 1990 || yOut > 2150) return 1;
       const diff = Math.round((dOut.getTime() - dIn.getTime()) / (1000 * 60 * 60 * 24));
-      return diff >= 1 ? diff : 1;
+      return (diff >= 1 && diff <= 366) ? diff : 1;
     };
 
     const addStayDays = (inVal, days) => {
       const inStr = toInputDate(inVal) || new Date().toISOString().split("T")[0];
       const d = new Date(inStr + "T00:00:00");
       if (isNaN(d.getTime())) return "";
-      const validDays = Math.max(1, parseInt(days, 10) || 1);
+      const yIn = d.getFullYear();
+      if (yIn < 1990 || yIn > 2150) return "";
+      const validDays = Math.max(1, Math.min(366, parseInt(days, 10) || 1));
       d.setDate(d.getDate() + validDays);
-      const y = d.getFullYear();
+      const y = String(d.getFullYear()).padStart(4, "0");
       const m = String(d.getMonth() + 1).padStart(2, "0");
       const day = String(d.getDate()).padStart(2, "0");
       return `${y}-${m}-${day}`;
@@ -1763,7 +1778,7 @@
           const hasGridPrices = Object.values(grid).some(b => Object.values(b || {}).some(p => p !== '' && p !== 0 && p !== null));
           if (!hasGridPrices && formData.Hotel_Asignado) {
             const parsedY = formData.Entrada ? new Date(toInputDate(formData.Entrada)).getFullYear() : 2027;
-            const targetY = isNaN(parsedY) ? 2027 : parsedY;
+            const targetY = (!isNaN(parsedY) && parsedY >= 2020 && parsedY <= 2100) ? parsedY : 2027;
             grid = getOfficialTariffsGrid(formData.Hotel_Asignado, targetY);
             changed = true;
           }
@@ -1813,7 +1828,7 @@
             const boardKey = currentBoard.split(' ')[0]; // e.g. "AD", "PC"
             const roomTypes = getRoomTypesForHotel(formData.Hotel_Asignado);
             const parsedY = date ? new Date(toInputDate(date)).getFullYear() : (formData.Entrada ? new Date(toInputDate(formData.Entrada)).getFullYear() : 2027);
-            const targetY = isNaN(parsedY) ? 2027 : parsedY;
+            const targetY = (!isNaN(parsedY) && parsedY >= 2020 && parsedY <= 2100) ? parsedY : 2027;
             const officialGrid = getOfficialTariffsGrid(formData.Hotel_Asignado, targetY);
             const boardPrices = (formData.isRatesOnly && grid && grid[boardKey]) ? grid[boardKey] : (officialGrid[boardKey] || {});
 
@@ -1879,6 +1894,43 @@
               }
             })
             .catch(err => console.warn("Error sincronizando groupTariffs en Presupuestos:", err));
+        }
+      }, []);
+
+      // Sincronizar inteligencia de tarifas y PVP CapaSuite desde Firestore (settings/calendar_data)
+      useEffect(() => {
+        if (window.db && typeof window.db.collection === "function") {
+          window.db.collection("settings").doc("calendar_data").get()
+            .then(snap => {
+              if (snap.exists) {
+                const d = snap.data();
+                if (window.CapaSuitePricingService && typeof window.CapaSuitePricingService.setCalendarData === "function") {
+                  window.CapaSuitePricingService.setCalendarData(d);
+                } else {
+                  if (d.revenueData) {
+                    try {
+                      localStorage.setItem("v3_revenue_data_v2", JSON.stringify(d.revenueData));
+                      localStorage.setItem("revenue_data_v2", JSON.stringify(d.revenueData));
+                    } catch(e) {}
+                  }
+                  if (d.hotelManagerDb) {
+                    try {
+                      localStorage.setItem("v3_hotel_manager_db_v2", JSON.stringify(d.hotelManagerDb));
+                      localStorage.setItem("hotel_manager_db_v2", JSON.stringify(d.hotelManagerDb));
+                    } catch(e) {}
+                  }
+                  if (d.customEvents) {
+                    try {
+                      localStorage.setItem("v3_custom_events", JSON.stringify(d.customEvents));
+                      localStorage.setItem("custom_events", JSON.stringify(d.customEvents));
+                    } catch(e) {}
+                  }
+                }
+                window.dispatchEvent(new CustomEvent('capasuite-data-synced'));
+                refreshAvailability(v => v + 1);
+              }
+            })
+            .catch(err => console.warn("Error sincronizando calendar_data en Presupuestos:", err));
         }
       }, []);
 
@@ -2044,7 +2096,8 @@
           const discount = prev.capaSuiteDiscountPercent ?? 15;
           const average = !!prev.averageStayCondition;
           const recommendedGrid = prev.gridTariffMode === 'recommended';
-          const year = Number(toInputDate(next.Entrada).slice(0, 4)) || 2027;
+          const rawY = Number(toInputDate(next.Entrada).slice(0, 4));
+          const year = (!isNaN(rawY) && rawY >= 2020 && rawY <= 2100) ? rawY : 2027;
           next.ratesOnlyGrid = {};
           ['HA', 'HD', 'MP', 'PC'].forEach(board => {
             next.ratesOnlyGrid[board] = {};
@@ -3603,9 +3656,22 @@ ${emailContent}`;
                           value={toInputDate(formData.Entrada)} 
                           onChange={e => {
                             const newIn = e.target.value;
-                            const currentDays = calcStayDays(formData.Entrada, formData.Salida);
-                            const newOut = newIn ? addStayDays(newIn, currentDays) : formData.Salida;
+                            let newOut = formData.Salida;
+                            if (isCompleteDate(newIn)) {
+                              const currentDays = calcStayDays(formData.Entrada, formData.Salida);
+                              const calculatedOut = addStayDays(newIn, currentDays);
+                              if (calculatedOut) newOut = calculatedOut;
+                            }
                             setFormData({ ...formData, Entrada: newIn, Salida: newOut });
+                          }}
+                          onBlur={() => {
+                            if (isCompleteDate(formData.Entrada)) {
+                              const currentDays = calcStayDays(formData.Entrada, formData.Salida);
+                              const validOut = addStayDays(formData.Entrada, currentDays);
+                              if (validOut && validOut !== formData.Salida) {
+                                setFormData(prev => ({ ...prev, Salida: validOut }));
+                              }
+                            }
                           }}
                           className="bg-white border border-slate-200 focus:border-indigo-500 rounded-lg px-2.5 py-1 text-xs font-bold text-slate-800 outline-none shadow-2xs w-[145px]"
                         />
@@ -3617,11 +3683,12 @@ ${emailContent}`;
                           <input 
                             type="number" 
                             min="1"
-                            value={formData.Entrada && formData.Salida ? calcStayDays(formData.Entrada, formData.Salida) : (formData.Entrada ? 1 : '')} 
+                            max="365"
+                            value={formData.Entrada && formData.Salida && isCompleteDate(formData.Entrada) && isCompleteDate(formData.Salida) ? calcStayDays(formData.Entrada, formData.Salida) : (formData.Entrada ? 1 : '')} 
                             onChange={e => {
                               const val = e.target.value;
-                              const days = Math.max(1, parseInt(val, 10) || 1);
-                              const inDate = formData.Entrada || toInputDate(new Date());
+                              const days = Math.max(1, Math.min(365, parseInt(val, 10) || 1));
+                              const inDate = isCompleteDate(formData.Entrada) ? formData.Entrada : toInputDate(new Date());
                               const newOut = addStayDays(inDate, days);
                               setFormData({ ...formData, Entrada: inDate, Salida: newOut });
                             }}
@@ -3638,14 +3705,17 @@ ${emailContent}`;
                         <input 
                           type="date" 
                           value={toInputDate(formData.Salida)} 
-                          min={formData.Entrada ? addStayDays(formData.Entrada, 1) : undefined}
+                          min={isCompleteDate(formData.Entrada) ? addStayDays(formData.Entrada, 1) : undefined}
                           onChange={e => {
-                            const newOut = e.target.value;
-                            let validOut = newOut;
-                            if (formData.Entrada && newOut && toInputDate(newOut) <= toInputDate(formData.Entrada)) {
-                              validOut = addStayDays(formData.Entrada, 1);
+                            setFormData({ ...formData, Salida: e.target.value });
+                          }}
+                          onBlur={() => {
+                            if (isCompleteDate(formData.Entrada) && isCompleteDate(formData.Salida)) {
+                              if (toInputDate(formData.Salida) <= toInputDate(formData.Entrada)) {
+                                const validOut = addStayDays(formData.Entrada, 1);
+                                setFormData(prev => ({ ...prev, Salida: validOut }));
+                              }
                             }
-                            setFormData({ ...formData, Salida: validOut });
                           }}
                           className="bg-white border border-slate-200 focus:border-indigo-500 rounded-lg px-2.5 py-1 text-xs font-bold text-slate-800 outline-none shadow-2xs w-[145px]"
                         />
@@ -3846,11 +3916,26 @@ ${emailContent}`;
                                   value={toInputDate(seg.in)}
                                   onChange={e => {
                                     const val = e.target.value;
-                                    const currentDays = calcStayDays(seg.in, seg.out);
-                                    const newOut = val ? addStayDays(val, currentDays) : seg.out;
+                                    let newOut = seg.out;
+                                    if (isCompleteDate(val)) {
+                                      const currentDays = calcStayDays(seg.in, seg.out);
+                                      const calculatedOut = addStayDays(val, currentDays);
+                                      if (calculatedOut) newOut = calculatedOut;
+                                    }
                                     const updated = [...(formData.segments || [])];
                                     updated[idx] = { ...updated[idx], in: val, out: newOut };
                                     setFormData({ ...formData, segments: updated });
+                                  }}
+                                  onBlur={() => {
+                                    if (isCompleteDate(seg.in)) {
+                                      const currentDays = calcStayDays(seg.in, seg.out);
+                                      const validOut = addStayDays(seg.in, currentDays);
+                                      if (validOut && validOut !== seg.out) {
+                                        const updated = [...(formData.segments || [])];
+                                        updated[idx] = { ...updated[idx], out: validOut };
+                                        setFormData(prev => ({ ...prev, segments: updated }));
+                                      }
+                                    }
                                   }}
                                   className="w-full bg-slate-50 border border-slate-100 rounded-lg p-2 text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500"
                                 />
@@ -3859,10 +3944,11 @@ ${emailContent}`;
                                 <input
                                   type="number"
                                   min="1"
-                                  value={seg.in && seg.out ? calcStayDays(seg.in, seg.out) : (seg.in ? 1 : '')}
+                                  max="365"
+                                  value={seg.in && seg.out && isCompleteDate(seg.in) && isCompleteDate(seg.out) ? calcStayDays(seg.in, seg.out) : (seg.in ? 1 : '')}
                                   onChange={e => {
-                                    const days = Math.max(1, parseInt(e.target.value, 10) || 1);
-                                    const inDate = seg.in || toInputDate(new Date());
+                                    const days = Math.max(1, Math.min(365, parseInt(e.target.value, 10) || 1));
+                                    const inDate = isCompleteDate(seg.in) ? seg.in : toInputDate(new Date());
                                     const newOut = addStayDays(inDate, days);
                                     const updated = [...(formData.segments || [])];
                                     updated[idx] = { ...updated[idx], in: inDate, out: newOut };
@@ -3877,16 +3963,22 @@ ${emailContent}`;
                                 <input
                                   type="date"
                                   value={toInputDate(seg.out)}
-                                  min={seg.in ? addStayDays(seg.in, 1) : undefined}
+                                  min={isCompleteDate(seg.in) ? addStayDays(seg.in, 1) : undefined}
                                   onChange={e => {
                                     const val = e.target.value;
-                                    let validOut = val;
-                                    if (seg.in && val && toInputDate(val) <= toInputDate(seg.in)) {
-                                      validOut = addStayDays(seg.in, 1);
-                                    }
                                     const updated = [...(formData.segments || [])];
-                                    updated[idx] = { ...updated[idx], out: validOut };
+                                    updated[idx] = { ...updated[idx], out: val };
                                     setFormData({ ...formData, segments: updated });
+                                  }}
+                                  onBlur={() => {
+                                    if (isCompleteDate(seg.in) && isCompleteDate(seg.out)) {
+                                      if (toInputDate(seg.out) <= toInputDate(seg.in)) {
+                                        const validOut = addStayDays(seg.in, 1);
+                                        const updated = [...(formData.segments || [])];
+                                        updated[idx] = { ...updated[idx], out: validOut };
+                                        setFormData(prev => ({ ...prev, segments: updated }));
+                                      }
+                                    }
                                   }}
                                   className="w-full bg-slate-50 border border-slate-100 rounded-lg p-2 text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500"
                                 />

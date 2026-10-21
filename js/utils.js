@@ -78,7 +78,7 @@
       if (isNaN(dateStr.getTime())) return "";
       var day = String(dateStr.getDate()).padStart(2, "0");
       var month = String(dateStr.getMonth() + 1).padStart(2, "0");
-      var year = dateStr.getFullYear();
+      var year = String(dateStr.getFullYear()).padStart(4, "0");
       return day + "/" + month + "/" + year;
     }
     var s = String(dateStr).trim();
@@ -107,6 +107,13 @@
   // ── Normalización a formato input (YYYY-MM-DD) ───────
   function toInputDate(val) {
     if (!val) return "";
+    if (val instanceof Date) {
+      if (isNaN(val.getTime())) return "";
+      var y = val.getFullYear();
+      var m = String(val.getMonth() + 1).padStart(2, "0");
+      var d = String(val.getDate()).padStart(2, "0");
+      return String(y).padStart(4, "0") + "-" + m + "-" + d;
+    }
     var str = String(val).trim();
 
     // Caso 1: Excel Serial (ej: 46129)
@@ -125,7 +132,7 @@
         var d = parts[0], m = parts[1], yRaw = parts[2];
         var y = parseInt(yRaw);
         if (y < 100) y += 2000;
-        return String(y) + "-" + m.padStart(2, "0") + "-" + d.padStart(2, "0");
+        return String(y).padStart(4, "0") + "-" + m.padStart(2, "0") + "-" + d.padStart(2, "0");
       }
     }
 
@@ -152,7 +159,7 @@
         var d = parts[0], m = parts[1], yRaw = parts[2];
         var y = parseInt(yRaw);
         if (y < 100) y += 2000;
-        return String(y) + "-" + m.padStart(2, "0") + "-" + d.padStart(2, "0");
+        return String(y).padStart(4, "0") + "-" + m.padStart(2, "0") + "-" + d.padStart(2, "0");
       }
     }
 
@@ -204,17 +211,43 @@
     },
   };
 
+  // ── Validación de fecha completa (evita valores incompletos al teclear) ──
+  function isCompleteDate(val) {
+    if (!val) return false;
+    var str = toInputDate(val);
+    if (!str) return false;
+    var parts = str.split("-");
+    if (parts.length !== 3 || parts[0].length !== 4) return false;
+    var y = parseInt(parts[0], 10);
+    if (isNaN(y) || y < 1990 || y > 2150) return false;
+    var m = parseInt(parts[1], 10);
+    var d = parseInt(parts[2], 10);
+    if (isNaN(m) || m < 1 || m > 12 || isNaN(d) || d < 1 || d > 31) return false;
+    var dateObj = new Date(str + "T00:00:00");
+    return !isNaN(dateObj.getTime());
+  }
+
   // ── Generación de array de fechas ──────────────────────
   function generateDates(start, end) {
     if (!start || !end) return [];
     try {
-      var d1 = new Date(start + "T00:00:00");
-      var d2 = new Date(end + "T00:00:00");
-      if (isNaN(d1) || isNaN(d2) || d1 >= d2) return [];
+      var sStart = toInputDate(start);
+      var sEnd = toInputDate(end);
+      if (!sStart || !sEnd) return [];
+      var d1 = new Date(sStart + "T00:00:00");
+      var d2 = new Date(sEnd + "T00:00:00");
+      if (isNaN(d1.getTime()) || isNaN(d2.getTime()) || d1 >= d2) return [];
+      var y1 = d1.getFullYear();
+      var y2 = d2.getFullYear();
+      // Verificación de año realista (evita desbordamientos al teclear manualmente años incompletos ej: 0002)
+      if (y1 < 1990 || y1 > 2150 || y2 < 1990 || y2 > 2150) return [];
+      var diffDays = Math.round((d2.getTime() - d1.getTime()) / (1000 * 60 * 60 * 24));
+      // Máximo rango de estancia admisible (366 días) para evitar bloqueos del navegador
+      if (diffDays <= 0 || diffDays > 366) return [];
       var dates = [];
       var current = new Date(d1);
       while (current < d2) {
-        var year = current.getFullYear();
+        var year = String(current.getFullYear()).padStart(4, "0");
         var month = String(current.getMonth() + 1).padStart(2, "0");
         var day = String(current.getDate()).padStart(2, "0");
         dates.push(year + "-" + month + "-" + day);
@@ -250,8 +283,8 @@
     return "bg-amber-100 text-amber-700 border-amber-200";
   }
 
-  // ── Exportar al scope global ───────────────────────────
-  window.NexusUtils = {
+  // ── Exportar al scope global y módulos ────────────────
+  var utilsExport = {
     parseNum: parseNum,
     normalizeId: normalizeId,
     getBaseId: getBaseId,
@@ -264,7 +297,15 @@
     generateSeriesDates: generateSeriesDates,
     getStatusColor: getStatusColor,
     toInputDate: toInputDate,
+    isCompleteDate: isCompleteDate,
     COLORS: COLORS,
   };
+
+  if (typeof window !== "undefined") {
+    window.NexusUtils = utilsExport;
+  }
+  if (typeof module !== "undefined" && module.exports) {
+    module.exports = utilsExport;
+  }
 
 })();

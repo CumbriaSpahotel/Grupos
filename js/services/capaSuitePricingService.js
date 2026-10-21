@@ -20,13 +20,64 @@
 
   function roundRate(value) { return Math.round((Number(value) + Number.EPSILON) * 20) / 20; }
 
+  var inMemoryStorage = {};
+
   function safeGetStorage(key) {
+    if (inMemoryStorage[key]) return inMemoryStorage[key];
+    if (inMemoryStorage['v3_' + key]) return inMemoryStorage['v3_' + key];
     if (typeof localStorage === 'undefined') return null;
     try {
       return localStorage.getItem('v3_' + key) || localStorage.getItem(key) || null;
     } catch (e) {
       return null;
     }
+  }
+
+  function setCalendarData(data) {
+    if (!data || typeof data !== 'object') return;
+    if (data.revenueData) {
+      inMemoryStorage['revenue_data_v2'] = data.revenueData;
+      try {
+        localStorage.setItem('v3_revenue_data_v2', JSON.stringify(data.revenueData));
+        localStorage.setItem('revenue_data_v2', JSON.stringify(data.revenueData));
+      } catch (e) {}
+    }
+    if (data.hotelManagerDb) {
+      inMemoryStorage['hotel_manager_db_v2'] = data.hotelManagerDb;
+      try {
+        localStorage.setItem('v3_hotel_manager_db_v2', JSON.stringify(data.hotelManagerDb));
+        localStorage.setItem('hotel_manager_db_v2', JSON.stringify(data.hotelManagerDb));
+      } catch (e) {}
+    }
+    if (data.customEvents) {
+      inMemoryStorage['custom_events'] = data.customEvents;
+      try {
+        localStorage.setItem('v3_custom_events', JSON.stringify(data.customEvents));
+        localStorage.setItem('custom_events', JSON.stringify(data.customEvents));
+      } catch (e) {}
+    }
+  }
+
+  function syncFromFirestore(dbInstance, callback) {
+    var db = dbInstance || (typeof window !== 'undefined' ? window.db : null);
+    if (!db || typeof db.collection !== 'function') return Promise.resolve(false);
+    return db.collection('settings').doc('calendar_data').get()
+      .then(function (doc) {
+        if (doc.exists) {
+          var d = doc.data();
+          setCalendarData(d);
+          if (typeof callback === 'function') callback(d);
+          if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+            window.dispatchEvent(new CustomEvent('capasuite-data-synced'));
+          }
+          return true;
+        }
+        return false;
+      })
+      .catch(function (err) {
+        console.warn('Error sincronizando calendar_data en CapaSuitePricingService:', err);
+        return false;
+      });
   }
 
   function normalizeHotelKey(hotel) {
@@ -58,8 +109,10 @@
         var parsedRev = typeof rawRev === 'string' ? JSON.parse(rawRev) : rawRev;
         var dayData = null;
         if (parsedRev) {
-          if (Array.isArray(parsedRev.data)) {
-            dayData = parsedRev.data.find(function (d) { return d && d.dateISO === dateISO; });
+          if (Array.isArray(parsedRev)) {
+            dayData = parsedRev.find(function (d) { return d && (d.dateISO === dateISO || d.date === dateISO); });
+          } else if (Array.isArray(parsedRev.data)) {
+            dayData = parsedRev.data.find(function (d) { return d && (d.dateISO === dateISO || d.date === dateISO); });
           } else if (typeof parsedRev === 'object') {
             dayData = parsedRev[dateISO] || (parsedRev.data && parsedRev.data[dateISO]);
           }
@@ -74,8 +127,14 @@
             });
             if (hotelEntry) {
               var val = hotelEntry[1];
-              var p = typeof val === 'object' ? (val.price || 0) : (Number(val) || 0);
-              var isSold = typeof val === 'object' && (val.sold === true || val.soldOut === true);
+              var rawP = typeof val === 'object' && val !== null ? (val.price !== undefined ? val.price : val.p) : val;
+              var p = 0;
+              if (typeof rawP === 'number') {
+                p = rawP;
+              } else if (rawP !== null && rawP !== undefined && String(rawP).trim() !== '') {
+                p = parseFloat(String(rawP).replace(/[^\d.,]/g, '').replace(',', '.')) || 0;
+              }
+              var isSold = typeof val === 'object' && val !== null && (val.sold === true || val.soldOut === true || val.isSoldOut === true || String(rawP).toUpperCase() === 'SOLD');
               if (p > 0 && !isSold) {
                 return {
                   price: Math.round(p * 100) / 100,
@@ -85,6 +144,20 @@
                   dateISO: dateISO
                 };
               }
+            }
+          }
+
+          // Buscar si el propio dayData tiene propiedad price directa
+          if (dayData.price !== undefined && !dayData.hotels) {
+            var pDirect = typeof dayData.price === 'number' ? dayData.price : parseFloat(String(dayData.price).replace(/[^\d.,]/g, '').replace(',', '.')) || 0;
+            if (pDirect > 0) {
+              return {
+                price: Math.round(pDirect * 100) / 100,
+                source: 'PVP CapaSuite',
+                isEstimated: false,
+                hotel: hotelName,
+                dateISO: dateISO
+              };
             }
           }
 
@@ -477,6 +550,8 @@
     getCapaSuiteHotelDayPrice: getCapaSuiteHotelDayPrice,
     getTariffComparison: getTariffComparison,
     getStayTariffSummary: getStayTariffSummary,
-    normalizeHotelKey: normalizeHotelKey
+    normalizeHotelKey: normalizeHotelKey,
+    setCalendarData: setCalendarData,
+    syncFromFirestore: syncFromFirestore
   };
 }));

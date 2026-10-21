@@ -1474,11 +1474,25 @@
                     window.db.collection('settings').doc('calendar_data').get().then(function (doc) {
                         if (doc.exists) {
                             var d = doc.data();
-                            if (d.revenueData) revenueData = d.revenueData;
-                            if (d.customEvents) rawEvents = d.customEvents;
-                            if (d.hotelManagerDb) db = d.hotelManagerDb;
+                            if (d.revenueData) {
+                                revenueData = d.revenueData;
+                                setStorageItem('revenue_data_v2', JSON.stringify(d.revenueData));
+                            }
+                            if (d.customEvents) {
+                                rawEvents = d.customEvents;
+                                setStorageItem('custom_events', JSON.stringify(d.customEvents));
+                            }
+                            if (d.hotelManagerDb) {
+                                db = d.hotelManagerDb;
+                                setStorageItem('hotel_manager_db_v2', JSON.stringify(d.hotelManagerDb));
+                            }
+                            if (window.CapaSuitePricingService && typeof window.CapaSuitePricingService.setCalendarData === 'function') {
+                                window.CapaSuitePricingService.setCalendarData(d);
+                            }
                         }
-                    }).catch(function () {}).finally(function () {
+                    }).catch(function (e) {
+                        console.warn("Error sincronizando calendar_data:", e);
+                    }).finally(function () {
                         loadAllData();
                         setTimeout(function () {
                             if (btnIcon) btnIcon.classList.remove("spinner-anim");
@@ -1597,6 +1611,9 @@
             // Inicialización al cargar la página
             window.addEventListener('load', function () {
                 loadAllData();
+                if (window.db && typeof window.db.collection === 'function') {
+                    refreshCalendarData();
+                }
             });
 
         })();
