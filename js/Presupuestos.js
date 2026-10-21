@@ -2218,40 +2218,48 @@ function App() {
 
   // Sincronizar inteligencia de tarifas y PVP CapaSuite desde Firestore (settings/calendar_data)
   useEffect(function () {
-    if (window.db && typeof window.db.collection === "function") {
-      window.db.collection("settings").doc("calendar_data").get().then(function (snap) {
-        if (snap.exists) {
-          var d = snap.data();
-          if (window.CapaSuitePricingService && typeof window.CapaSuitePricingService.setCalendarData === "function") {
-            window.CapaSuitePricingService.setCalendarData(d);
-          } else {
-            if (d.revenueData) {
-              try {
-                localStorage.setItem("v3_revenue_data_v2", JSON.stringify(d.revenueData));
-                localStorage.setItem("revenue_data_v2", JSON.stringify(d.revenueData));
-              } catch (e) {}
-            }
-            if (d.hotelManagerDb) {
-              try {
-                localStorage.setItem("v3_hotel_manager_db_v2", JSON.stringify(d.hotelManagerDb));
-                localStorage.setItem("hotel_manager_db_v2", JSON.stringify(d.hotelManagerDb));
-              } catch (e) {}
-            }
-            if (d.customEvents) {
-              try {
-                localStorage.setItem("v3_custom_events", JSON.stringify(d.customEvents));
-                localStorage.setItem("custom_events", JSON.stringify(d.customEvents));
-              } catch (e) {}
-            }
-          }
-          window.dispatchEvent(new CustomEvent('capasuite-data-synced'));
-          refreshAvailability(function (v) {
-            return v + 1;
-          });
+    var handleSnapshot = function handleSnapshot(snap) {
+      if (snap && snap.exists) {
+        var d = snap.data();
+        if (window.CapaSuitePricingService && typeof window.CapaSuitePricingService.setCalendarData === "function") {
+          window.CapaSuitePricingService.setCalendarData(d);
         }
-      }).catch(function (err) {
-        return console.warn("Error sincronizando calendar_data en Presupuestos:", err);
-      });
+        if (d.revenueData) {
+          try {
+            localStorage.setItem("v3_revenue_data_v2", JSON.stringify(d.revenueData));
+            localStorage.setItem("revenue_data_v2", JSON.stringify(d.revenueData));
+          } catch (e) {}
+        }
+        if (d.hotelManagerDb) {
+          try {
+            localStorage.setItem("v3_hotel_manager_db_v2", JSON.stringify(d.hotelManagerDb));
+            localStorage.setItem("hotel_manager_db_v2", JSON.stringify(d.hotelManagerDb));
+          } catch (e) {}
+        }
+        if (d.customEvents) {
+          try {
+            localStorage.setItem("v3_custom_events", JSON.stringify(d.customEvents));
+            localStorage.setItem("custom_events", JSON.stringify(d.customEvents));
+          } catch (e) {}
+        }
+        window.dispatchEvent(new CustomEvent('capasuite-data-synced'));
+        refreshAvailability(function (v) {
+          return v + 1;
+        });
+      }
+    };
+    if (window.db && typeof window.db.collection === "function") {
+      try {
+        var unsub = window.db.collection("settings").doc("calendar_data").onSnapshot(handleSnapshot, function (err) {
+          console.warn("Error en listener calendar_data en Presupuestos, reintentando con get():", err);
+          window.db.collection("settings").doc("calendar_data").get().then(handleSnapshot).catch(function () {});
+        });
+        return function () {
+          if (typeof unsub === "function") unsub();
+        };
+      } catch (e) {
+        window.db.collection("settings").doc("calendar_data").get().then(handleSnapshot).catch(function () {});
+      }
     }
   }, []);
 
@@ -7929,7 +7937,7 @@ function App() {
       return setEmailContent(e.target.value);
     },
     disabled: isParsingEmail,
-    placeholder: "Querido Hotel, me gustar\xEDa reservar habitaciones para 9 personas de nuestra compa\xF1\xEDa...\r 3 personas: Entrada 14 junio, Salida 19 junio.\r\nY del 21 de junio al...",
+    placeholder: "Querido Hotel, me gustar\xEDa reservar habitaciones para 9 personas de nuestra compa\xF1\xEDa... 3 personas: Entrada 14 junio, Salida 19 junio.\nY del 21 de junio al...",
     className: "w-full bg-slate-50 border border-slate-100 rounded-xl p-4 text-xs text-slate-700 placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all min-h-[250px] resize-none"
   }))), /*#__PURE__*/React.createElement("div", {
     className: "p-6 border-t border-slate-100 bg-slate-50/30 flex justify-end gap-3"

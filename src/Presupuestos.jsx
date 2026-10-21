@@ -1899,38 +1899,47 @@
 
       // Sincronizar inteligencia de tarifas y PVP CapaSuite desde Firestore (settings/calendar_data)
       useEffect(() => {
+        const handleSnapshot = (snap) => {
+          if (snap && snap.exists) {
+            const d = snap.data();
+            if (window.CapaSuitePricingService && typeof window.CapaSuitePricingService.setCalendarData === "function") {
+              window.CapaSuitePricingService.setCalendarData(d);
+            }
+            if (d.revenueData) {
+              try {
+                localStorage.setItem("v3_revenue_data_v2", JSON.stringify(d.revenueData));
+                localStorage.setItem("revenue_data_v2", JSON.stringify(d.revenueData));
+              } catch(e) {}
+            }
+            if (d.hotelManagerDb) {
+              try {
+                localStorage.setItem("v3_hotel_manager_db_v2", JSON.stringify(d.hotelManagerDb));
+                localStorage.setItem("hotel_manager_db_v2", JSON.stringify(d.hotelManagerDb));
+              } catch(e) {}
+            }
+            if (d.customEvents) {
+              try {
+                localStorage.setItem("v3_custom_events", JSON.stringify(d.customEvents));
+                localStorage.setItem("custom_events", JSON.stringify(d.customEvents));
+              } catch(e) {}
+            }
+            window.dispatchEvent(new CustomEvent('capasuite-data-synced'));
+            refreshAvailability(v => v + 1);
+          }
+        };
+
         if (window.db && typeof window.db.collection === "function") {
-          window.db.collection("settings").doc("calendar_data").get()
-            .then(snap => {
-              if (snap.exists) {
-                const d = snap.data();
-                if (window.CapaSuitePricingService && typeof window.CapaSuitePricingService.setCalendarData === "function") {
-                  window.CapaSuitePricingService.setCalendarData(d);
-                } else {
-                  if (d.revenueData) {
-                    try {
-                      localStorage.setItem("v3_revenue_data_v2", JSON.stringify(d.revenueData));
-                      localStorage.setItem("revenue_data_v2", JSON.stringify(d.revenueData));
-                    } catch(e) {}
-                  }
-                  if (d.hotelManagerDb) {
-                    try {
-                      localStorage.setItem("v3_hotel_manager_db_v2", JSON.stringify(d.hotelManagerDb));
-                      localStorage.setItem("hotel_manager_db_v2", JSON.stringify(d.hotelManagerDb));
-                    } catch(e) {}
-                  }
-                  if (d.customEvents) {
-                    try {
-                      localStorage.setItem("v3_custom_events", JSON.stringify(d.customEvents));
-                      localStorage.setItem("custom_events", JSON.stringify(d.customEvents));
-                    } catch(e) {}
-                  }
-                }
-                window.dispatchEvent(new CustomEvent('capasuite-data-synced'));
-                refreshAvailability(v => v + 1);
-              }
-            })
-            .catch(err => console.warn("Error sincronizando calendar_data en Presupuestos:", err));
+          try {
+            const unsub = window.db.collection("settings").doc("calendar_data").onSnapshot(handleSnapshot, err => {
+              console.warn("Error en listener calendar_data en Presupuestos, reintentando con get():", err);
+              window.db.collection("settings").doc("calendar_data").get().then(handleSnapshot).catch(() => {});
+            });
+            return () => {
+              if (typeof unsub === "function") unsub();
+            };
+          } catch (e) {
+            window.db.collection("settings").doc("calendar_data").get().then(handleSnapshot).catch(() => {});
+          }
         }
       }, []);
 

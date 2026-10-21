@@ -56,6 +56,23 @@
         localStorage.setItem('custom_events', JSON.stringify(data.customEvents));
       } catch (e) {}
     }
+    if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+      window.dispatchEvent(new CustomEvent('capasuite-data-synced'));
+    }
+  }
+
+  // Escuchar sincronizaciones externas (ej. desde groupTargetsService o Firebase)
+  if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+    window.addEventListener('capasuite-data-synced', function () {
+      try {
+        var rawRev = safeGetStorage('revenue_data_v2');
+        if (rawRev) inMemoryStorage['revenue_data_v2'] = typeof rawRev === 'string' ? JSON.parse(rawRev) : rawRev;
+      } catch (e) {}
+      try {
+        var rawDb = safeGetStorage('hotel_manager_db_v2');
+        if (rawDb) inMemoryStorage['hotel_manager_db_v2'] = typeof rawDb === 'string' ? JSON.parse(rawDb) : rawDb;
+      } catch (e) {}
+    });
   }
 
   function syncFromFirestore(dbInstance, callback) {
@@ -102,32 +119,68 @@
     var hotelKey = normalizeHotelKey(hotelName);
     var isCumbria = hotelKey === 'cumbria';
 
+    // Normalizar formato de fecha a ISO (YYYY-MM-DD) y alternativo (DD/MM/YYYY)
+    var rawDateStr = String(dateISO).trim();
+    var iso = rawDateStr;
+    var dmy = rawDateStr;
+    if (rawDateStr.indexOf('/') !== -1) {
+      var slashParts = rawDateStr.split('/');
+      if (slashParts.length === 3) {
+        if (slashParts[0].length === 4) {
+          iso = slashParts[0] + '-' + slashParts[1].padStart(2, '0') + '-' + slashParts[2].padStart(2, '0');
+          dmy = slashParts[2].padStart(2, '0') + '/' + slashParts[1].padStart(2, '0') + '/' + slashParts[0];
+        } else {
+          iso = slashParts[2] + '-' + slashParts[1].padStart(2, '0') + '-' + slashParts[0].padStart(2, '0');
+          dmy = slashParts[0].padStart(2, '0') + '/' + slashParts[1].padStart(2, '0') + '/' + slashParts[2];
+        }
+      }
+    } else if (rawDateStr.indexOf('-') !== -1) {
+      var dashParts = rawDateStr.split('-');
+      if (dashParts.length === 3) {
+        if (dashParts[0].length === 4) {
+          iso = dashParts[0] + '-' + dashParts[1].padStart(2, '0') + '-' + dashParts[2].padStart(2, '0');
+          dmy = dashParts[2].padStart(2, '0') + '/' + dashParts[1].padStart(2, '0') + '/' + dashParts[0];
+        } else {
+          iso = dashParts[2] + '-' + dashParts[1].padStart(2, '0') + '-' + dashParts[0].padStart(2, '0');
+          dmy = dashParts[0].padStart(2, '0') + '/' + dashParts[1].padStart(2, '0') + '/' + dashParts[2];
+        }
+      }
+    }
+
     // 1. Intentar leer de revenue_data_v2
     try {
       var rawRev = safeGetStorage('revenue_data_v2');
+      if (!rawRev && typeof window !== 'undefined' && window._capasuiteRevenueCache) {
+        rawRev = window._capasuiteRevenueCache;
+      }
       if (rawRev) {
         var parsedRev = typeof rawRev === 'string' ? JSON.parse(rawRev) : rawRev;
         var dayData = null;
         if (parsedRev) {
           if (Array.isArray(parsedRev)) {
-            dayData = parsedRev.find(function (d) { return d && (d.dateISO === dateISO || d.date === dateISO); });
+            dayData = parsedRev.find(function (d) {
+              return d && (d.dateISO === iso || d.date === iso || d.dateISO === dmy || d.date === dmy);
+            });
           } else if (Array.isArray(parsedRev.data)) {
-            dayData = parsedRev.data.find(function (d) { return d && (d.dateISO === dateISO || d.date === dateISO); });
+            dayData = parsedRev.data.find(function (d) {
+              return d && (d.dateISO === iso || d.date === iso || d.dateISO === dmy || d.date === dmy);
+            });
           } else if (typeof parsedRev === 'object') {
-            dayData = parsedRev[dateISO] || (parsedRev.data && parsedRev.data[dateISO]);
+            dayData = parsedRev[iso] || parsedRev[dmy] || (parsedRev.data && (parsedRev.data[iso] || parsedRev.data[dmy]));
           }
         }
 
         if (dayData) {
-          // Buscar en hotels (PVP retail del día)
-          if (dayData.hotels && typeof dayData.hotels === 'object') {
-            var hotelEntry = Object.entries(dayData.hotels).find(function (entry) {
-              var h = entry[0].toLowerCase();
-              return isCumbria ? h.indexOf('cumbria') !== -1 : (h.indexOf('guadiana') !== -1 || h.indexOf('sercotel') !== -1);
+          // Buscar en hotels (PVP retail del día) o directamente en dayData
+          var hotelsMap = (dayData.hotels && typeof dayData.hotels === 'object') ? dayData.hotels : dayData;
+          if (hotelsMap && typeof hotelsMap === 'object') {
+            var hotelEntry = Object.entries(hotelsMap).find(function (entry) {
+              var h = String(entry[0]).toLowerCase();
+              return isCumbria ? (h.indexOf('cumbria') !== -1 || h.indexOf('spa') !== -1) : (h.indexOf('guadiana') !== -1 || h.indexOf('sercotel') !== -1);
             });
             if (hotelEntry) {
               var val = hotelEntry[1];
-              var rawP = typeof val === 'object' && val !== null ? (val.price !== undefined ? val.price : val.p) : val;
+              var rawP = typeof val === 'object' && val !== null ? (val.price !== undefined ? val.price : (val.p !== undefined ? val.p : (val.rate !== undefined ? val.rate : val.tarifa))) : val;
               var p = 0;
               if (typeof rawP === 'number') {
                 p = rawP;
@@ -141,7 +194,7 @@
                   source: 'PVP CapaSuite (' + hotelEntry[0] + ')',
                   isEstimated: false,
                   hotel: hotelName,
-                  dateISO: dateISO
+                  dateISO: iso
                 };
               }
             }
@@ -156,7 +209,7 @@
                 source: 'PVP CapaSuite',
                 isEstimated: false,
                 hotel: hotelName,
-                dateISO: dateISO
+                dateISO: iso
               };
             }
           }
@@ -174,7 +227,7 @@
                 source: 'ADR CapaSuite (' + occKey + ')',
                 isEstimated: false,
                 hotel: hotelName,
-                dateISO: dateISO
+                dateISO: iso
               };
             }
           }
@@ -187,6 +240,9 @@
     // 2. Intentar leer de hotel_manager_db_v2
     try {
       var rawProd = safeGetStorage('hotel_manager_db_v2');
+      if (!rawProd && typeof window !== 'undefined' && window._capasuiteDbCache) {
+        rawProd = window._capasuiteDbCache;
+      }
       if (rawProd) {
         var parsedProd = typeof rawProd === 'string' ? JSON.parse(rawProd) : rawProd;
         if (parsedProd && typeof parsedProd === 'object') {
@@ -195,20 +251,26 @@
             return isCumbria ? lower.indexOf('cumbria') !== -1 : lower.indexOf('guadiana') !== -1;
           });
           if (masterKey && parsedProd[masterKey]) {
-            var parts = String(dateISO).split('-');
+            var parts = iso.split('-');
             var year = parts[0];
             var yearData = parsedProd[masterKey][year];
-            if (yearData && yearData.daily_otb && yearData.daily_otb[dateISO]) {
-              var dotb = yearData.daily_otb[dateISO];
-              var priceVal = dotb.price || dotb.adr || 0;
-              if (priceVal > 0) {
-                return {
-                  price: Math.round(priceVal * 100) / 100,
-                  source: 'OTB CapaSuite (' + masterKey + ')',
-                  isEstimated: false,
-                  hotel: hotelName,
-                  dateISO: dateISO
-                };
+            if (yearData) {
+              var dotb = (yearData.daily_otb && (yearData.daily_otb[iso] || yearData.daily_otb[dmy])) ||
+                         (yearData.daily && (yearData.daily[iso] || yearData.daily[dmy]));
+              if (dotb) {
+                var priceVal = dotb.price || dotb.adr || dotb.pmp || 0;
+                if (!priceVal && dotb.revenue && dotb.rooms && Number(dotb.rooms) > 0) {
+                  priceVal = Math.round((Number(dotb.revenue) / Number(dotb.rooms)) * 100) / 100;
+                }
+                if (priceVal > 0) {
+                  return {
+                    price: Math.round(priceVal * 100) / 100,
+                    source: 'OTB CapaSuite (' + masterKey + ')',
+                    isEstimated: false,
+                    hotel: hotelName,
+                    dateISO: iso
+                  };
+                }
               }
             }
           }
@@ -219,7 +281,7 @@
     }
 
     // 3. Fallback inteligente de mercado CapaSuite (Estacionalidad + Fin de semana)
-    var dateParts = String(dateISO).split('-');
+    var dateParts = String(iso).split('-');
     var y = parseInt(dateParts[0], 10) || 2026;
     var m = (parseInt(dateParts[1], 10) || 1) - 1; // 0..11
     var d = parseInt(dateParts[2], 10) || 1;
@@ -227,26 +289,25 @@
     var dow = dateObj.getDay(); // 0 Dom, 5 Vie, 6 Sab
     var isWeekend = (dow === 5 || dow === 6);
 
-    var baseRate = isCumbria ? 62 : 68;
-    // Primavera-verano y temporada de ferias/eventos (Mayo a Octubre)
+    // Mismo esquema base calibrado de Calendario.html
+    var baseRate = 65;
     if (m >= 4 && m <= 9) {
-      baseRate += 12;
+      baseRate = 75; // Primavera-verano
     }
-    // Fines de semana tienen mayor presión de demanda ocio
+    var hotelRate = isCumbria ? (baseRate - 4) : baseRate; // Cumbria 71€ en temporada alta
     if (isWeekend) {
-      baseRate += 18;
+      hotelRate += 6;
     }
-    // Domingos precio valle
     if (dow === 0) {
-      baseRate -= 4;
+      hotelRate -= 4;
     }
 
     return {
-      price: baseRate,
+      price: hotelRate,
       source: 'Benchmark CapaSuite (' + (isCumbria ? 'Cumbria' : 'Guadiana') + (isWeekend ? ' Fin de Semana' : '') + ')',
       isEstimated: true,
       hotel: hotelName,
-      dateISO: dateISO
+      dateISO: iso
     };
   }
 
