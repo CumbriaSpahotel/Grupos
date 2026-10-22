@@ -3651,7 +3651,15 @@ ${emailContent}`;
                         <input 
                           type="date" 
                           value={toInputDate(formData.Entrada)} 
-                          onChange={e => setFormData(prev => ({ ...prev, Entrada: e.target.value, DateRanges_JSON: [] }))}
+                          onChange={e => {
+                            const entrada = e.target.value;
+                            setFormData(prev => ({ ...prev, Entrada: entrada, DateRanges_JSON: [] }));
+                          }}
+                          onBlur={() => {
+                            if (isCompleteDate(formData.Entrada) && !calcStayDays(formData.Entrada, formData.Salida)) {
+                              setFormData(prev => ({ ...prev, Salida: addStayDays(prev.Entrada, 1), DateRanges_JSON: [] }));
+                            }
+                          }}
                           className="bg-white border border-slate-200 focus:border-indigo-500 rounded-lg px-2.5 py-1 text-xs font-bold text-slate-800 outline-none shadow-2xs w-[145px]"
                         />
                       </div>
@@ -3663,7 +3671,7 @@ ${emailContent}`;
                             type="number" 
                             min="1"
                             max="365"
-                            value={calcStayDays(formData.Entrada, formData.Salida) || ''}
+                            value={calcStayDays(formData.Entrada, formData.Salida) || 1}
                             onChange={e => {
                               const val = e.target.value;
                               const days = Math.max(1, Math.min(365, parseInt(val, 10) || 1));
@@ -3671,11 +3679,10 @@ ${emailContent}`;
                               const newOut = addStayDays(inDate, days);
                               setFormData({ ...formData, Entrada: inDate, Salida: newOut, DateRanges_JSON: [] });
                             }}
-                            className="bg-white border border-slate-200 focus:border-indigo-500 rounded-lg pl-2 pr-7 py-1 text-xs font-black text-slate-800 text-center outline-none shadow-2xs w-[68px]"
+                            className="bg-white border border-slate-200 focus:border-indigo-500 rounded-lg px-3 py-1 text-xs font-black text-slate-800 text-center outline-none shadow-2xs w-24"
                             placeholder="1"
                             title="Número de noches de estancia"
                           />
-                          <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[9px] font-bold text-slate-400 uppercase pointer-events-none">noches</span>
                         </div>
                       </div>
                       {/* Fecha Salida */}
@@ -3686,6 +3693,11 @@ ${emailContent}`;
                           value={toInputDate(formData.Salida)} 
                           min={isCompleteDate(formData.Entrada) ? addStayDays(formData.Entrada, 1) : undefined}
                           onChange={e => setFormData(prev => ({ ...prev, Salida: e.target.value, DateRanges_JSON: [] }))}
+                          onBlur={() => {
+                            if (isCompleteDate(formData.Entrada) && !calcStayDays(formData.Entrada, formData.Salida)) {
+                              setFormData(prev => ({ ...prev, Salida: addStayDays(prev.Entrada, 1), DateRanges_JSON: [] }));
+                            }
+                          }}
                           className="bg-white border border-slate-200 focus:border-indigo-500 rounded-lg px-2.5 py-1 text-xs font-bold text-slate-800 outline-none shadow-2xs w-[145px]"
                         />
                       </div>
@@ -3700,10 +3712,9 @@ ${emailContent}`;
                             onChange={e => setFormData({ ...formData, "Pax.": e.target.value === '' ? '' : Number(e.target.value) })}
                             disabled={!formData.isRatesOnly}
                             placeholder={!formData.isRatesOnly ? "Auto" : "0"}
-                            className="bg-white border border-slate-200 focus:border-indigo-500 rounded-lg pl-2 pr-7 py-1 text-xs font-black text-slate-800 text-center outline-none shadow-2xs w-[72px] disabled:opacity-60 disabled:bg-slate-100"
+                            className="bg-white border border-slate-200 focus:border-indigo-500 rounded-lg px-3 py-1 text-xs font-black text-slate-800 text-center outline-none shadow-2xs w-24 disabled:opacity-60 disabled:bg-slate-100"
                             title={!formData.isRatesOnly ? "Calculado automáticamente por el cupo de habitaciones" : "Pax manual"}
                           />
-                          <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[9px] font-bold text-slate-400 uppercase pointer-events-none">pax</span>
                         </div>
                       </div>
                     </div>

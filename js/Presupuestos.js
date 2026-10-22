@@ -4405,12 +4405,23 @@ function App() {
       type: "date",
       value: toInputDate(formData.Entrada),
       onChange: function onChange(e) {
-        return setFormData(function (prev) {
+        var entrada = e.target.value;
+        setFormData(function (prev) {
           return _objectSpread(_objectSpread({}, prev), {}, {
-            Entrada: e.target.value,
+            Entrada: entrada,
             DateRanges_JSON: []
           });
         });
+      },
+      onBlur: function onBlur() {
+        if (isCompleteDate(formData.Entrada) && !calcStayDays(formData.Entrada, formData.Salida)) {
+          setFormData(function (prev) {
+            return _objectSpread(_objectSpread({}, prev), {}, {
+              Salida: addStayDays(prev.Entrada, 1),
+              DateRanges_JSON: []
+            });
+          });
+        }
       },
       className: "bg-white border border-slate-200 focus:border-indigo-500 rounded-lg px-2.5 py-1 text-xs font-bold text-slate-800 outline-none shadow-2xs w-[145px]"
     })), /*#__PURE__*/React.createElement("div", {
@@ -4423,7 +4434,7 @@ function App() {
       type: "number",
       min: "1",
       max: "365",
-      value: calcStayDays(formData.Entrada, formData.Salida) || '',
+      value: calcStayDays(formData.Entrada, formData.Salida) || 1,
       onChange: function onChange(e) {
         var val = e.target.value;
         var days = Math.max(1, Math.min(365, parseInt(val, 10) || 1));
@@ -4435,12 +4446,10 @@ function App() {
           DateRanges_JSON: []
         }));
       },
-      className: "bg-white border border-slate-200 focus:border-indigo-500 rounded-lg pl-2 pr-7 py-1 text-xs font-black text-slate-800 text-center outline-none shadow-2xs w-[68px]",
+      className: "bg-white border border-slate-200 focus:border-indigo-500 rounded-lg px-3 py-1 text-xs font-black text-slate-800 text-center outline-none shadow-2xs w-24",
       placeholder: "1",
       title: "N\xFAmero de noches de estancia"
-    }), /*#__PURE__*/React.createElement("span", {
-      className: "absolute right-1.5 top-1/2 -translate-y-1/2 text-[9px] font-bold text-slate-400 uppercase pointer-events-none"
-    }, "noches"))), /*#__PURE__*/React.createElement("div", {
+    }))), /*#__PURE__*/React.createElement("div", {
       className: "flex items-center gap-1.5"
     }, /*#__PURE__*/React.createElement("label", {
       className: "text-[10px] font-black text-slate-500 uppercase tracking-tight shrink-0"
@@ -4455,6 +4464,16 @@ function App() {
             DateRanges_JSON: []
           });
         });
+      },
+      onBlur: function onBlur() {
+        if (isCompleteDate(formData.Entrada) && !calcStayDays(formData.Entrada, formData.Salida)) {
+          setFormData(function (prev) {
+            return _objectSpread(_objectSpread({}, prev), {}, {
+              Salida: addStayDays(prev.Entrada, 1),
+              DateRanges_JSON: []
+            });
+          });
+        }
       },
       className: "bg-white border border-slate-200 focus:border-indigo-500 rounded-lg px-2.5 py-1 text-xs font-bold text-slate-800 outline-none shadow-2xs w-[145px]"
     })), /*#__PURE__*/React.createElement("div", {
@@ -4474,11 +4493,9 @@ function App() {
       },
       disabled: !formData.isRatesOnly,
       placeholder: !formData.isRatesOnly ? "Auto" : "0",
-      className: "bg-white border border-slate-200 focus:border-indigo-500 rounded-lg pl-2 pr-7 py-1 text-xs font-black text-slate-800 text-center outline-none shadow-2xs w-[72px] disabled:opacity-60 disabled:bg-slate-100",
+      className: "bg-white border border-slate-200 focus:border-indigo-500 rounded-lg px-3 py-1 text-xs font-black text-slate-800 text-center outline-none shadow-2xs w-24 disabled:opacity-60 disabled:bg-slate-100",
       title: !formData.isRatesOnly ? "Calculado automáticamente por el cupo de habitaciones" : "Pax manual"
-    }), /*#__PURE__*/React.createElement("span", {
-      className: "absolute right-1.5 top-1/2 -translate-y-1/2 text-[9px] font-bold text-slate-400 uppercase pointer-events-none"
-    }, "pax"))))) : /*#__PURE__*/React.createElement("div", {
+    }))))) : /*#__PURE__*/React.createElement("div", {
       className: "space-y-4 pt-2"
     }, /*#__PURE__*/React.createElement("div", {
       className: "flex flex-col sm:flex-row justify-between sm:items-center gap-4 border-b border-slate-100 pb-2"
