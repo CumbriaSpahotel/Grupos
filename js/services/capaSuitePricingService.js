@@ -188,13 +188,50 @@
         }
 
         if (dayData) {
-          return resolveDayPrice(hotelName, iso, dayData);
-
-
+          var dayResult = resolveDayPrice(hotelName, iso, dayData);
+          if (dayResult.price > 0 || dayResult.status === 'sold-out') {
+            return dayResult;
+          }
         }
       }
     } catch (e) {
       console.warn('Error leyendo revenue_data_v2 en CapaSuitePricingService:', e);
+    }
+
+    // 2. Intentar leer precio de venta explícito desde hotel_manager_db_v2 (daily_otb.price)
+    try {
+      var liveSyncDb = typeof window !== 'undefined' && window.CapaSuiteCalendarSync;
+      var rawDb = liveSyncDb && liveSyncDb.state.authenticated ? (liveSyncDb.state.data || {}).hotel_manager_db_v2 : safeGetStorage('hotel_manager_db_v2');
+      if (rawDb) {
+        var parsedDb = typeof rawDb === 'string' ? JSON.parse(rawDb) : rawDb;
+        if (parsedDb && typeof parsedDb === 'object') {
+          var hKey = Object.keys(parsedDb).find(function (k) { return k.toLowerCase().includes(hotelKey); });
+          var year = iso.slice(0, 4);
+          var yearData = hKey && parsedDb[hKey] && parsedDb[hKey][year];
+          var otbEntry = yearData && yearData.daily_otb && yearData.daily_otb[iso];
+          if (otbEntry && typeof otbEntry === 'object') {
+            var isOtbSold = otbEntry.isSoldOut === true || otbEntry.sold === true || otbEntry.soldOut === true;
+            if (isOtbSold) {
+              return { price: 0, source: 'Hotel completo', status: 'sold-out', unavailable: true, isEstimated: false, hotel: hotelName, dateISO: iso };
+            }
+            var otbRaw = otbEntry.price ?? otbEntry.rate ?? otbEntry.tarifa ?? otbEntry.pvp ?? otbEntry.bar;
+            var otbPrice = parseSalePrice(otbRaw);
+            if (otbPrice > 0) {
+              return {
+                price: otbPrice,
+                source: 'PVP CapaSuite OTB (' + (hKey.charAt(0).toUpperCase() + hKey.slice(1)) + ')',
+                status: 'available',
+                unavailable: false,
+                isEstimated: false,
+                hotel: hotelName,
+                dateISO: iso
+              };
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Error leyendo hotel_manager_db_v2 en CapaSuitePricingService:', e);
     }
 
     var sync = typeof window !== 'undefined' && window.CapaSuiteCalendarSync;
@@ -225,7 +262,7 @@
     if (!entry) return result;
     var value = entry[1];
     var raw = value && typeof value === 'object' ? (value.price ?? value.p ?? value.rate ?? value.tarifa) : value;
-    var sold = value && typeof value === 'object' && (value.sold === true || value.soldOut === true || value.isSoldOut === true);
+    var sold = value && typeof value === 'object' && (value.sold === true || value.soldOut === true || value.isSoldOut === true || value.price === 0 || value.price === '0');
     if (sold || String(raw).toUpperCase() === 'SOLD') {
       result.status = 'sold-out'; result.source = 'Hotel completo'; return result;
     }
@@ -303,12 +340,14 @@
    * - Tarifa de habitación del hotel para ese día
    * - Tarifa recomendada CapaSuite aplicando el descuento
    */
-  function getTariffComparison(hotelName, dateISO, boardName, discountPercent, officialGrid) {
+  function getTariffComparison(hotelName, dateISO, boardName, discountPercent, officialGrid, overridePrice) {
     var discount = typeof discountPercent === 'number' && !isNaN(discountPercent)
       ? Math.max(0, Math.min(90, discountPercent))
       : DEFAULT_DISCOUNT_PERCENT;
 
-    var hotelPriceInfo = getCapaSuiteHotelDayPrice(hotelName, dateISO);
+    var hotelPriceInfo = (overridePrice > 0)
+      ? { price: Number(overridePrice), source: 'PVP manual (' + overridePrice + ' €)', status: 'available', unavailable: false, isEstimated: false, hotel: hotelName, dateISO: dateISO }
+      : getCapaSuiteHotelDayPrice(hotelName, dateISO);
     var hotelRoomPrice = hotelPriceInfo.price; // En CapaSuite la tarifa es siempre Solo Alojamiento (HA)
 
     var boardCode = (boardName || 'HD').split(' ')[0].toUpperCase();
@@ -364,7 +403,9 @@
 
     var discountFactor = (100 - discount) / 100;
     // Tarifa recomendada base de alojamiento (HA) para habitación doble con descuento
-    var recDobleHA = Math.round(hotelRoomPrice * discountFactor * 100) / 100;
+    var recDobleHA = hotelRoomPrice > 0
+      ? Math.round(hotelRoomPrice * discountFactor * 100) / 100
+      : offDblHA;
 
     var targets = typeof window !== "undefined" ? window.GroupTargetsService : null;
     if (!targets && typeof require === 'function') targets = require('./groupTargetsService');
@@ -427,8 +468,11 @@
 
       officialPricesByRoom[rt] = offP;
       if (!(hotelRoomPrice > 0)) {
-        recommendedPricesByRoom[rt] = null;
-        savingsByRoom[rt] = null;
+        recommendedPricesByRoom[rt] = offP;
+        savingsByRoom[rt] = {
+          diffVsHotel: 0,
+          diffVsOfficial: 0
+        };
         return;
       }
 

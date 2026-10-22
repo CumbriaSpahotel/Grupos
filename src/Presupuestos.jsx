@@ -226,16 +226,18 @@
 
     const roundRate = value => Math.round((Number(value) + Number.EPSILON) * 20) / 20;
 
-    const getCapaSuiteTariffComparison = (hotelName, dateISO, boardName, discountPercent) => {
+    const getCapaSuiteTariffComparison = (hotelName, dateISO, boardName, discountPercent, manualOverridePrice) => {
       const ps = window.CapaSuitePricingService;
       const y = dateISO ? new Date(toInputDate(dateISO)).getFullYear() : 2027;
       const offGrid = getOfficialTariffsGrid(hotelName, isNaN(y) ? 2027 : y);
       if (ps && typeof ps.getTariffComparison === 'function') {
-        return ps.getTariffComparison(hotelName, dateISO, boardName, discountPercent, offGrid);
+        return ps.getTariffComparison(hotelName, dateISO, boardName, discountPercent, offGrid, manualOverridePrice);
       }
-      const priceInfo = getCapaSuiteHotelDayPrice(hotelName, dateISO);
+      const priceInfo = (manualOverridePrice > 0)
+        ? { price: Number(manualOverridePrice), source: 'PVP manual (' + manualOverridePrice + ' €)', status: 'available', unavailable: false, isEstimated: false, hotel: hotelName, dateISO }
+        : getCapaSuiteHotelDayPrice(hotelName, dateISO);
       const discount = typeof discountPercent === 'number' && !isNaN(discountPercent) ? discountPercent : 15;
-      const recDobleHA = Math.round(priceInfo.price * (1 - discount / 100) * 100) / 100;
+      const recDobleHA = priceInfo.price > 0 ? Math.round(priceInfo.price * (1 - discount / 100) * 100) / 100 : 0;
       const boardCode = (boardName || 'HD').split(' ')[0].toUpperCase();
       const offPrices = offGrid[boardCode] || offGrid['HD'] || {};
       const haPrices = offGrid['HA'] || {};
@@ -311,16 +313,17 @@
       };
     };
 
-    const getCapaSuiteStayTariffSummary = (hotelName, stayDates, boardName, discountPercent, dailyConfig) => {
+    const getCapaSuiteStayTariffSummary = (hotelName, stayDates, boardName, discountPercent, dailyConfig, customPvpMap = {}) => {
       const ps = window.CapaSuitePricingService;
       const firstDate = stayDates && stayDates[0];
       const y = firstDate ? new Date(toInputDate(firstDate)).getFullYear() : 2027;
       const offGrid = getOfficialTariffsGrid(hotelName, isNaN(y) ? 2027 : y);
-      if (!dailyConfig && ps && typeof ps.getStayTariffSummary === 'function') {
+      const hasCustom = Object.keys(customPvpMap || {}).some(k => customPvpMap[k] > 0);
+      if (!dailyConfig && !hasCustom && ps && typeof ps.getStayTariffSummary === 'function') {
         return ps.getStayTariffSummary(hotelName, stayDates, boardName, discountPercent, offGrid);
       }
       if (!stayDates || stayDates.length === 0) return null;
-      const comps = stayDates.map(d => getCapaSuiteTariffComparison(hotelName, d, dailyConfig?.[d]?.board || boardName, discountPercent));
+      const comps = stayDates.map(d => getCapaSuiteTariffComparison(hotelName, d, dailyConfig?.[d]?.board || boardName, discountPercent, customPvpMap?.[d]));
       const len = comps.length;
       let sumH = 0, sumOff = 0, sumRec = 0;
       comps.forEach(c => {
@@ -565,7 +568,8 @@
       segments: [],           // NUEVO: array de sub-grupos [{id,pax,rooms,roomType,in,out,notes}]
       isMultiSegment: false,   // NUEVO: modo multi-segmento activo
       declaredPax: '',        // NUEVO: Pax declarados por el cliente
-      capaSuiteDiscountPercent: 15 // Descuento comercial recomendado CapaSuite (por defecto 15%)
+      capaSuiteDiscountPercent: 15, // Descuento comercial recomendado CapaSuite (por defecto 15%)
+      customDailyPvp: {}      // Tarifas PVP manuales por fecha (ej. {'2026-11-07': 92})
     };
 
     // ── Calcula cupos diarios a partir de los segmentos ─────────────────
@@ -1135,6 +1139,7 @@
       newData.ratesOnlyGrid = groupData.ratesOnlyGrid || {};
       newData.hiddenGridCols = Array.isArray(groupData.hiddenGridCols) ? [...groupData.hiddenGridCols] : [...DEFAULT_FORM_DATA.hiddenGridCols];
       newData.capaSuiteDiscountPercent = groupData.capaSuiteDiscountPercent !== undefined ? groupData.capaSuiteDiscountPercent : 15;
+      newData.customDailyPvp = groupData.customDailyPvp || {};
       
       const rawHotel = groupData.Hotel_Asignado || groupData.Hotel || "";
       if (rawHotel.toLowerCase().includes("cumbria")) {
@@ -2277,26 +2282,50 @@
         const parsedY = formData.Entrada ? new Date(toInputDate(formData.Entrada)).getFullYear() : 2027;
         const validYear = isNaN(parsedY) ? 2027 : parsedY;
         const hotel = formData.Hotel_Asignado || 'Sercotel Guadiana';
-        if (!getCurrentStayDates(formData).length) {
+        const stayDates = getCurrentStayDates(formData);
+        if (!stayDates.length) {
           alert('Revisa las fechas de estancia antes de aplicar precios.');
           return;
         }
-        const missingPvp = getCurrentStayDates(formData).some(date => !(getCapaSuiteHotelDayPrice(hotel, date).price > 0));
-        if (missingPvp) {
+
+        const getEffectivePvp = (d) => {
+          if (formData.customDailyPvp?.[d] > 0) return Number(formData.customDailyPvp[d]);
+          const live = getCapaSuiteHotelDayPrice(hotel, d).price;
+          if (live > 0) return live;
+          const idx = stayDates.indexOf(d);
+          for (let i = idx - 1; i >= 0; i--) {
+            const prevD = stayDates[i];
+            const p = formData.customDailyPvp?.[prevD] || getCapaSuiteHotelDayPrice(hotel, prevD).price;
+            if (p > 0) return p;
+          }
+          for (let i = idx + 1; i < stayDates.length; i++) {
+            const nextD = stayDates[i];
+            const p = formData.customDailyPvp?.[nextD] || getCapaSuiteHotelDayPrice(hotel, nextD).price;
+            if (p > 0) return p;
+          }
+          return 0;
+        };
+
+        const hasAnyPvp = stayDates.some(date => getEffectivePvp(date) > 0);
+        if (!hasAnyPvp) {
           alert('Falta el PVP real de CapaSuite para alguna fecha. No se ha aplicado la tarifa recomendada.');
           return;
         }
         const roomTypes = getRoomTypesForHotel(hotel);
-        const stayDates = getCurrentStayDates(formData);
         const newDailyConfig = { ...(formData.dailyConfig || {}) };
+        const newCustomPvp = { ...(formData.customDailyPvp || {}) };
 
         stayDates.forEach(date => {
+          const effectivePvp = getEffectivePvp(date);
+          if (effectivePvp > 0 && !(newCustomPvp[date] > 0) && !(getCapaSuiteHotelDayPrice(hotel, date).price > 0)) {
+            newCustomPvp[date] = effectivePvp;
+          }
           if (!newDailyConfig[date]) {
             newDailyConfig[date] = { board: formData['Régimen'] || 'AD (Alojamiento y Desayuno)', prices: {}, counts: {}, gratuities: {} };
           }
           const dayConf = newDailyConfig[date];
           const currentBoard = dayConf.board || formData['Régimen'] || 'AD (Alojamiento y Desayuno)';
-          const comp = getCapaSuiteTariffComparison(hotel, date, currentBoard, discount);
+          const comp = getCapaSuiteTariffComparison(hotel, date, currentBoard, discount, effectivePvp);
 
           const updatedPrices = { ...(dayConf.prices || {}) };
           roomTypes.forEach(rt => {
@@ -2313,7 +2342,7 @@
         const refDate = stayDates[0] || formData.Entrada || new Date().toISOString().split('T')[0];
 
         ['HA', 'HD', 'MP', 'PC'].forEach(bCode => {
-          const bComp = getCapaSuiteTariffComparison(hotel, refDate, bCode, discount);
+          const bComp = getCapaSuiteTariffComparison(hotel, refDate, bCode, discount, getEffectivePvp(refDate));
           if (bComp && bComp.recommendedPricesByRoom) {
             if (!mergedGrid[bCode]) mergedGrid[bCode] = {};
             roomTypes.forEach(rt => {
@@ -2327,6 +2356,7 @@
         setFormData(prev => ({
           ...prev,
           capaSuiteDiscountPercent: discount,
+          customDailyPvp: newCustomPvp,
           ratesOnlyGrid: mergedGrid,
           dailyConfig: newDailyConfig,
           averageStayCondition: null,
@@ -2348,21 +2378,46 @@
           ? customDiscount 
           : (formData.capaSuiteDiscountPercent !== undefined ? formData.capaSuiteDiscountPercent : 15);
         const hotel = formData.Hotel_Asignado || 'Sercotel Guadiana';
-        if (!getCurrentStayDates(formData).length) {
+        if (!stayDates.length) {
           alert('Revisa las fechas de estancia antes de aplicar precios.');
           return;
         }
-        const missingPvp = getCurrentStayDates(formData).some(date => !(getCapaSuiteHotelDayPrice(hotel, date).price > 0));
-        if (missingPvp) {
+        const getEffectivePvp = (d) => {
+          if (formData.customDailyPvp?.[d] > 0) return Number(formData.customDailyPvp[d]);
+          const live = getCapaSuiteHotelDayPrice(hotel, d).price;
+          if (live > 0) return live;
+          const idx = stayDates.indexOf(d);
+          for (let i = idx - 1; i >= 0; i--) {
+            const prevD = stayDates[i];
+            const p = formData.customDailyPvp?.[prevD] || getCapaSuiteHotelDayPrice(hotel, prevD).price;
+            if (p > 0) return p;
+          }
+          for (let i = idx + 1; i < stayDates.length; i++) {
+            const nextD = stayDates[i];
+            const p = formData.customDailyPvp?.[nextD] || getCapaSuiteHotelDayPrice(hotel, nextD).price;
+            if (p > 0) return p;
+          }
+          return 0;
+        };
+
+        const hasAnyPvp = stayDates.some(date => getEffectivePvp(date) > 0);
+        if (!hasAnyPvp) {
           alert('Falta el PVP real de CapaSuite para alguna fecha. No se ha aplicado la tarifa recomendada.');
           return;
         }
         const roomTypes = getRoomTypesForHotel(hotel);
+        const newCustomPvp = { ...(formData.customDailyPvp || {}) };
+        stayDates.forEach(date => {
+          const effectivePvp = getEffectivePvp(date);
+          if (effectivePvp > 0 && !(newCustomPvp[date] > 0) && !(getCapaSuiteHotelDayPrice(hotel, date).price > 0)) {
+            newCustomPvp[date] = effectivePvp;
+          }
+        });
 
         if (formData.isRatesOnly) {
           const mergedGrid = { ...(formData.ratesOnlyGrid || {}) };
           ['HA', 'HD', 'MP', 'PC'].forEach(board => {
-            const comparisons = stayDates.map(date => getCapaSuiteTariffComparison(hotel, date, board, discount));
+            const comparisons = stayDates.map(date => getCapaSuiteTariffComparison(hotel, date, board, discount, getEffectivePvp(date)));
             mergedGrid[board] = { ...(mergedGrid[board] || {}) };
             roomTypes.forEach(room => {
               const prices = comparisons.map(comp => comp.recommendedPricesByRoom?.[room]);
@@ -2372,6 +2427,7 @@
             });
           });
           setFormData(prev => ({ ...prev, ratesOnlyGrid: mergedGrid, capaSuiteDiscountPercent: discount,
+            customDailyPvp: newCustomPvp,
             averageStayCondition: { dates: [...stayDates], nights: stayDates.length } }));
           return;
         }
@@ -2383,7 +2439,7 @@
           let countDays = 0;
           stayDates.forEach(date => {
             const currentBoard = formData.dailyConfig?.[date]?.board || formData['Régimen'] || 'AD (Alojamiento y Desayuno)';
-            const comp = getCapaSuiteTariffComparison(hotel, date, currentBoard, discount);
+            const comp = getCapaSuiteTariffComparison(hotel, date, currentBoard, discount, getEffectivePvp(date));
             const p = comp.recommendedPricesByRoom?.[rt];
             if (p !== undefined && p !== null && p !== '') {
               sumPrice += Number(p);
@@ -2423,8 +2479,10 @@
           capaSuiteDiscountPercent: discount,
           ratesOnlyGrid: mergedGrid,
           dailyConfig: newDailyConfig,
+          customDailyPvp: newCustomPvp,
           averageStayCondition: { dates: [...stayDates], nights: stayDates.length }
         }));
+
 
         alert(`📊 Tarifa Media de Estancia aplicada con éxito a las ${stayDates.length} noches para ${hotel} (Tarifa plana uniforme por tipología).`);
       };
@@ -4191,7 +4249,7 @@ ${emailContent}`;
                         const hotel = formData.Hotel_Asignado || 'Sercotel Guadiana';
                         const discount = formData.capaSuiteDiscountPercent !== undefined ? formData.capaSuiteDiscountPercent : 15;
                         const board = formData['Régimen'] || 'AD (Alojamiento y Desayuno)';
-                        const staySummary = getCapaSuiteStayTariffSummary(hotel, stayDates, board, discount, formData.dailyConfig || {});
+                        const staySummary = getCapaSuiteStayTariffSummary(hotel, stayDates, board, discount, formData.dailyConfig || {}, formData.customDailyPvp || {});
                         if (!staySummary) return null;
                         const completePvp = staySummary.comparisons.every(c => c.hotelDayPrice > 0);
 
@@ -4290,8 +4348,9 @@ ${emailContent}`;
                               <div className="bg-white/5 rounded-xl p-2 border border-white/5">
                                 <div className="text-[8px] font-bold text-slate-400 uppercase tracking-wider">PVP de venta por fecha (HA)</div>
                                 <div className="mt-0.5 max-h-32 overflow-y-auto space-y-1">{stayDates.map(date => {
-                                  const pvp = getCapaSuiteHotelDayPrice(hotel, date);
-                                  return <div key={date} className="flex justify-between gap-2"><span>{formatDate(date)}</span><strong>{pvp.price > 0 ? `${pvp.price.toFixed(2)} €` : pvp.source}</strong></div>;
+                                  const manual = formData.customDailyPvp?.[date];
+                                  const pvp = manual > 0 ? { price: manual, source: 'PVP manual' } : getCapaSuiteHotelDayPrice(hotel, date);
+                                  return <div key={date} className="flex justify-between gap-2"><span>{formatDate(date)}</span><strong>{pvp.price > 0 ? `${pvp.price.toFixed(2)} €${manual > 0 ? ' (manual)' : ''}` : (pvp.source || 'Sin PVP disponible')}</strong></div>;
                                 })}</div>
                                 <div className="text-[7px] text-slate-400 truncate">Habitación doble · solo alojamiento</div>
                               </div>
@@ -4319,7 +4378,22 @@ ${emailContent}`;
                         {stayDates.map(date => {
                           const discount = formData.capaSuiteDiscountPercent !== undefined ? formData.capaSuiteDiscountPercent : 15;
                           const currentBoard = formData.dailyConfig?.[date]?.board || formData['Régimen'] || 'AD (Alojamiento y Desayuno)';
-                          const dayComp = getCapaSuiteTariffComparison(formData.Hotel_Asignado, date, currentBoard, discount);
+                          const manualPrice = formData.customDailyPvp?.[date];
+                          const dayComp = getCapaSuiteTariffComparison(formData.Hotel_Asignado, date, currentBoard, discount, manualPrice);
+                          const adjacentPvp = (() => {
+                            const idx = stayDates.indexOf(date);
+                            for (let i = idx - 1; i >= 0; i--) {
+                              const prevD = stayDates[i];
+                              const p = formData.customDailyPvp?.[prevD] || getCapaSuiteHotelDayPrice(formData.Hotel_Asignado, prevD).price;
+                              if (p > 0) return p;
+                            }
+                            for (let i = idx + 1; i < stayDates.length; i++) {
+                              const nextD = stayDates[i];
+                              const p = formData.customDailyPvp?.[nextD] || getCapaSuiteHotelDayPrice(formData.Hotel_Asignado, nextD).price;
+                              if (p > 0) return p;
+                            }
+                            return null;
+                          })();
 
                           const selectedTypes = formData.isMultiSegment
                             ? Array.from(new Set(
@@ -4337,7 +4411,75 @@ ${emailContent}`;
                                 <span className="bg-slate-800 text-white px-2 py-1 rounded text-[8px] font-black w-fit uppercase tracking-widest">{formatDate(date)}</span>
                                 <span className="text-[7px] text-slate-400 font-bold" title={`PVP de habitación doble, solo alojamiento, sin manutención: ${dayComp.hotelDayPrice} €`}>
                                   <span className="text-slate-500">{formData.Hotel_Asignado?.toLowerCase().includes('cumbria') ? 'Cumbria' : 'Guadiana'} · {date.slice(0, 4)}</span><br />
-                                  PVP hab. (HA): <span className="text-slate-600 font-black">{dayComp.hotelDayPrice > 0 ? `${dayComp.hotelDayPrice} €` : 'Sin PVP disponible'}</span>
+                                  PVP hab. (HA):{' '}
+                                  {dayComp.hotelDayPrice > 0 ? (
+                                    <span className="inline-flex items-center gap-1">
+                                      <span className="text-slate-600 font-black">{dayComp.hotelDayPrice} €</span>
+                                      {formData.customDailyPvp?.[date] > 0 && (
+                                        <span className="bg-amber-100 text-amber-800 text-[6.5px] font-black px-1 py-0.2 rounded" title="PVP manual">Manual</span>
+                                      )}
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          const input = prompt(`Editar PVP hab. (HA) para el ${formatDate(date)} (dejar vacío para restaurar automático):`, dayComp.hotelDayPrice);
+                                          if (input !== null) {
+                                            const trimmed = input.trim();
+                                            const val = parseFloat(trimmed.replace(',', '.'));
+                                            setFormData(prev => {
+                                              const updated = { ...(prev.customDailyPvp || {}) };
+                                              if (val > 0) updated[date] = val;
+                                              else delete updated[date];
+                                              return { ...prev, customDailyPvp: updated };
+                                            });
+                                          }
+                                        }}
+                                        className="text-slate-400 hover:text-indigo-600 text-[8px] p-0.5 cursor-pointer"
+                                        title="Editar tarifa PVP manualmente"
+                                      >
+                                        <i className="fas fa-pen text-[7px]"></i>
+                                      </button>
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex flex-wrap items-center gap-1 mt-0.5">
+                                      <span className="text-rose-600 font-black text-[7.5px] bg-rose-50 px-1 py-0.5 rounded border border-rose-100">
+                                        {dayComp.hotelPriceInfo?.source === 'Hotel completo' ? 'Hotel completo' : 'Sin PVP disponible'}
+                                      </span>
+                                      {adjacentPvp > 0 && (
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setFormData(prev => ({
+                                              ...prev,
+                                              customDailyPvp: { ...(prev.customDailyPvp || {}), [date]: adjacentPvp }
+                                            }));
+                                          }}
+                                          className="text-[7.5px] bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-black px-1.5 py-0.5 rounded border border-indigo-200 transition active:scale-95 flex items-center gap-0.5 cursor-pointer"
+                                          title={`Usar el PVP de la noche contigua (${adjacentPvp} €)`}
+                                        >
+                                          <i className="fas fa-copy text-[6.5px]"></i> Usar {adjacentPvp} €
+                                        </button>
+                                      )}
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          const input = prompt(`Introducir PVP hab. (HA) manual para el ${formatDate(date)}:`, adjacentPvp || '');
+                                          if (input !== null) {
+                                            const val = parseFloat(input.trim().replace(',', '.'));
+                                            if (val > 0) {
+                                              setFormData(prev => ({
+                                                ...prev,
+                                                customDailyPvp: { ...(prev.customDailyPvp || {}), [date]: val }
+                                              }));
+                                            }
+                                          }
+                                        }}
+                                        className="text-[7.5px] bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-1 py-0.5 rounded border border-slate-200 transition cursor-pointer"
+                                        title="Introducir PVP manual"
+                                      >
+                                        <i className="fas fa-plus text-[6.5px] mr-0.5"></i> Manual
+                                      </button>
+                                    </span>
+                                  )}
                                 </span>
                                 {(() => {
                                   const info = window.CapaSuitePricingService?.getDayEvents?.(date);

@@ -385,16 +385,24 @@ var getCapaSuiteHotelDayPrice = function getCapaSuiteHotelDayPrice(hotelName, da
 var roundRate = function roundRate(value) {
   return Math.round((Number(value) + Number.EPSILON) * 20) / 20;
 };
-var getCapaSuiteTariffComparison = function getCapaSuiteTariffComparison(hotelName, dateISO, boardName, discountPercent) {
+var getCapaSuiteTariffComparison = function getCapaSuiteTariffComparison(hotelName, dateISO, boardName, discountPercent, manualOverridePrice) {
   var ps = window.CapaSuitePricingService;
   var y = dateISO ? new Date(toInputDate(dateISO)).getFullYear() : 2027;
   var offGrid = getOfficialTariffsGrid(hotelName, isNaN(y) ? 2027 : y);
   if (ps && typeof ps.getTariffComparison === 'function') {
-    return ps.getTariffComparison(hotelName, dateISO, boardName, discountPercent, offGrid);
+    return ps.getTariffComparison(hotelName, dateISO, boardName, discountPercent, offGrid, manualOverridePrice);
   }
-  var priceInfo = getCapaSuiteHotelDayPrice(hotelName, dateISO);
+  var priceInfo = manualOverridePrice > 0 ? {
+    price: Number(manualOverridePrice),
+    source: 'PVP manual (' + manualOverridePrice + ' €)',
+    status: 'available',
+    unavailable: false,
+    isEstimated: false,
+    hotel: hotelName,
+    dateISO: dateISO
+  } : getCapaSuiteHotelDayPrice(hotelName, dateISO);
   var discount = typeof discountPercent === 'number' && !isNaN(discountPercent) ? discountPercent : 15;
-  var recDobleHA = Math.round(priceInfo.price * (1 - discount / 100) * 100) / 100;
+  var recDobleHA = priceInfo.price > 0 ? Math.round(priceInfo.price * (1 - discount / 100) * 100) / 100 : 0;
   var boardCode = (boardName || 'HD').split(' ')[0].toUpperCase();
   var offPrices = offGrid[boardCode] || offGrid['HD'] || {};
   var haPrices = offGrid['HA'] || {};
@@ -459,17 +467,21 @@ var getCapaSuiteTariffComparison = function getCapaSuiteTariffComparison(hotelNa
   };
 };
 var getCapaSuiteStayTariffSummary = function getCapaSuiteStayTariffSummary(hotelName, stayDates, boardName, discountPercent, dailyConfig) {
+  var customPvpMap = arguments.length > 5 && arguments[5] !== undefined ? arguments[5] : {};
   var ps = window.CapaSuitePricingService;
   var firstDate = stayDates && stayDates[0];
   var y = firstDate ? new Date(toInputDate(firstDate)).getFullYear() : 2027;
   var offGrid = getOfficialTariffsGrid(hotelName, isNaN(y) ? 2027 : y);
-  if (!dailyConfig && ps && typeof ps.getStayTariffSummary === 'function') {
+  var hasCustom = Object.keys(customPvpMap || {}).some(function (k) {
+    return customPvpMap[k] > 0;
+  });
+  if (!dailyConfig && !hasCustom && ps && typeof ps.getStayTariffSummary === 'function') {
     return ps.getStayTariffSummary(hotelName, stayDates, boardName, discountPercent, offGrid);
   }
   if (!stayDates || stayDates.length === 0) return null;
   var comps = stayDates.map(function (d) {
     var _dailyConfig$d;
-    return getCapaSuiteTariffComparison(hotelName, d, (dailyConfig === null || dailyConfig === void 0 || (_dailyConfig$d = dailyConfig[d]) === null || _dailyConfig$d === void 0 ? void 0 : _dailyConfig$d.board) || boardName, discountPercent);
+    return getCapaSuiteTariffComparison(hotelName, d, (dailyConfig === null || dailyConfig === void 0 || (_dailyConfig$d = dailyConfig[d]) === null || _dailyConfig$d === void 0 ? void 0 : _dailyConfig$d.board) || boardName, discountPercent, customPvpMap === null || customPvpMap === void 0 ? void 0 : customPvpMap[d]);
   });
   var len = comps.length;
   var sumH = 0,
@@ -714,7 +726,9 @@ var DEFAULT_FORM_DATA = {
   // NUEVO: modo multi-segmento activo
   declaredPax: '',
   // NUEVO: Pax declarados por el cliente
-  capaSuiteDiscountPercent: 15 // Descuento comercial recomendado CapaSuite (por defecto 15%)
+  capaSuiteDiscountPercent: 15,
+  // Descuento comercial recomendado CapaSuite (por defecto 15%)
+  customDailyPvp: {} // Tarifas PVP manuales por fecha (ej. {'2026-11-07': 92})
 };
 
 // ── Calcula cupos diarios a partir de los segmentos ─────────────────
@@ -1304,6 +1318,7 @@ var normalizeGroupData = function normalizeGroupData(groupData) {
   newData.ratesOnlyGrid = groupData.ratesOnlyGrid || {};
   newData.hiddenGridCols = Array.isArray(groupData.hiddenGridCols) ? _toConsumableArray(groupData.hiddenGridCols) : _toConsumableArray(DEFAULT_FORM_DATA.hiddenGridCols);
   newData.capaSuiteDiscountPercent = groupData.capaSuiteDiscountPercent !== undefined ? groupData.capaSuiteDiscountPercent : 15;
+  newData.customDailyPvp = groupData.customDailyPvp || {};
   var rawHotel = groupData.Hotel_Asignado || groupData.Hotel || "";
   if (rawHotel.toLowerCase().includes("cumbria")) {
     newData.Hotel_Asignado = "Cumbria Spa&Hotel";
@@ -2636,21 +2651,46 @@ function App() {
     var parsedY = formData.Entrada ? new Date(toInputDate(formData.Entrada)).getFullYear() : 2027;
     var validYear = isNaN(parsedY) ? 2027 : parsedY;
     var hotel = formData.Hotel_Asignado || 'Sercotel Guadiana';
-    if (!getCurrentStayDates(formData).length) {
+    var stayDates = getCurrentStayDates(formData);
+    if (!stayDates.length) {
       alert('Revisa las fechas de estancia antes de aplicar precios.');
       return;
     }
-    var missingPvp = getCurrentStayDates(formData).some(function (date) {
-      return !(getCapaSuiteHotelDayPrice(hotel, date).price > 0);
+    var getEffectivePvp = function getEffectivePvp(d) {
+      var _formData$customDaily;
+      if (((_formData$customDaily = formData.customDailyPvp) === null || _formData$customDaily === void 0 ? void 0 : _formData$customDaily[d]) > 0) return Number(formData.customDailyPvp[d]);
+      var live = getCapaSuiteHotelDayPrice(hotel, d).price;
+      if (live > 0) return live;
+      var idx = stayDates.indexOf(d);
+      for (var i = idx - 1; i >= 0; i--) {
+        var _formData$customDaily2;
+        var prevD = stayDates[i];
+        var p = ((_formData$customDaily2 = formData.customDailyPvp) === null || _formData$customDaily2 === void 0 ? void 0 : _formData$customDaily2[prevD]) || getCapaSuiteHotelDayPrice(hotel, prevD).price;
+        if (p > 0) return p;
+      }
+      for (var _i = idx + 1; _i < stayDates.length; _i++) {
+        var _formData$customDaily3;
+        var nextD = stayDates[_i];
+        var _p2 = ((_formData$customDaily3 = formData.customDailyPvp) === null || _formData$customDaily3 === void 0 ? void 0 : _formData$customDaily3[nextD]) || getCapaSuiteHotelDayPrice(hotel, nextD).price;
+        if (_p2 > 0) return _p2;
+      }
+      return 0;
+    };
+    var hasAnyPvp = stayDates.some(function (date) {
+      return getEffectivePvp(date) > 0;
     });
-    if (missingPvp) {
+    if (!hasAnyPvp) {
       alert('Falta el PVP real de CapaSuite para alguna fecha. No se ha aplicado la tarifa recomendada.');
       return;
     }
     var roomTypes = getRoomTypesForHotel(hotel);
-    var stayDates = getCurrentStayDates(formData);
     var newDailyConfig = _objectSpread({}, formData.dailyConfig || {});
+    var newCustomPvp = _objectSpread({}, formData.customDailyPvp || {});
     stayDates.forEach(function (date) {
+      var effectivePvp = getEffectivePvp(date);
+      if (effectivePvp > 0 && !(newCustomPvp[date] > 0) && !(getCapaSuiteHotelDayPrice(hotel, date).price > 0)) {
+        newCustomPvp[date] = effectivePvp;
+      }
       if (!newDailyConfig[date]) {
         newDailyConfig[date] = {
           board: formData['Régimen'] || 'AD (Alojamiento y Desayuno)',
@@ -2661,7 +2701,7 @@ function App() {
       }
       var dayConf = newDailyConfig[date];
       var currentBoard = dayConf.board || formData['Régimen'] || 'AD (Alojamiento y Desayuno)';
-      var comp = getCapaSuiteTariffComparison(hotel, date, currentBoard, discount);
+      var comp = getCapaSuiteTariffComparison(hotel, date, currentBoard, discount, effectivePvp);
       var updatedPrices = _objectSpread({}, dayConf.prices || {});
       roomTypes.forEach(function (rt) {
         var _comp$recommendedPric3;
@@ -2680,7 +2720,7 @@ function App() {
     var mergedGrid = _objectSpread({}, formData.ratesOnlyGrid || {});
     var refDate = stayDates[0] || formData.Entrada || new Date().toISOString().split('T')[0];
     ['HA', 'HD', 'MP', 'PC'].forEach(function (bCode) {
-      var bComp = getCapaSuiteTariffComparison(hotel, refDate, bCode, discount);
+      var bComp = getCapaSuiteTariffComparison(hotel, refDate, bCode, discount, getEffectivePvp(refDate));
       if (bComp && bComp.recommendedPricesByRoom) {
         if (!mergedGrid[bCode]) mergedGrid[bCode] = {};
         roomTypes.forEach(function (rt) {
@@ -2693,6 +2733,7 @@ function App() {
     setFormData(function (prev) {
       return _objectSpread(_objectSpread({}, prev), {}, {
         capaSuiteDiscountPercent: discount,
+        customDailyPvp: newCustomPvp,
         ratesOnlyGrid: mergedGrid,
         dailyConfig: newDailyConfig,
         averageStayCondition: null,
@@ -2711,23 +2752,50 @@ function App() {
     if (stayDates.length === 0) return;
     var discount = customDiscount !== undefined ? customDiscount : formData.capaSuiteDiscountPercent !== undefined ? formData.capaSuiteDiscountPercent : 15;
     var hotel = formData.Hotel_Asignado || 'Sercotel Guadiana';
-    if (!getCurrentStayDates(formData).length) {
+    if (!stayDates.length) {
       alert('Revisa las fechas de estancia antes de aplicar precios.');
       return;
     }
-    var missingPvp = getCurrentStayDates(formData).some(function (date) {
-      return !(getCapaSuiteHotelDayPrice(hotel, date).price > 0);
+    var getEffectivePvp = function getEffectivePvp(d) {
+      var _formData$customDaily4;
+      if (((_formData$customDaily4 = formData.customDailyPvp) === null || _formData$customDaily4 === void 0 ? void 0 : _formData$customDaily4[d]) > 0) return Number(formData.customDailyPvp[d]);
+      var live = getCapaSuiteHotelDayPrice(hotel, d).price;
+      if (live > 0) return live;
+      var idx = stayDates.indexOf(d);
+      for (var i = idx - 1; i >= 0; i--) {
+        var _formData$customDaily5;
+        var prevD = stayDates[i];
+        var p = ((_formData$customDaily5 = formData.customDailyPvp) === null || _formData$customDaily5 === void 0 ? void 0 : _formData$customDaily5[prevD]) || getCapaSuiteHotelDayPrice(hotel, prevD).price;
+        if (p > 0) return p;
+      }
+      for (var _i2 = idx + 1; _i2 < stayDates.length; _i2++) {
+        var _formData$customDaily6;
+        var nextD = stayDates[_i2];
+        var _p3 = ((_formData$customDaily6 = formData.customDailyPvp) === null || _formData$customDaily6 === void 0 ? void 0 : _formData$customDaily6[nextD]) || getCapaSuiteHotelDayPrice(hotel, nextD).price;
+        if (_p3 > 0) return _p3;
+      }
+      return 0;
+    };
+    var hasAnyPvp = stayDates.some(function (date) {
+      return getEffectivePvp(date) > 0;
     });
-    if (missingPvp) {
+    if (!hasAnyPvp) {
       alert('Falta el PVP real de CapaSuite para alguna fecha. No se ha aplicado la tarifa recomendada.');
       return;
     }
     var roomTypes = getRoomTypesForHotel(hotel);
+    var newCustomPvp = _objectSpread({}, formData.customDailyPvp || {});
+    stayDates.forEach(function (date) {
+      var effectivePvp = getEffectivePvp(date);
+      if (effectivePvp > 0 && !(newCustomPvp[date] > 0) && !(getCapaSuiteHotelDayPrice(hotel, date).price > 0)) {
+        newCustomPvp[date] = effectivePvp;
+      }
+    });
     if (formData.isRatesOnly) {
       var _mergedGrid = _objectSpread({}, formData.ratesOnlyGrid || {});
       ['HA', 'HD', 'MP', 'PC'].forEach(function (board) {
         var comparisons = stayDates.map(function (date) {
-          return getCapaSuiteTariffComparison(hotel, date, board, discount);
+          return getCapaSuiteTariffComparison(hotel, date, board, discount, getEffectivePvp(date));
         });
         _mergedGrid[board] = _objectSpread({}, _mergedGrid[board] || {});
         roomTypes.forEach(function (room) {
@@ -2748,6 +2816,7 @@ function App() {
         return _objectSpread(_objectSpread({}, prev), {}, {
           ratesOnlyGrid: _mergedGrid,
           capaSuiteDiscountPercent: discount,
+          customDailyPvp: newCustomPvp,
           averageStayCondition: {
             dates: _toConsumableArray(stayDates),
             nights: stayDates.length
@@ -2765,7 +2834,7 @@ function App() {
       stayDates.forEach(function (date) {
         var _formData$dailyConfig, _comp$recommendedPric5;
         var currentBoard = ((_formData$dailyConfig = formData.dailyConfig) === null || _formData$dailyConfig === void 0 || (_formData$dailyConfig = _formData$dailyConfig[date]) === null || _formData$dailyConfig === void 0 ? void 0 : _formData$dailyConfig.board) || formData['Régimen'] || 'AD (Alojamiento y Desayuno)';
-        var comp = getCapaSuiteTariffComparison(hotel, date, currentBoard, discount);
+        var comp = getCapaSuiteTariffComparison(hotel, date, currentBoard, discount, getEffectivePvp(date));
         var p = (_comp$recommendedPric5 = comp.recommendedPricesByRoom) === null || _comp$recommendedPric5 === void 0 ? void 0 : _comp$recommendedPric5[rt];
         if (p !== undefined && p !== null && p !== '') {
           sumPrice += Number(p);
@@ -2811,6 +2880,7 @@ function App() {
         capaSuiteDiscountPercent: discount,
         ratesOnlyGrid: mergedGrid,
         dailyConfig: newDailyConfig,
+        customDailyPvp: newCustomPvp,
         averageStayCondition: {
           dates: _toConsumableArray(stayDates),
           nights: stayDates.length
@@ -3256,7 +3326,7 @@ function App() {
       var type,
         clauses,
         textToTranslate,
-        prompt,
+        _prompt,
         aiResult,
         _args3 = arguments,
         _t3;
@@ -3273,9 +3343,9 @@ function App() {
             return _context3.a(2);
           case 1:
             _context3.p = 1;
-            prompt = "Traduce el siguiente texto de un presupuesto de hotel al ingl\xE9s. Mant\xE9n un tono profesional y corporativo. Devuelve SOLO el texto traducido, sin comillas ni introducciones: \"".concat(textToTranslate, "\"");
+            _prompt = "Traduce el siguiente texto de un presupuesto de hotel al ingl\xE9s. Mant\xE9n un tono profesional y corporativo. Devuelve SOLO el texto traducido, sin comillas ni introducciones: \"".concat(textToTranslate, "\"");
             _context3.n = 2;
-            return window.callGemini(prompt);
+            return window.callGemini(_prompt);
           case 2:
             aiResult = _context3.v;
             if (aiResult !== null && aiResult !== void 0 && aiResult.ok) {
@@ -3301,7 +3371,7 @@ function App() {
   }();
   var handleParseEmailIA = /*#__PURE__*/function () {
     var _ref47 = _asyncToGenerator(/*#__PURE__*/_regenerator().m(function _callee4() {
-      var currentYear, prompt, aiResult, cleanJson, parsed, segments, normalizedSegments, stats, _t4;
+      var currentYear, _prompt2, aiResult, cleanJson, parsed, segments, normalizedSegments, stats, _t4;
       return _regenerator().w(function (_context4) {
         while (1) switch (_context4.p = _context4.n) {
           case 0:
@@ -3315,7 +3385,7 @@ function App() {
             setIsParsingEmail(true);
             _context4.p = 2;
             currentYear = new Date().getFullYear();
-            prompt = "Analiza el siguiente email de solicitud de habitaciones de hotel.\nExtrae el n\xFAmero total de personas declaradas por el cliente en el email (\"declaredPax\") y TODOS los segmentos de estancia de los subgrupos (cada segmento con su id, travelerGroupId, pax, fechas in y out, y asignaci\xF3n de habitaciones \"roomAllocations\").\nResponde EXCLUSIVAMENTE con JSON v\xE1lido (sin formato markdown ```json ni texto explicativo) con esta estructura exacta:\n{\n  \"groupName\": \"Nombre empresa o grupo\",\n  \"contactName\": \"Nombre contacto\",\n  \"contactEmail\": \"email@ejemplo.com\",\n  \"hotel\": \"nombre del hotel si se menciona\",\n  \"observations\": \"preguntas, notas, solicitudes del pool/gimnasio u observaciones adicionales\",\n  \"declaredPax\": 9,\n  \"segments\": [\n    {\n      \"id\": \"A\",\n      \"travelerGroupId\": \"G1\",\n      \"pax\": 3,\n      \"in\": \"YYYY-MM-DD\",\n      \"out\": \"YYYY-MM-DD\",\n      \"roomAllocations\": [\n        { \"pax\": 3, \"roomType\": \"DOBLE DE USO INDIVIDUAL\", \"rooms\": 3 }\n      ],\n      \"notes\": \"\"\n    }\n  ]\n}\nReglas para los segmentos:\n1. Por defecto, asigna 1 habitaci\xF3n por persona (\"rooms\" = \"pax\") y tipo \"DOBLE DE USO INDIVIDUAL\" en el array \"roomAllocations\", a menos que se indique lo contrario.\n2. Si no se especifica el a\xF1o para las fechas, usa ".concat(currentYear, ".\n3. El formato de las fechas \"in\" y \"out\" debe ser estrictamente YYYY-MM-DD.\n\nEmail a analizar:\n").concat(emailContent);
+            _prompt2 = "Analiza el siguiente email de solicitud de habitaciones de hotel.\nExtrae el n\xFAmero total de personas declaradas por el cliente en el email (\"declaredPax\") y TODOS los segmentos de estancia de los subgrupos (cada segmento con su id, travelerGroupId, pax, fechas in y out, y asignaci\xF3n de habitaciones \"roomAllocations\").\nResponde EXCLUSIVAMENTE con JSON v\xE1lido (sin formato markdown ```json ni texto explicativo) con esta estructura exacta:\n{\n  \"groupName\": \"Nombre empresa o grupo\",\n  \"contactName\": \"Nombre contacto\",\n  \"contactEmail\": \"email@ejemplo.com\",\n  \"hotel\": \"nombre del hotel si se menciona\",\n  \"observations\": \"preguntas, notas, solicitudes del pool/gimnasio u observaciones adicionales\",\n  \"declaredPax\": 9,\n  \"segments\": [\n    {\n      \"id\": \"A\",\n      \"travelerGroupId\": \"G1\",\n      \"pax\": 3,\n      \"in\": \"YYYY-MM-DD\",\n      \"out\": \"YYYY-MM-DD\",\n      \"roomAllocations\": [\n        { \"pax\": 3, \"roomType\": \"DOBLE DE USO INDIVIDUAL\", \"rooms\": 3 }\n      ],\n      \"notes\": \"\"\n    }\n  ]\n}\nReglas para los segmentos:\n1. Por defecto, asigna 1 habitaci\xF3n por persona (\"rooms\" = \"pax\") y tipo \"DOBLE DE USO INDIVIDUAL\" en el array \"roomAllocations\", a menos que se indique lo contrario.\n2. Si no se especifica el a\xF1o para las fechas, usa ".concat(currentYear, ".\n3. El formato de las fechas \"in\" y \"out\" debe ser estrictamente YYYY-MM-DD.\n\nEmail a analizar:\n").concat(emailContent);
             if (window.callGemini) {
               _context4.n = 3;
               break;
@@ -3323,7 +3393,7 @@ function App() {
             throw new Error('La API de Gemini no está disponible.');
           case 3:
             _context4.n = 4;
-            return window.callGemini(prompt);
+            return window.callGemini(_prompt2);
           case 4:
             aiResult = _context4.v;
             if (aiResult !== null && aiResult !== void 0 && aiResult.ok) {
@@ -5023,7 +5093,7 @@ function App() {
       var hotel = formData.Hotel_Asignado || 'Sercotel Guadiana';
       var discount = formData.capaSuiteDiscountPercent !== undefined ? formData.capaSuiteDiscountPercent : 15;
       var board = formData['Régimen'] || 'AD (Alojamiento y Desayuno)';
-      var staySummary = getCapaSuiteStayTariffSummary(hotel, stayDates, board, discount, formData.dailyConfig || {});
+      var staySummary = getCapaSuiteStayTariffSummary(hotel, stayDates, board, discount, formData.dailyConfig || {}, formData.customDailyPvp || {});
       if (!staySummary) return null;
       var completePvp = staySummary.comparisons.every(function (c) {
         return c.hotelDayPrice > 0;
@@ -5132,11 +5202,16 @@ function App() {
       }, "PVP de venta por fecha (HA)"), /*#__PURE__*/React.createElement("div", {
         className: "mt-0.5 max-h-32 overflow-y-auto space-y-1"
       }, stayDates.map(function (date) {
-        var pvp = getCapaSuiteHotelDayPrice(hotel, date);
+        var _formData$customDaily7;
+        var manual = (_formData$customDaily7 = formData.customDailyPvp) === null || _formData$customDaily7 === void 0 ? void 0 : _formData$customDaily7[date];
+        var pvp = manual > 0 ? {
+          price: manual,
+          source: 'PVP manual'
+        } : getCapaSuiteHotelDayPrice(hotel, date);
         return /*#__PURE__*/React.createElement("div", {
           key: date,
           className: "flex justify-between gap-2"
-        }, /*#__PURE__*/React.createElement("span", null, formatDate(date)), /*#__PURE__*/React.createElement("strong", null, pvp.price > 0 ? "".concat(pvp.price.toFixed(2), " \u20AC") : pvp.source));
+        }, /*#__PURE__*/React.createElement("span", null, formatDate(date)), /*#__PURE__*/React.createElement("strong", null, pvp.price > 0 ? "".concat(pvp.price.toFixed(2), " \u20AC").concat(manual > 0 ? ' (manual)' : '') : pvp.source || 'Sin PVP disponible'));
       })), /*#__PURE__*/React.createElement("div", {
         className: "text-[7px] text-slate-400 truncate"
       }, "Habitaci\xF3n doble \xB7 solo alojamiento")), /*#__PURE__*/React.createElement("div", {
@@ -5169,10 +5244,27 @@ function App() {
     }(), /*#__PURE__*/React.createElement("div", {
       className: "space-y-3"
     }, stayDates.map(function (date) {
-      var _formData$dailyConfig4, _formData$Hotel_Asign, _formData$dailyConfig0, _formData$dailyConfig10;
+      var _formData$dailyConfig4, _formData$customDaily8, _formData$Hotel_Asign, _formData$customDaily1, _dayComp$hotelPriceIn, _formData$dailyConfig0, _formData$dailyConfig10;
       var discount = formData.capaSuiteDiscountPercent !== undefined ? formData.capaSuiteDiscountPercent : 15;
       var currentBoard = ((_formData$dailyConfig4 = formData.dailyConfig) === null || _formData$dailyConfig4 === void 0 || (_formData$dailyConfig4 = _formData$dailyConfig4[date]) === null || _formData$dailyConfig4 === void 0 ? void 0 : _formData$dailyConfig4.board) || formData['Régimen'] || 'AD (Alojamiento y Desayuno)';
-      var dayComp = getCapaSuiteTariffComparison(formData.Hotel_Asignado, date, currentBoard, discount);
+      var manualPrice = (_formData$customDaily8 = formData.customDailyPvp) === null || _formData$customDaily8 === void 0 ? void 0 : _formData$customDaily8[date];
+      var dayComp = getCapaSuiteTariffComparison(formData.Hotel_Asignado, date, currentBoard, discount, manualPrice);
+      var adjacentPvp = function () {
+        var idx = stayDates.indexOf(date);
+        for (var i = idx - 1; i >= 0; i--) {
+          var _formData$customDaily9;
+          var prevD = stayDates[i];
+          var p = ((_formData$customDaily9 = formData.customDailyPvp) === null || _formData$customDaily9 === void 0 ? void 0 : _formData$customDaily9[prevD]) || getCapaSuiteHotelDayPrice(formData.Hotel_Asignado, prevD).price;
+          if (p > 0) return p;
+        }
+        for (var _i3 = idx + 1; _i3 < stayDates.length; _i3++) {
+          var _formData$customDaily0;
+          var nextD = stayDates[_i3];
+          var _p4 = ((_formData$customDaily0 = formData.customDailyPvp) === null || _formData$customDaily0 === void 0 ? void 0 : _formData$customDaily0[nextD]) || getCapaSuiteHotelDayPrice(formData.Hotel_Asignado, nextD).price;
+          if (_p4 > 0) return _p4;
+        }
+        return null;
+      }();
       var selectedTypes = formData.isMultiSegment ? Array.from(new Set((formData.segments || []).flatMap(function (s) {
         var allocations = Array.isArray(s.roomAllocations) && s.roomAllocations.length > 0 ? s.roomAllocations : [{
           roomType: s.roomType || "DOBLE DE USO INDIVIDUAL"
@@ -5195,9 +5287,70 @@ function App() {
         title: "PVP de habitaci\xF3n doble, solo alojamiento, sin manutenci\xF3n: ".concat(dayComp.hotelDayPrice, " \u20AC")
       }, /*#__PURE__*/React.createElement("span", {
         className: "text-slate-500"
-      }, (_formData$Hotel_Asign = formData.Hotel_Asignado) !== null && _formData$Hotel_Asign !== void 0 && _formData$Hotel_Asign.toLowerCase().includes('cumbria') ? 'Cumbria' : 'Guadiana', " \xB7 ", date.slice(0, 4)), /*#__PURE__*/React.createElement("br", null), "PVP hab. (HA): ", /*#__PURE__*/React.createElement("span", {
+      }, (_formData$Hotel_Asign = formData.Hotel_Asignado) !== null && _formData$Hotel_Asign !== void 0 && _formData$Hotel_Asign.toLowerCase().includes('cumbria') ? 'Cumbria' : 'Guadiana', " \xB7 ", date.slice(0, 4)), /*#__PURE__*/React.createElement("br", null), "PVP hab. (HA):", ' ', dayComp.hotelDayPrice > 0 ? /*#__PURE__*/React.createElement("span", {
+        className: "inline-flex items-center gap-1"
+      }, /*#__PURE__*/React.createElement("span", {
         className: "text-slate-600 font-black"
-      }, dayComp.hotelDayPrice > 0 ? "".concat(dayComp.hotelDayPrice, " \u20AC") : 'Sin PVP disponible')), function (_window$CapaSuitePric3, _window$CapaSuitePric4) {
+      }, dayComp.hotelDayPrice, " \u20AC"), ((_formData$customDaily1 = formData.customDailyPvp) === null || _formData$customDaily1 === void 0 ? void 0 : _formData$customDaily1[date]) > 0 && /*#__PURE__*/React.createElement("span", {
+        className: "bg-amber-100 text-amber-800 text-[6.5px] font-black px-1 py-0.2 rounded",
+        title: "PVP manual"
+      }, "Manual"), /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        onClick: function onClick() {
+          var input = prompt("Editar PVP hab. (HA) para el ".concat(formatDate(date), " (dejar vac\xEDo para restaurar autom\xE1tico):"), dayComp.hotelDayPrice);
+          if (input !== null) {
+            var trimmed = input.trim();
+            var val = parseFloat(trimmed.replace(',', '.'));
+            setFormData(function (prev) {
+              var updated = _objectSpread({}, prev.customDailyPvp || {});
+              if (val > 0) updated[date] = val;else delete updated[date];
+              return _objectSpread(_objectSpread({}, prev), {}, {
+                customDailyPvp: updated
+              });
+            });
+          }
+        },
+        className: "text-slate-400 hover:text-indigo-600 text-[8px] p-0.5 cursor-pointer",
+        title: "Editar tarifa PVP manualmente"
+      }, /*#__PURE__*/React.createElement("i", {
+        className: "fas fa-pen text-[7px]"
+      }))) : /*#__PURE__*/React.createElement("span", {
+        className: "inline-flex flex-wrap items-center gap-1 mt-0.5"
+      }, /*#__PURE__*/React.createElement("span", {
+        className: "text-rose-600 font-black text-[7.5px] bg-rose-50 px-1 py-0.5 rounded border border-rose-100"
+      }, ((_dayComp$hotelPriceIn = dayComp.hotelPriceInfo) === null || _dayComp$hotelPriceIn === void 0 ? void 0 : _dayComp$hotelPriceIn.source) === 'Hotel completo' ? 'Hotel completo' : 'Sin PVP disponible'), adjacentPvp > 0 && /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        onClick: function onClick() {
+          setFormData(function (prev) {
+            return _objectSpread(_objectSpread({}, prev), {}, {
+              customDailyPvp: _objectSpread(_objectSpread({}, prev.customDailyPvp || {}), {}, _defineProperty({}, date, adjacentPvp))
+            });
+          });
+        },
+        className: "text-[7.5px] bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-black px-1.5 py-0.5 rounded border border-indigo-200 transition active:scale-95 flex items-center gap-0.5 cursor-pointer",
+        title: "Usar el PVP de la noche contigua (".concat(adjacentPvp, " \u20AC)")
+      }, /*#__PURE__*/React.createElement("i", {
+        className: "fas fa-copy text-[6.5px]"
+      }), " Usar ", adjacentPvp, " \u20AC"), /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        onClick: function onClick() {
+          var input = prompt("Introducir PVP hab. (HA) manual para el ".concat(formatDate(date), ":"), adjacentPvp || '');
+          if (input !== null) {
+            var val = parseFloat(input.trim().replace(',', '.'));
+            if (val > 0) {
+              setFormData(function (prev) {
+                return _objectSpread(_objectSpread({}, prev), {}, {
+                  customDailyPvp: _objectSpread(_objectSpread({}, prev.customDailyPvp || {}), {}, _defineProperty({}, date, val))
+                });
+              });
+            }
+          }
+        },
+        className: "text-[7.5px] bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-1 py-0.5 rounded border border-slate-200 transition cursor-pointer",
+        title: "Introducir PVP manual"
+      }, /*#__PURE__*/React.createElement("i", {
+        className: "fas fa-plus text-[6.5px] mr-0.5"
+      }), " Manual"))), function (_window$CapaSuitePric3, _window$CapaSuitePric4) {
         var info = (_window$CapaSuitePric3 = window.CapaSuitePricingService) === null || _window$CapaSuitePric3 === void 0 || (_window$CapaSuitePric4 = _window$CapaSuitePric3.getDayEvents) === null || _window$CapaSuitePric4 === void 0 ? void 0 : _window$CapaSuitePric4.call(_window$CapaSuitePric3, date);
         if (!(info !== null && info !== void 0 && info.known)) return /*#__PURE__*/React.createElement("span", {
           className: "text-[9px] text-slate-400"
