@@ -1417,6 +1417,7 @@
 
     // Sincronización continua en tiempo real con CapaSuite y Firestore
     function listenToCapaSuiteDb() {
+      if (window.CapaSuiteCalendarSync) return;
       if (window.db && typeof window.db.collection === "function") {
         window.db.collection("settings").doc("calendar_data").onSnapshot(function (doc) {
           if (doc.exists) {

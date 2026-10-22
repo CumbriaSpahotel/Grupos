@@ -2,7 +2,7 @@
  * CapaSuitePricingService
  * 
  * Servicio para integrar las tarifas del hotel desde CapaSuite con la cotización de grupos:
- * 1. Obtiene el precio de habitación del hotel para cada día de estancia (PVP/BAR desde revenue_data_v2, hotel_manager_db_v2 o benchmark estacional).
+ * 1. Obtiene el precio de habitación del hotel para cada día de estancia (PVP de venta desde revenue_data_v2).
  * 2. Compara con la tarifa oficial de grupos (catálogo de objetivos).
  * 3. Calcula la tarifa recomendada aplicando un descuento comercial configurable (por defecto 15%).
  * 4. Permite aplicar la tarifa oficial o la recomendada con 1 solo clic.
@@ -23,6 +23,11 @@
   var inMemoryStorage = {};
 
   function safeGetStorage(key) {
+    var sync = typeof window !== 'undefined' && window.CapaSuiteCalendarSync;
+    if (sync && ['revenue_data_v2', 'hotel_manager_db_v2', 'custom_events', 'manual_cupos_v1'].indexOf(key) !== -1) {
+      var value = (sync.state.data || {})[key];
+      return value === undefined ? null : JSON.stringify(value);
+    }
     if (inMemoryStorage[key]) return inMemoryStorage[key];
     if (inMemoryStorage['v3_' + key]) return inMemoryStorage['v3_' + key];
     if (typeof localStorage === 'undefined') return null;
@@ -35,6 +40,7 @@
 
   function setCalendarData(data) {
     if (!data || typeof data !== 'object') return;
+    if (typeof window !== 'undefined' && window.CapaSuiteCalendarSync) return;
     if (data.revenueData) {
       inMemoryStorage['revenue_data_v2'] = data.revenueData;
       try {
@@ -65,17 +71,18 @@
   if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
     window.addEventListener('capasuite-data-synced', function () {
       try {
-        var rawRev = safeGetStorage('revenue_data_v2');
+        var rawRev = typeof localStorage !== 'undefined' && (localStorage.getItem('v3_revenue_data_v2') || localStorage.getItem('revenue_data_v2'));
         if (rawRev) inMemoryStorage['revenue_data_v2'] = typeof rawRev === 'string' ? JSON.parse(rawRev) : rawRev;
       } catch (e) {}
       try {
-        var rawDb = safeGetStorage('hotel_manager_db_v2');
+        var rawDb = typeof localStorage !== 'undefined' && (localStorage.getItem('v3_hotel_manager_db_v2') || localStorage.getItem('hotel_manager_db_v2'));
         if (rawDb) inMemoryStorage['hotel_manager_db_v2'] = typeof rawDb === 'string' ? JSON.parse(rawDb) : rawDb;
       } catch (e) {}
     });
   }
 
   function syncFromFirestore(dbInstance, callback) {
+    if (typeof window !== 'undefined' && window.CapaSuiteCalendarSync) return window.CapaSuiteCalendarSync.refresh();
     var db = dbInstance || (typeof window !== 'undefined' ? window.db : null);
     if (!db || typeof db.collection !== 'function') return Promise.resolve(false);
     return db.collection('settings').doc('calendar_data').get()
@@ -113,7 +120,7 @@
    */
   function getCapaSuiteHotelDayPrice(hotelName, dateISO) {
     if (!dateISO) {
-      return { price: 85, source: 'Tarifa Base Estándar', isEstimated: true };
+      return { price: 0, source: 'Sin PVP disponible', unavailable: true, isEstimated: false };
     }
 
     var hotelKey = normalizeHotelKey(hotelName);
@@ -150,7 +157,7 @@
     // 1. Intentar leer de revenue_data_v2
     try {
       var rawRev = safeGetStorage('revenue_data_v2');
-      if (!rawRev && typeof window !== 'undefined' && window._capasuiteRevenueCache) {
+      if (!rawRev && typeof window !== 'undefined' && !window.CapaSuiteCalendarSync && window._capasuiteRevenueCache) {
         rawRev = window._capasuiteRevenueCache;
       }
       if (rawRev) {
@@ -176,7 +183,7 @@
           if (hotelsMap && typeof hotelsMap === 'object') {
             var hotelEntry = Object.entries(hotelsMap).find(function (entry) {
               var h = String(entry[0]).toLowerCase();
-              return isCumbria ? (h.indexOf('cumbria') !== -1 || h.indexOf('spa') !== -1) : (h.indexOf('guadiana') !== -1 || h.indexOf('sercotel') !== -1);
+              return isCumbria ? (h.indexOf('cumbria') !== -1) : (h.indexOf('guadiana') !== -1);
             });
             if (hotelEntry) {
               var val = hotelEntry[1];
@@ -214,101 +221,14 @@
             }
           }
 
-          // Buscar en occupancyData (ADR registrado del hotel)
-          if (dayData.occupancyData && typeof dayData.occupancyData === 'object') {
-            var occKey = Object.keys(dayData.occupancyData).find(function (k) {
-              var lower = k.toLowerCase();
-              return isCumbria ? lower.indexOf('cumbria') !== -1 : lower.indexOf('guadiana') !== -1;
-            });
-            if (occKey && dayData.occupancyData[occKey] && dayData.occupancyData[occKey].adr > 0) {
-              var adr = Math.round(dayData.occupancyData[occKey].adr);
-              return {
-                price: adr,
-                source: 'ADR CapaSuite (' + occKey + ')',
-                isEstimated: false,
-                hotel: hotelName,
-                dateISO: iso
-              };
-            }
-          }
+
         }
       }
     } catch (e) {
       console.warn('Error leyendo revenue_data_v2 en CapaSuitePricingService:', e);
     }
 
-    // 2. Intentar leer de hotel_manager_db_v2
-    try {
-      var rawProd = safeGetStorage('hotel_manager_db_v2');
-      if (!rawProd && typeof window !== 'undefined' && window._capasuiteDbCache) {
-        rawProd = window._capasuiteDbCache;
-      }
-      if (rawProd) {
-        var parsedProd = typeof rawProd === 'string' ? JSON.parse(rawProd) : rawProd;
-        if (parsedProd && typeof parsedProd === 'object') {
-          var masterKey = Object.keys(parsedProd).find(function (k) {
-            var lower = k.toLowerCase();
-            return isCumbria ? lower.indexOf('cumbria') !== -1 : lower.indexOf('guadiana') !== -1;
-          });
-          if (masterKey && parsedProd[masterKey]) {
-            var parts = iso.split('-');
-            var year = parts[0];
-            var yearData = parsedProd[masterKey][year];
-            if (yearData) {
-              var dotb = (yearData.daily_otb && (yearData.daily_otb[iso] || yearData.daily_otb[dmy])) ||
-                         (yearData.daily && (yearData.daily[iso] || yearData.daily[dmy]));
-              if (dotb) {
-                var priceVal = dotb.price || dotb.adr || dotb.pmp || 0;
-                if (!priceVal && dotb.revenue && dotb.rooms && Number(dotb.rooms) > 0) {
-                  priceVal = Math.round((Number(dotb.revenue) / Number(dotb.rooms)) * 100) / 100;
-                }
-                if (priceVal > 0) {
-                  return {
-                    price: Math.round(priceVal * 100) / 100,
-                    source: 'OTB CapaSuite (' + masterKey + ')',
-                    isEstimated: false,
-                    hotel: hotelName,
-                    dateISO: iso
-                  };
-                }
-              }
-            }
-          }
-        }
-      }
-    } catch (e) {
-      console.warn('Error leyendo hotel_manager_db_v2 en CapaSuitePricingService:', e);
-    }
-
-    // 3. Fallback inteligente de mercado CapaSuite (Estacionalidad + Fin de semana)
-    var dateParts = String(iso).split('-');
-    var y = parseInt(dateParts[0], 10) || 2026;
-    var m = (parseInt(dateParts[1], 10) || 1) - 1; // 0..11
-    var d = parseInt(dateParts[2], 10) || 1;
-    var dateObj = new Date(y, m, d);
-    var dow = dateObj.getDay(); // 0 Dom, 5 Vie, 6 Sab
-    var isWeekend = (dow === 5 || dow === 6);
-
-    // Mismo esquema base calibrado de Calendario.html
-    var baseRate = 65;
-    if (m >= 4 && m <= 9) {
-      baseRate = 75; // Primavera-verano
-    }
-    var hotelRate = isCumbria ? (baseRate - 4) : baseRate; // Cumbria 71€ en temporada alta
-    if (isWeekend) {
-      hotelRate += 6;
-    }
-    if (dow === 0) {
-      hotelRate -= 4;
-    }
-
-    return {
-      price: hotelRate,
-      source: 'Benchmark CapaSuite (' + (isCumbria ? 'Cumbria' : 'Guadiana') + (isWeekend ? ' Fin de Semana' : '') + ')',
-      isEstimated: true,
-      hotel: hotelName,
-      dateISO: iso
-    };
+    return { price: 0, source: 'Sin PVP disponible', unavailable: true, isEstimated: false, hotel: hotelName, dateISO: iso };
   }
 
   // Same inventory and blocked-allotment rules as Calendario.html.
@@ -503,6 +423,11 @@
       }
 
       officialPricesByRoom[rt] = offP;
+      if (!(hotelRoomPrice > 0)) {
+        recommendedPricesByRoom[rt] = null;
+        savingsByRoom[rt] = null;
+        return;
+      }
 
       if (offP === null && isCumbria && (rtNorm.indexOf('cuadruple') !== -1 || rtNorm.indexOf('cuádruple') !== -1)) {
         recommendedPricesByRoom[rt] = null;
@@ -546,7 +471,7 @@
     });
 
     // La tarifa recomendada para doble en el régimen seleccionado es:
-    var recDoble = recommendedPricesByRoom['DOBLE'] || Math.round((recDobleHA + (boardSupplementPerPerson * 2)) * 100) / 100;
+    var recDoble = hotelRoomPrice > 0 ? (recommendedPricesByRoom['DOBLE'] || Math.round((recDobleHA + (boardSupplementPerPerson * 2)) * 100) / 100) : 0;
 
     return {
       hotelName: hotelName,

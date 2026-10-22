@@ -373,16 +373,11 @@ var getCapaSuiteHotelDayPrice = function getCapaSuiteHotelDayPrice(hotelName, da
   if (ps && typeof ps.getCapaSuiteHotelDayPrice === 'function') {
     return ps.getCapaSuiteHotelDayPrice(hotelName, dateISO);
   }
-  var isCumbria = (hotelName || '').toLowerCase().includes('cumbria');
-  var d = dateISO ? new Date(toInputDate(dateISO) + 'T00:00:00') : new Date();
-  var dow = d.getDay();
-  var isWeekend = dow === 5 || dow === 6;
-  var base = isCumbria ? 62 : 68;
-  if (isWeekend) base += 18;
   return {
-    price: base,
-    source: 'CapaSuite Benchmark',
-    isEstimated: true,
+    price: 0,
+    unavailable: true,
+    source: 'Sin PVP disponible',
+    isEstimated: false,
     hotel: hotelName,
     dateISO: dateISO
   };
@@ -1884,12 +1879,14 @@ function App() {
       });
     };
     window.addEventListener('capasuite-data-synced', refresh);
+    window.addEventListener('capasuite-calendar-state', refresh);
     var storageChanged = function storageChanged(event) {
       if (['hotel_manager_db_v2', 'v3_hotel_manager_db_v2', 'revenue_data_v2', 'v3_revenue_data_v2', 'manual_cupos_v1', 'v3_manual_cupos_v1', 'custom_events', 'v3_custom_events'].includes(event.key)) refresh();
     };
     window.addEventListener('storage', storageChanged);
     return function () {
       window.removeEventListener('capasuite-data-synced', refresh);
+      window.removeEventListener('capasuite-calendar-state', refresh);
       window.removeEventListener('storage', storageChanged);
     };
   }, []);
@@ -2218,6 +2215,7 @@ function App() {
 
   // Sincronizar inteligencia de tarifas y PVP CapaSuite desde Firestore (settings/calendar_data)
   useEffect(function () {
+    if (window.CapaSuiteCalendarSync) return;
     var handleSnapshot = function handleSnapshot(snap) {
       if (snap && snap.exists) {
         var d = snap.data();
@@ -2670,6 +2668,13 @@ function App() {
     var parsedY = formData.Entrada ? new Date(toInputDate(formData.Entrada)).getFullYear() : 2027;
     var validYear = isNaN(parsedY) ? 2027 : parsedY;
     var hotel = formData.Hotel_Asignado || 'Sercotel Guadiana';
+    var missingPvp = getCurrentStayDates(formData).some(function (date) {
+      return !(getCapaSuiteHotelDayPrice(hotel, date).price > 0);
+    });
+    if (missingPvp) {
+      alert('Falta el PVP real de CapaSuite para alguna fecha. No se ha aplicado la tarifa recomendada.');
+      return;
+    }
     var roomTypes = getRoomTypesForHotel(hotel);
     var stayDates = getCurrentStayDates(formData);
     var newDailyConfig = _objectSpread({}, formData.dailyConfig || {});
@@ -2734,6 +2739,13 @@ function App() {
     if (stayDates.length === 0) return;
     var discount = customDiscount !== undefined ? customDiscount : formData.capaSuiteDiscountPercent !== undefined ? formData.capaSuiteDiscountPercent : 15;
     var hotel = formData.Hotel_Asignado || 'Sercotel Guadiana';
+    var missingPvp = getCurrentStayDates(formData).some(function (date) {
+      return !(getCapaSuiteHotelDayPrice(hotel, date).price > 0);
+    });
+    if (missingPvp) {
+      alert('Falta el PVP real de CapaSuite para alguna fecha. No se ha aplicado la tarifa recomendada.');
+      return;
+    }
     var roomTypes = getRoomTypesForHotel(hotel);
     if (formData.isRatesOnly) {
       var _mergedGrid = _objectSpread({}, formData.ratesOnlyGrid || {});
@@ -5030,7 +5042,7 @@ function App() {
       title: "Copiar precios y cupos del primer d\xEDa a todos los siguientes"
     }, /*#__PURE__*/React.createElement("i", {
       className: "fas fa-copy"
-    }), " Copiar 1\xBA D\xEDa a Todos"))), function () {
+    }), " Copiar 1\xBA D\xEDa a Todos"))), function (_window$CapaSuiteCale, _window$CapaSuiteCale2) {
       var hotel = formData.Hotel_Asignado || 'Sercotel Guadiana';
       var discount = formData.capaSuiteDiscountPercent !== undefined ? formData.capaSuiteDiscountPercent : 15;
       var board = formData['Régimen'] || 'AD (Alojamiento y Desayuno)';
@@ -5039,6 +5051,15 @@ function App() {
       return /*#__PURE__*/React.createElement("div", {
         className: "bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 rounded-2xl p-4 text-white shadow-sm border border-indigo-500/20 space-y-3"
       }, /*#__PURE__*/React.createElement("div", {
+        role: "status",
+        className: "text-xs text-indigo-200"
+      }, ((_window$CapaSuiteCale = window.CapaSuiteCalendarSync) === null || _window$CapaSuiteCale === void 0 ? void 0 : _window$CapaSuiteCale.state.status) || 'Conexión de PVP no disponible', !((_window$CapaSuiteCale2 = window.CapaSuiteCalendarSync) !== null && _window$CapaSuiteCale2 !== void 0 && _window$CapaSuiteCale2.state.authenticated) && /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        className: "ml-2 underline",
+        onClick: function onClick() {
+          return document.getElementById('capasuite-login').showModal();
+        }
+      }, "Iniciar sesi\xF3n en CapaSuite")), /*#__PURE__*/React.createElement("div", {
         className: "flex flex-col md:flex-row md:items-center justify-between gap-3"
       }, /*#__PURE__*/React.createElement("div", {
         className: "flex items-center gap-2.5"
@@ -5126,9 +5147,15 @@ function App() {
         className: "bg-white/5 rounded-xl p-2 border border-white/5"
       }, /*#__PURE__*/React.createElement("div", {
         className: "text-[8px] font-bold text-slate-400 uppercase tracking-wider"
-      }, "Tarifa del hotel \xB7 media (HA)"), /*#__PURE__*/React.createElement("div", {
-        className: "text-sm font-black text-white mt-0.5"
-      }, staySummary.avgHotelPrice.toFixed(2), " \u20AC"), /*#__PURE__*/React.createElement("div", {
+      }, "PVP de venta por fecha (HA)"), /*#__PURE__*/React.createElement("div", {
+        className: "mt-0.5 max-h-32 overflow-y-auto space-y-1"
+      }, stayDates.map(function (date) {
+        var pvp = getCapaSuiteHotelDayPrice(hotel, date);
+        return /*#__PURE__*/React.createElement("div", {
+          key: date,
+          className: "flex justify-between gap-2"
+        }, /*#__PURE__*/React.createElement("span", null, formatDate(date)), /*#__PURE__*/React.createElement("strong", null, pvp.price > 0 ? "".concat(pvp.price.toFixed(2), " \u20AC") : 'Sin PVP disponible'));
+      })), /*#__PURE__*/React.createElement("div", {
         className: "text-[7px] text-slate-400 truncate"
       }, "Habitaci\xF3n doble \xB7 solo alojamiento")), /*#__PURE__*/React.createElement("div", {
         className: "bg-white/5 rounded-xl p-2 border border-white/5"
@@ -5188,7 +5215,7 @@ function App() {
         className: "text-slate-500"
       }, (_formData$Hotel_Asign = formData.Hotel_Asignado) !== null && _formData$Hotel_Asign !== void 0 && _formData$Hotel_Asign.toLowerCase().includes('cumbria') ? 'Cumbria' : 'Guadiana', " \xB7 ", date.slice(0, 4)), /*#__PURE__*/React.createElement("br", null), "PVP hab. (HA): ", /*#__PURE__*/React.createElement("span", {
         className: "text-slate-600 font-black"
-      }, dayComp.hotelDayPrice, " \u20AC")), function (_window$CapaSuitePric3, _window$CapaSuitePric4) {
+      }, dayComp.hotelDayPrice > 0 ? "".concat(dayComp.hotelDayPrice, " \u20AC") : 'Sin PVP disponible')), function (_window$CapaSuitePric3, _window$CapaSuitePric4) {
         var info = (_window$CapaSuitePric3 = window.CapaSuitePricingService) === null || _window$CapaSuitePric3 === void 0 || (_window$CapaSuitePric4 = _window$CapaSuitePric3.getDayEvents) === null || _window$CapaSuitePric4 === void 0 ? void 0 : _window$CapaSuitePric4.call(_window$CapaSuitePric3, date);
         if (!(info !== null && info !== void 0 && info.known)) return /*#__PURE__*/React.createElement("span", {
           className: "text-[9px] text-slate-400"
@@ -7937,7 +7964,7 @@ function App() {
       return setEmailContent(e.target.value);
     },
     disabled: isParsingEmail,
-    placeholder: "Querido Hotel, me gustar\xEDa reservar habitaciones para 9 personas de nuestra compa\xF1\xEDa... 3 personas: Entrada 14 junio, Salida 19 junio.\nY del 21 de junio al...",
+    placeholder: "Querido Hotel, me gustar\xEDa reservar habitaciones para 9 personas de nuestra compa\xF1\xEDa...\r 3 personas: Entrada 14 junio, Salida 19 junio.\r\nY del 21 de junio al...",
     className: "w-full bg-slate-50 border border-slate-100 rounded-xl p-4 text-xs text-slate-700 placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all min-h-[250px] resize-none"
   }))), /*#__PURE__*/React.createElement("div", {
     className: "p-6 border-t border-slate-100 bg-slate-50/30 flex justify-end gap-3"

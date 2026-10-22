@@ -221,13 +221,7 @@
       if (ps && typeof ps.getCapaSuiteHotelDayPrice === 'function') {
         return ps.getCapaSuiteHotelDayPrice(hotelName, dateISO);
       }
-      const isCumbria = (hotelName || '').toLowerCase().includes('cumbria');
-      const d = dateISO ? new Date(toInputDate(dateISO) + 'T00:00:00') : new Date();
-      const dow = d.getDay();
-      const isWeekend = (dow === 5 || dow === 6);
-      let base = isCumbria ? 62 : 68;
-      if (isWeekend) base += 18;
-      return { price: base, source: 'CapaSuite Benchmark', isEstimated: true, hotel: hotelName, dateISO };
+      return { price: 0, unavailable: true, source: 'Sin PVP disponible', isEstimated: false, hotel: hotelName, dateISO };
     };
 
     const roundRate = value => Math.round((Number(value) + Number.EPSILON) * 20) / 20;
@@ -1622,12 +1616,14 @@
       useEffect(() => {
         const refresh = () => refreshAvailability(value => value + 1);
         window.addEventListener('capasuite-data-synced', refresh);
+        window.addEventListener('capasuite-calendar-state', refresh);
         const storageChanged = event => {
           if (['hotel_manager_db_v2', 'v3_hotel_manager_db_v2', 'revenue_data_v2', 'v3_revenue_data_v2', 'manual_cupos_v1', 'v3_manual_cupos_v1', 'custom_events', 'v3_custom_events'].includes(event.key)) refresh();
         };
         window.addEventListener('storage', storageChanged);
         return () => {
           window.removeEventListener('capasuite-data-synced', refresh);
+          window.removeEventListener('capasuite-calendar-state', refresh);
           window.removeEventListener('storage', storageChanged);
         };
       }, []);
@@ -1899,6 +1895,7 @@
 
       // Sincronizar inteligencia de tarifas y PVP CapaSuite desde Firestore (settings/calendar_data)
       useEffect(() => {
+        if (window.CapaSuiteCalendarSync) return;
         const handleSnapshot = (snap) => {
           if (snap && snap.exists) {
             const d = snap.data();
@@ -2316,6 +2313,11 @@
         const parsedY = formData.Entrada ? new Date(toInputDate(formData.Entrada)).getFullYear() : 2027;
         const validYear = isNaN(parsedY) ? 2027 : parsedY;
         const hotel = formData.Hotel_Asignado || 'Sercotel Guadiana';
+        const missingPvp = getCurrentStayDates(formData).some(date => !(getCapaSuiteHotelDayPrice(hotel, date).price > 0));
+        if (missingPvp) {
+          alert('Falta el PVP real de CapaSuite para alguna fecha. No se ha aplicado la tarifa recomendada.');
+          return;
+        }
         const roomTypes = getRoomTypesForHotel(hotel);
         const stayDates = getCurrentStayDates(formData);
         const newDailyConfig = { ...(formData.dailyConfig || {}) };
@@ -2378,6 +2380,11 @@
           ? customDiscount 
           : (formData.capaSuiteDiscountPercent !== undefined ? formData.capaSuiteDiscountPercent : 15);
         const hotel = formData.Hotel_Asignado || 'Sercotel Guadiana';
+        const missingPvp = getCurrentStayDates(formData).some(date => !(getCapaSuiteHotelDayPrice(hotel, date).price > 0));
+        if (missingPvp) {
+          alert('Falta el PVP real de CapaSuite para alguna fecha. No se ha aplicado la tarifa recomendada.');
+          return;
+        }
         const roomTypes = getRoomTypesForHotel(hotel);
 
         if (formData.isRatesOnly) {
@@ -4225,6 +4232,10 @@ ${emailContent}`;
 
                         return (
                           <div className="bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 rounded-2xl p-4 text-white shadow-sm border border-indigo-500/20 space-y-3">
+                            <div role="status" className="text-xs text-indigo-200">
+                              {window.CapaSuiteCalendarSync?.state.status || 'Conexión de PVP no disponible'}
+                              {!window.CapaSuiteCalendarSync?.state.authenticated && <button type="button" className="ml-2 underline" onClick={() => document.getElementById('capasuite-login').showModal()}>Iniciar sesión en CapaSuite</button>}
+                            </div>
                             <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
                               <div className="flex items-center gap-2.5">
                                 <div className="w-8 h-8 rounded-lg bg-indigo-500/20 border border-indigo-400/30 flex items-center justify-center text-indigo-300">
@@ -4311,8 +4322,11 @@ ${emailContent}`;
                             {/* Tarjetas resumen de precio medio */}
                             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-white/10 text-[10px]">
                               <div className="bg-white/5 rounded-xl p-2 border border-white/5">
-                                <div className="text-[8px] font-bold text-slate-400 uppercase tracking-wider">Tarifa del hotel · media (HA)</div>
-                                <div className="text-sm font-black text-white mt-0.5">{staySummary.avgHotelPrice.toFixed(2)} €</div>
+                                <div className="text-[8px] font-bold text-slate-400 uppercase tracking-wider">PVP de venta por fecha (HA)</div>
+                                <div className="mt-0.5 max-h-32 overflow-y-auto space-y-1">{stayDates.map(date => {
+                                  const pvp = getCapaSuiteHotelDayPrice(hotel, date);
+                                  return <div key={date} className="flex justify-between gap-2"><span>{formatDate(date)}</span><strong>{pvp.price > 0 ? `${pvp.price.toFixed(2)} €` : 'Sin PVP disponible'}</strong></div>;
+                                })}</div>
                                 <div className="text-[7px] text-slate-400 truncate">Habitación doble · solo alojamiento</div>
                               </div>
                               <div className="bg-white/5 rounded-xl p-2 border border-white/5">
@@ -4357,7 +4371,7 @@ ${emailContent}`;
                                 <span className="bg-slate-800 text-white px-2 py-1 rounded text-[8px] font-black w-fit uppercase tracking-widest">{formatDate(date)}</span>
                                 <span className="text-[7px] text-slate-400 font-bold" title={`PVP de habitación doble, solo alojamiento, sin manutención: ${dayComp.hotelDayPrice} €`}>
                                   <span className="text-slate-500">{formData.Hotel_Asignado?.toLowerCase().includes('cumbria') ? 'Cumbria' : 'Guadiana'} · {date.slice(0, 4)}</span><br />
-                                  PVP hab. (HA): <span className="text-slate-600 font-black">{dayComp.hotelDayPrice} €</span>
+                                  PVP hab. (HA): <span className="text-slate-600 font-black">{dayComp.hotelDayPrice > 0 ? `${dayComp.hotelDayPrice} €` : 'Sin PVP disponible'}</span>
                                 </span>
                                 {(() => {
                                   const info = window.CapaSuitePricingService?.getDayEvents?.(date);
