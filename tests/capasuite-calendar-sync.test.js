@@ -11,12 +11,12 @@ function fixture(options={}) {
     observeConnection:fn=>{connection=fn;},
     observeAuth:fn=>{auth=fn;fn({uid:'first'});},
     listen:(uid,next,error)=>{callbacks.push({uid,next,error});return ()=>{};},
-    read:async()=>{reads++;return {val:()=>payload(125)};},
+    read:async()=>{reads++;return options.read ? options.read() : {val:()=>payload(125)};},
     signIn:async()=>{}
   })};
   const context={window:{addEventListener:(key,fn)=>handlers[key]=fn,dispatchEvent:()=>{}},
     localStorage:{setItem:(key,value)=>{if(options.storageBlocked)throw Error('quota');store.set(key,value);}},
-    CustomEvent:function(){},setTimeout:(fn,ms)=>timers.push({fn,ms}),sdk};
+    CustomEvent:function(){},setTimeout:(fn,ms)=>timers.push({fn,ms}),clearTimeout:id=>{if(timers[id-1])timers[id-1].cancelled=true;},sdk};
   vm.createContext(context);
   vm.runInContext(source.replace("import('./capaSuiteSession.mjs?v=1')",'Promise.resolve(sdk)'),context);
   return {service:context.window.CapaSuiteCalendarSync,handlers,callbacks,store,timers,auth:user=>auth(user),connection:value=>connection(value),get reads(){return reads;}};
@@ -64,7 +64,7 @@ test('retries when loading the SDK fails',async()=>{
 });
 test('calendar uses direct memory data, preserves filters, and never claims a cache read is synchronized',()=>{
   const html=fs.readFileSync('Calendario.html','utf8');
-  assert.ok(html.includes('js/services/capaSuiteCalendarSync.js?v=1-direct-source'));
+  assert.ok(html.includes('js/services/capaSuiteCalendarSync.js?v=2-guarded-sync'));
   assert.ok(fs.existsSync('js/services/capaSuiteSession.mjs'));
   assert.ok(!html.includes('id="btn-refresh"'));
   const engine=html.slice(html.indexOf('(function () {',html.indexOf('MOTOR Y')),html.lastIndexOf('</script>'));
@@ -75,6 +75,66 @@ test('calendar uses direct memory data, preserves filters, and never claims a ca
   vm.runInNewContext(engine.slice(start,end)+'this.read = getStorageItem;',context);
   assert.equal(context.read('revenue_data_v2'),'{"real":1}');
   assert.equal(context.read('hotel_manager_db_v2'),null);
-  assert.ok(engine.includes("if (window.CapaSuiteCalendarSync) return;"),'no old Firestore listener');
+  assert.ok(!engine.includes("doc('calendar_data')"), 'must never fall back to the obsolete Groups cloud copy');
   assert.ok(!engine.includes('syncBadge.textContent = "Sincronizado"'));
+});
+
+test('listener errors retry without hiding the error on reconnect',async()=>{
+  const f=fixture();await f.service.start();f.connection(true);
+  f.callbacks[0].next({val:()=>payload(80)});
+  f.callbacks[0].error();
+  assert.equal(f.timers[0].ms,5000);
+  f.connection(false);f.connection(true);
+  assert.match(f.service.state.status,/Error de acceso/);
+  f.timers[0].fn();
+  assert.equal(f.callbacks.length,2);
+  f.callbacks[1].next({val:()=>payload(90)});
+  assert.equal(f.service.state.status,'CapaSuite actualizado');
+});
+test('a delayed read cannot replace a newer live price and concurrent refreshes share a read',async()=>{
+  let resolveRead;
+  const f=fixture({read:()=>new Promise(resolve=>{resolveRead=resolve;})});
+  await f.service.start();
+  const first=f.service.refresh(), second=f.service.refresh();
+  assert.equal(first,second);
+  await turn();
+  f.callbacks[0].next({val:()=>payload(200)});
+  resolveRead({val:()=>payload(100)});
+  await first;
+  assert.equal(f.reads,1);
+  assert.equal(f.service.state.data.revenue_data_v2.data[0].hotels.Cumbria.price,200);
+});
+test('bad structured data never overwrites the last valid calendar or cache',async()=>{
+  const f=fixture();await f.service.start();f.connection(true);
+  f.callbacks[0].next({val:()=>payload(80)});
+  const stored=f.store.get('v3_revenue_data_v2');
+  f.callbacks[0].next({val:()=>({...payload(90),compData:JSON.stringify({data:[false]})})});
+  assert.match(f.service.state.status,/no se pudo leer/);
+  f.connection(false);f.connection(true);
+  assert.match(f.service.state.status,/no se pudo leer/);
+  assert.equal(f.store.get('v3_revenue_data_v2'),stored);
+  assert.equal(f.service.state.data.revenue_data_v2.data[0].hotels.Cumbria.price,80);
+});
+test('changing accounts cancels scheduled listener retries',async()=>{
+  const f=fixture();await f.service.start();f.callbacks[0].error();
+  f.auth({uid:'second'});
+  assert.equal(f.timers[0].cancelled,true);
+  f.timers[0].fn();
+  assert.equal(f.callbacks.length,2);
+});
+test('GitHub checks always run the explicit calendar integrity suite',()=>{
+  const pkg=JSON.parse(fs.readFileSync('package.json','utf8'));
+  assert.match(pkg.scripts['check:calendar'],/tests\/capasuite-calendar-sync\.test\.js/);
+  const workflow=fs.readFileSync('.github/workflows/calendar-sync.yml','utf8');
+  assert.ok(workflow.includes('npm run check:calendar'));
+  assert.ok(workflow.includes('pull_request:') && workflow.includes('push:'));
+});
+
+test('failed background reads preserve the last price and schedule a retry',async()=>{
+  const f=fixture({read:async()=>{throw Error('network');}});
+  await f.service.start();f.connection(true);f.callbacks[0].next({val:()=>payload(80)});
+  await assert.rejects(f.service.refresh());
+  assert.equal(f.service.state.status,'No se pudo actualizar CapaSuite');
+  assert.equal(f.service.state.data.revenue_data_v2.data[0].hotels.Cumbria.price,80);
+  assert.equal(f.timers[0].ms,5000);
 });

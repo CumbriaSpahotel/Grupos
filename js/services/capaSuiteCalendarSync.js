@@ -1,11 +1,36 @@
 (function () {
     'use strict';
-    var session, ready, stopData, generation = 0, retryTimer, retryDelay = 5000;
+    if (window.CapaSuiteCalendarSync) return;
+    var session, ready, stopData, stopAuth, stopConnection, refreshPending;
+    var generation = 0, revision = 0, retryTimer, retryDelay = 5000, sourceError = '';
     var state = { status: 'Conectando con CapaSuite...', connected: false, authenticated: false, data: null, updatedAt: null };
     var stores = { compData: 'revenue_data_v2', hotelData: 'hotel_manager_db_v2', customEvents: 'custom_events', manualCupos: 'manual_cupos_v1' };
 
     function notify() {
         window.dispatchEvent(new CustomEvent('capasuite-calendar-state', { detail: state }));
+    }
+    function cancelRetry() {
+        if (retryTimer) clearTimeout(retryTimer);
+        retryTimer = null;
+    }
+    function retry(work) {
+        if (retryTimer) return;
+        retryTimer = setTimeout(function () {
+            retryTimer = null;
+            work();
+        }, retryDelay);
+        retryDelay = Math.min(retryDelay * 2, 60000);
+    }
+    function listen(version) {
+        if (version !== generation || !state.uid) return;
+        if (stopData) stopData();
+        stopData = session.listen(state.uid, function (snapshot) { apply(snapshot, version); }, function () {
+            if (version !== generation) return;
+            sourceError = 'Error de acceso al calendario de CapaSuite';
+            state.status = sourceError;
+            notify();
+            retry(function () { listen(version); });
+        });
     }
     function apply(snapshot, version) {
         if (version !== generation) return;
@@ -18,7 +43,19 @@
                 values[stores[field]] = value == null ? (field === 'customEvents' ? [] : {}) : typeof value === 'string' ? JSON.parse(value) : value;
             });
             var revenue = values.revenue_data_v2;
-            if (!revenue || typeof revenue !== 'object' || !Array.isArray(values.custom_events)) throw new Error('Formato de calendario no válido');
+            var production = values.hotel_manager_db_v2;
+            if (!revenue || typeof revenue !== 'object' || !production || typeof production !== 'object' || Array.isArray(production) ||
+                !Array.isArray(values.custom_events) || !values.manual_cupos_v1 || typeof values.manual_cupos_v1 !== 'object') throw new Error('Formato de calendario no válido');
+            var days = Array.isArray(revenue) ? revenue : revenue.data !== undefined ? revenue.data : revenue;
+            if (!days || typeof days !== 'object') throw new Error('Fechas no válidas');
+            Object.values(days).forEach(function (day) {
+                if (!day || typeof day !== 'object' || Array.isArray(day) ||
+                    (day.hotels !== undefined && (!day.hotels || typeof day.hotels !== 'object'))) throw new Error('Precio diario no válido');
+            });
+            sourceError = '';
+            cancelRetry();
+            retryDelay = 5000;
+            revision++;
             state.data = values;
             state.updatedAt = new Date();
             state.status = state.connected ? 'CapaSuite actualizado' : 'CapaSuite: datos guardados, sin conexión';
@@ -28,7 +65,8 @@
             });
             notify();
         } catch (error) {
-            state.status = 'CapaSuite: no se pudo leer el calendario';
+            sourceError = 'CapaSuite: no se pudo leer el calendario';
+            state.status = sourceError;
             notify();
         }
     }
@@ -36,16 +74,18 @@
         if (ready) return ready;
         ready = import('./capaSuiteSession.mjs?v=1').then(function (sdk) {
             session = sdk.createSession();
-            retryDelay = 5000;
-            session.observeConnection(function (connected) {
+            stopConnection = session.observeConnection(function (connected) {
                 state.connected = connected;
-                if (state.authenticated) state.status = connected ? (state.data ? 'CapaSuite actualizado' : 'Recibiendo calendario de CapaSuite...') : 'CapaSuite sin conexión';
+                if (state.authenticated) state.status = connected ? (sourceError || (state.data ? 'CapaSuite actualizado' : 'Recibiendo calendario de CapaSuite...')) : 'CapaSuite sin conexión';
                 notify();
             });
             return new Promise(function (resolve, reject) {
-                session.observeAuth(function (user) {
+                stopAuth = session.observeAuth(function (user) {
                     generation++;
                     if (stopData) stopData();
+                    stopData = null;
+                    cancelRetry();
+                    sourceError = '';
                     state.authenticated = !!user;
                     state.data = null;
                     state.updatedAt = null;
@@ -53,27 +93,18 @@
                     state.status = user ? 'Recibiendo calendario de CapaSuite...' : 'CapaSuite: inicia sesión para sincronizar';
                     notify();
                     if (user) {
-                        var version = generation;
-                        stopData = session.listen(user.uid, function (snapshot) { apply(snapshot, version); }, function () {
-                            if (version !== generation) return;
-                            state.status = 'Error de acceso al calendario de CapaSuite';
-                            notify();
-                        });
+                        listen(generation);
                     }
                     resolve();
                 }, reject);
             });
         }).catch(function (error) {
+            if (typeof stopAuth === 'function') stopAuth();
+            if (typeof stopConnection === 'function') stopConnection();
             ready = null;
             state.status = 'No se pudo conectar con CapaSuite';
             notify();
-            if (!retryTimer) {
-                retryTimer = setTimeout(function () {
-                    retryTimer = null;
-                    start().catch(function () {});
-                }, retryDelay);
-                retryDelay = Math.min(retryDelay * 2, 60000);
-            }
+            retry(function () { start().catch(function () {}); });
             throw error;
         });
         return ready;
@@ -82,13 +113,28 @@
         state: state,
         start: start,
         signIn: async function (email, password) { await start(); return session.signIn(email, password); },
-        refresh: async function () {
-            await start();
-            if (!state.uid) return false;
-            var version = generation;
-            var snapshot = await session.read(state.uid);
-            apply(snapshot, version);
-            return true;
+        refresh: function () {
+            if (refreshPending) return refreshPending;
+            refreshPending = (async function () {
+                await start();
+                if (!state.uid) return false;
+                var version = generation, initialRevision = revision;
+                try {
+                    var snapshot = await session.read(state.uid);
+                    // A slower manual/focus read must not replace a newer live snapshot.
+                    if (revision === initialRevision) apply(snapshot, version);
+                    return true;
+                } catch (error) {
+                    if (version === generation && revision === initialRevision) {
+                        sourceError = 'No se pudo actualizar CapaSuite';
+                        state.status = sourceError;
+                        notify();
+                        retry(function () { window.CapaSuiteCalendarSync.refresh().catch(function () {}); });
+                    }
+                    throw error;
+                }
+            })().finally(function () { refreshPending = null; });
+            return refreshPending;
         }
     };
     window.addEventListener('load', function () { start().catch(function () {}); });

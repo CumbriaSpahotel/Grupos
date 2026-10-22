@@ -639,7 +639,7 @@
     <script src="js/navigation.js?v=2-shared-listener"></script>
     <script src="js/firebase-init.js?v=2-persistent-cache"></script>
 
-    <script src="js/services/capaSuiteCalendarSync.js?v=1-direct-source"></script>
+    <script src="js/services/capaSuiteCalendarSync.js?v=2-guarded-sync"></script>
     <dialog id="capasuite-login" class="rounded-xl p-6 shadow-xl" style="max-width:420px;width:90%">
         <form id="capasuite-login-form" class="flex flex-col gap-3">
             <h2 class="font-bold text-lg">Sesión de CapaSuite</h2>
@@ -812,7 +812,7 @@
                 var syncBadge = document.getElementById("sync-status-badge");
                 var syncLastTime = document.getElementById("sync-last-time");
                 var sync = window.CapaSuiteCalendarSync;
-                if (syncBadge) syncBadge.textContent = sync ? sync.state.status : 'Copia guardada';
+                if (syncBadge) syncBadge.textContent = sync ? sync.state.status : 'Conexión de CapaSuite no disponible (copia guardada)';
                 if (syncLastTime) syncLastTime.textContent = sync && sync.state.updatedAt ? 'Datos recibidos: ' + formatTime(sync.state.updatedAt) : 'Sin actualización confirmada';
                 var signIn = document.getElementById('capasuite-sign-in');
                 if (signIn) signIn.hidden = !sync || sync.state.authenticated || sync.state.status !== 'CapaSuite: inicia sesión para sincronizar';
@@ -1426,50 +1426,8 @@
 
             window.refreshCalendarData = function () {
                 if (window.CapaSuiteCalendarSync) return window.CapaSuiteCalendarSync.refresh();
-                var btnIcon = document.getElementById("btn-refresh-icon");
-                var syncBadge = document.getElementById("sync-status-badge");
-                if (btnIcon) btnIcon.classList.add("spinner-anim");
-                if (syncBadge) {
-                    syncBadge.textContent = "Actualizando...";
-                    syncBadge.className = "text-[10px] font-bold text-amber-600 uppercase tracking-wider";
-                }
-
-                // Sincronizar desde Firebase Firestore si existe
-                if (window.db && typeof window.db.collection === 'function') {
-                    window.db.collection('settings').doc('calendar_data').get().then(function (doc) {
-                        if (doc.exists) {
-                            var d = doc.data();
-                            if (d.revenueData) {
-                                revenueData = d.revenueData;
-                                setStorageItem('revenue_data_v2', JSON.stringify(d.revenueData));
-                            }
-                            if (d.customEvents) {
-                                rawEvents = d.customEvents;
-                                setStorageItem('custom_events', JSON.stringify(d.customEvents));
-                            }
-                            if (d.manualCupos) setStorageItem('manual_cupos_v1', JSON.stringify(d.manualCupos));
-                            if (d.hotelManagerDb) {
-                                db = d.hotelManagerDb;
-                                setStorageItem('hotel_manager_db_v2', JSON.stringify(d.hotelManagerDb));
-                            }
-                            if (window.CapaSuitePricingService && typeof window.CapaSuitePricingService.setCalendarData === 'function') {
-                                window.CapaSuitePricingService.setCalendarData(d);
-                            }
-                        }
-                    }).catch(function (e) {
-                        console.warn("Error sincronizando calendar_data:", e);
-                    }).finally(function () {
-                        loadAllData();
-                        setTimeout(function () {
-                            if (btnIcon) btnIcon.classList.remove("spinner-anim");
-                        }, 400);
-                    });
-                } else {
-                    setTimeout(function () {
-                        loadAllData();
-                        if (btnIcon) btnIcon.classList.remove("spinner-anim");
-                    }, 400);
-                }
+                loadAllData();
+                return Promise.resolve(false);
             };
 
             window.toggleFullScreen = function () {
@@ -1600,27 +1558,6 @@
             });
             window.addEventListener('load', function () {
                 loadAllData();
-                if (window.CapaSuiteCalendarSync) return;
-                if (!window.db || typeof window.db.collection !== 'function') return;
-                var reference = window.db.collection('settings').doc('calendar_data');
-                if (typeof reference.onSnapshot !== 'function') {
-                    window.refreshCalendarData();
-                    return;
-                }
-                var listen = window.nexusListen || function (ref, next, error) { return ref.onSnapshot(next, error); };
-                listen(reference, function (snapshot) {
-                    if (!snapshot.exists) return;
-                    var data = snapshot.data();
-                    var stores = { revenueData: 'revenue_data_v2', hotelManagerDb: 'hotel_manager_db_v2', customEvents: 'custom_events', manualCupos: 'manual_cupos_v1' };
-                    Object.keys(stores).forEach(function (field) {
-                        if (data[field] !== undefined) setStorageItem(stores[field], JSON.stringify(data[field]));
-                    });
-                    loadAllData();
-                }, function (error) {
-                    console.warn('Error sincronizando calendar_data:', error);
-                    var badge = document.getElementById('sync-status-badge');
-                    if (badge) badge.textContent = 'Error de sincronización';
-                });
             });
 
         })();
