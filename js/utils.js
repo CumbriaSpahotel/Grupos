@@ -270,6 +270,20 @@
     return Array.from(allDates).sort();
   }
 
+  // One source of occupied dates for pricing, totals and rooming.
+  function getStayDates(data) {
+    data = data || {};
+    if (data.isMultiSegment && Array.isArray(data.segments) && data.segments.length) {
+      return generateSeriesDates(data.segments);
+    }
+    var ranges = Array.isArray(data.DateRanges_JSON) ? data.DateRanges_JSON : [];
+    // Preserve legacy series with multiple stays; a single imported range
+    // must not override the arrival/departure shown in the editor.
+    if (ranges.length > 1) return generateSeriesDates(ranges);
+    if (data.Entrada || data.Salida) return generateDates(data.Entrada, data.Salida);
+    return generateSeriesDates(ranges);
+  }
+
   // ── Paleta de colores compartida ───────────────────────
   var COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042", "#8884d8", "#82ca9d", "#ff5722", "#795548"];
 
@@ -293,6 +307,7 @@
     formatNum: formatNum,
     formatCurrency: formatCurrency,
     safeStorage: safeStorage,
+    getStayDates: getStayDates,
     generateDates: generateDates,
     generateSeriesDates: generateSeriesDates,
     getStatusColor: getStatusColor,

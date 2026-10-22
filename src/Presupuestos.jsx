@@ -356,19 +356,7 @@
       return !isNaN(y) && y >= 1990 && y <= 2150;
     });
 
-    const calcStayDays = (inVal, outVal) => {
-      const inStr = toInputDate(inVal);
-      const outStr = toInputDate(outVal);
-      if (!inStr || !outStr) return 1;
-      const dIn = new Date(inStr + "T00:00:00");
-      const dOut = new Date(outStr + "T00:00:00");
-      if (isNaN(dIn.getTime()) || isNaN(dOut.getTime())) return 1;
-      const yIn = dIn.getFullYear();
-      const yOut = dOut.getFullYear();
-      if (yIn < 1990 || yIn > 2150 || yOut < 1990 || yOut > 2150) return 1;
-      const diff = Math.round((dOut.getTime() - dIn.getTime()) / (1000 * 60 * 60 * 24));
-      return (diff >= 1 && diff <= 366) ? diff : 1;
-    };
+    const calcStayDays = (inVal, outVal) => generateDates(inVal, outVal).length;
 
     const addStayDays = (inVal, days) => {
       const inStr = toInputDate(inVal) || new Date().toISOString().split("T")[0];
@@ -1005,14 +993,7 @@
         existingList = [];
       }
 
-      let dates = [];
-      if (group.isMultiSegment && Array.isArray(group.segments) && group.segments.length > 0) {
-        dates = generateSeriesDates(group.segments);
-      } else if (group.DateRanges_JSON && Array.isArray(group.DateRanges_JSON) && group.DateRanges_JSON.length > 0) {
-        dates = generateSeriesDates(group.DateRanges_JSON);
-      } else {
-        dates = generateDates(group.Entrada, group.Salida);
-      }
+      const dates = NexusUtils.getStayDates(group);
 
       if (!dates || dates.length === 0) return [];
 
@@ -1317,15 +1298,7 @@
         return withBreakdown ? window.AgencyCommissionService.settle(0, 0, groupData || {}) : 0;
       }
 
-      let dates = [];
-      // PRIORIDAD: multi-segmento > DateRanges > Entrada/Salida simple
-      if (groupData.isMultiSegment && Array.isArray(groupData.segments) && groupData.segments.length > 0) {
-        dates = generateSeriesDates(groupData.segments);
-      } else if (groupData.DateRanges_JSON && Array.isArray(groupData.DateRanges_JSON) && groupData.DateRanges_JSON.length > 0) {
-        dates = generateSeriesDates(groupData.DateRanges_JSON);
-      } else {
-        dates = generateDates(groupData.Entrada, groupData.Salida);
-      }
+      const dates = NexusUtils.getStayDates(groupData);
       let total = 0;
       let commissionBase = 0;
       const services = groupData.agencyCommissionServices || [];
@@ -1599,16 +1572,7 @@
         return () => unsubscribe();
       }, []);
 
-      const getCurrentStayDates = (data = formData) => {
-        // PRIORIDAD: multi-segmento > DateRanges > Entrada/Salida simple
-        if (data.isMultiSegment && Array.isArray(data.segments) && data.segments.length > 0) {
-          return generateSeriesDates(data.segments);
-        }
-        if (data.DateRanges_JSON && Array.isArray(data.DateRanges_JSON) && data.DateRanges_JSON.length > 0) {
-          return generateSeriesDates(data.DateRanges_JSON);
-        }
-        return generateDates(data.Entrada, data.Salida);
-      };
+      const getCurrentStayDates = (data = formData) => NexusUtils.getStayDates(data);
 
       const [formData, setFormData] = useState(DEFAULT_FORM_DATA);
       const [tariffCatalogRevision, setTariffCatalogRevision] = useState(0);
@@ -2313,6 +2277,10 @@
         const parsedY = formData.Entrada ? new Date(toInputDate(formData.Entrada)).getFullYear() : 2027;
         const validYear = isNaN(parsedY) ? 2027 : parsedY;
         const hotel = formData.Hotel_Asignado || 'Sercotel Guadiana';
+        if (!getCurrentStayDates(formData).length) {
+          alert('Revisa las fechas de estancia antes de aplicar precios.');
+          return;
+        }
         const missingPvp = getCurrentStayDates(formData).some(date => !(getCapaSuiteHotelDayPrice(hotel, date).price > 0));
         if (missingPvp) {
           alert('Falta el PVP real de CapaSuite para alguna fecha. No se ha aplicado la tarifa recomendada.');
@@ -2380,6 +2348,10 @@
           ? customDiscount 
           : (formData.capaSuiteDiscountPercent !== undefined ? formData.capaSuiteDiscountPercent : 15);
         const hotel = formData.Hotel_Asignado || 'Sercotel Guadiana';
+        if (!getCurrentStayDates(formData).length) {
+          alert('Revisa las fechas de estancia antes de aplicar precios.');
+          return;
+        }
         const missingPvp = getCurrentStayDates(formData).some(date => !(getCapaSuiteHotelDayPrice(hotel, date).price > 0));
         if (missingPvp) {
           alert('Falta el PVP real de CapaSuite para alguna fecha. No se ha aplicado la tarifa recomendada.');
@@ -2482,6 +2454,10 @@
 
       const handleSave = async (e) => {
         e.preventDefault();
+        if (!formData.isMultiSegment && !calcStayDays(formData.Entrada, formData.Salida)) {
+          alert('Revisa las fechas: la salida debe ser posterior a la entrada (máximo 366 noches).');
+          return;
+        }
         if (formData.averageStayCondition && JSON.stringify(getCurrentStayDates(formData)) !== JSON.stringify(formData.averageStayCondition.dates)) {
           alert('La tarifa media estaba calculada para ' + formData.averageStayCondition.nights + ' noches y las fechas han cambiado. Reaplica Tarifa Media Estancia o elige tarifas de grupos/recomendadas antes de guardar.');
           return;
@@ -3660,6 +3636,11 @@ ${emailContent}`;
                   </div>
                 </div>
 
+                {!formData.isMultiSegment && formData.Entrada && formData.Salida && !calcStayDays(formData.Entrada, formData.Salida) && (
+                  <div role="alert" className="bg-rose-50 border border-rose-300 text-rose-800 rounded-xl p-3 text-sm font-bold">
+                    Revisa las fechas: la salida debe ser posterior a la entrada y la estancia no puede superar 366 noches. No se pueden calcular precios con este rango.
+                  </div>
+                )}
                 {/* FILA 3: ESTANCIA Y FECHAS (Compacta, proporcionada y agrupada) */}
                 {!formData.isMultiSegment ? (
                   <div className="bg-slate-50/80 border border-slate-200/80 rounded-xl p-2.5 flex flex-wrap items-center justify-between gap-3 mt-1">
@@ -3670,25 +3651,7 @@ ${emailContent}`;
                         <input 
                           type="date" 
                           value={toInputDate(formData.Entrada)} 
-                          onChange={e => {
-                            const newIn = e.target.value;
-                            let newOut = formData.Salida;
-                            if (isCompleteDate(newIn)) {
-                              const currentDays = calcStayDays(formData.Entrada, formData.Salida);
-                              const calculatedOut = addStayDays(newIn, currentDays);
-                              if (calculatedOut) newOut = calculatedOut;
-                            }
-                            setFormData({ ...formData, Entrada: newIn, Salida: newOut });
-                          }}
-                          onBlur={() => {
-                            if (isCompleteDate(formData.Entrada)) {
-                              const currentDays = calcStayDays(formData.Entrada, formData.Salida);
-                              const validOut = addStayDays(formData.Entrada, currentDays);
-                              if (validOut && validOut !== formData.Salida) {
-                                setFormData(prev => ({ ...prev, Salida: validOut }));
-                              }
-                            }
-                          }}
+                          onChange={e => setFormData(prev => ({ ...prev, Entrada: e.target.value, DateRanges_JSON: [] }))}
                           className="bg-white border border-slate-200 focus:border-indigo-500 rounded-lg px-2.5 py-1 text-xs font-bold text-slate-800 outline-none shadow-2xs w-[145px]"
                         />
                       </div>
@@ -3700,19 +3663,19 @@ ${emailContent}`;
                             type="number" 
                             min="1"
                             max="365"
-                            value={formData.Entrada && formData.Salida && isCompleteDate(formData.Entrada) && isCompleteDate(formData.Salida) ? calcStayDays(formData.Entrada, formData.Salida) : (formData.Entrada ? 1 : '')} 
+                            value={calcStayDays(formData.Entrada, formData.Salida) || ''}
                             onChange={e => {
                               const val = e.target.value;
                               const days = Math.max(1, Math.min(365, parseInt(val, 10) || 1));
                               const inDate = isCompleteDate(formData.Entrada) ? formData.Entrada : toInputDate(new Date());
                               const newOut = addStayDays(inDate, days);
-                              setFormData({ ...formData, Entrada: inDate, Salida: newOut });
+                              setFormData({ ...formData, Entrada: inDate, Salida: newOut, DateRanges_JSON: [] });
                             }}
                             className="bg-white border border-slate-200 focus:border-indigo-500 rounded-lg pl-2 pr-7 py-1 text-xs font-black text-slate-800 text-center outline-none shadow-2xs w-[68px]"
                             placeholder="1"
                             title="Número de noches de estancia"
                           />
-                          <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[9px] font-bold text-slate-400 uppercase pointer-events-none">días</span>
+                          <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[9px] font-bold text-slate-400 uppercase pointer-events-none">noches</span>
                         </div>
                       </div>
                       {/* Fecha Salida */}
@@ -3722,17 +3685,7 @@ ${emailContent}`;
                           type="date" 
                           value={toInputDate(formData.Salida)} 
                           min={isCompleteDate(formData.Entrada) ? addStayDays(formData.Entrada, 1) : undefined}
-                          onChange={e => {
-                            setFormData({ ...formData, Salida: e.target.value });
-                          }}
-                          onBlur={() => {
-                            if (isCompleteDate(formData.Entrada) && isCompleteDate(formData.Salida)) {
-                              if (toInputDate(formData.Salida) <= toInputDate(formData.Entrada)) {
-                                const validOut = addStayDays(formData.Entrada, 1);
-                                setFormData(prev => ({ ...prev, Salida: validOut }));
-                              }
-                            }
-                          }}
+                          onChange={e => setFormData(prev => ({ ...prev, Salida: e.target.value, DateRanges_JSON: [] }))}
                           className="bg-white border border-slate-200 focus:border-indigo-500 rounded-lg px-2.5 py-1 text-xs font-bold text-slate-800 outline-none shadow-2xs w-[145px]"
                         />
                       </div>
@@ -4229,11 +4182,13 @@ ${emailContent}`;
                         const board = formData['Régimen'] || 'AD (Alojamiento y Desayuno)';
                         const staySummary = getCapaSuiteStayTariffSummary(hotel, stayDates, board, discount, formData.dailyConfig || {});
                         if (!staySummary) return null;
+                        const completePvp = staySummary.comparisons.every(c => c.hotelDayPrice > 0);
 
                         return (
                           <div className="bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 rounded-2xl p-4 text-white shadow-sm border border-indigo-500/20 space-y-3">
                             <div role="status" className="text-xs text-indigo-200">
                               {window.CapaSuiteCalendarSync?.state.status || 'Conexión de PVP no disponible'}
+                              {window.CapaSuiteCalendarSync?.state.updatedAt && <span className="ml-2">Última recepción: {new Date(window.CapaSuiteCalendarSync.state.updatedAt).toLocaleString('es-ES')}</span>}
                               {!window.CapaSuiteCalendarSync?.state.authenticated && <button type="button" className="ml-2 underline" onClick={() => document.getElementById('capasuite-login').showModal()}>Iniciar sesión en CapaSuite</button>}
                             </div>
                             <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
@@ -4325,7 +4280,7 @@ ${emailContent}`;
                                 <div className="text-[8px] font-bold text-slate-400 uppercase tracking-wider">PVP de venta por fecha (HA)</div>
                                 <div className="mt-0.5 max-h-32 overflow-y-auto space-y-1">{stayDates.map(date => {
                                   const pvp = getCapaSuiteHotelDayPrice(hotel, date);
-                                  return <div key={date} className="flex justify-between gap-2"><span>{formatDate(date)}</span><strong>{pvp.price > 0 ? `${pvp.price.toFixed(2)} €` : 'Sin PVP disponible'}</strong></div>;
+                                  return <div key={date} className="flex justify-between gap-2"><span>{formatDate(date)}</span><strong>{pvp.price > 0 ? `${pvp.price.toFixed(2)} €` : pvp.source}</strong></div>;
                                 })}</div>
                                 <div className="text-[7px] text-slate-400 truncate">Habitación doble · solo alojamiento</div>
                               </div>
@@ -4337,11 +4292,11 @@ ${emailContent}`;
                               <div className="bg-white/5 rounded-xl p-2 border border-white/5">
                                 <div className="text-[8px] font-bold text-amber-400 uppercase tracking-wider">Descuento CapaSuite</div>
                                 <div className="text-sm font-black text-amber-300 mt-0.5">-{discount}%</div>
-                                <div className="text-[7px] text-slate-400 truncate">Ahorro -{(staySummary.avgHotelPrice * (discount / 100)).toFixed(2)} €/hab</div>
+                                <div className="text-[7px] text-slate-400 truncate">{completePvp ? `Ahorro -${(staySummary.avgHotelPrice * (discount / 100)).toFixed(2)} €/hab` : 'Falta PVP en alguna fecha'}</div>
                               </div>
                               <div className="bg-indigo-500/20 rounded-xl p-2 border border-indigo-400/30">
                                 <div className="text-[8px] font-bold text-indigo-300 uppercase tracking-wider">Tarifa Recomendada</div>
-                                <div className="text-sm font-black text-indigo-200 mt-0.5">{staySummary.avgRecommendedRate.toFixed(2)} €</div>
+                                <div className="text-sm font-black text-indigo-200 mt-0.5">{completePvp ? `${staySummary.avgRecommendedRate.toFixed(2)} €` : 'PVP pendiente'}</div>
                                 <div className="text-[7px] text-indigo-300/80 truncate">Doble · media con régimen de cada noche</div>
                               </div>
                             </div>

@@ -21,6 +21,7 @@
   function roundRate(value) { return Math.round((Number(value) + Number.EPSILON) * 20) / 20; }
 
   var inMemoryStorage = {};
+  var lastRevenueRaw, lastRevenueParsed;
 
   function safeGetStorage(key) {
     var sync = typeof window !== 'undefined' && window.CapaSuiteCalendarSync;
@@ -120,10 +121,7 @@
 
   /**
    * Obtiene el precio de la habitación del hotel para una fecha específica desde CapaSuite.
-   * Prioridad de búsqueda:
-   * 1. revenue_data_v2 (PVP/BAR extraído de scraping o cargado en calendario)
-   * 2. hotel_manager_db_v2 (OTB / ADR de producción)
-   * 3. Benchmark estacional inteligente basado en ocupación y fin de semana de Ciudad Real.
+   * Solo utiliza PVP de venta identificado por hotel; nunca ADR ni estimaciones.
    */
   function getCapaSuiteHotelDayPrice(hotelName, dateISO) {
     if (!dateISO) {
@@ -163,12 +161,17 @@
 
     // 1. Intentar leer de revenue_data_v2
     try {
-      var rawRev = safeGetStorage('revenue_data_v2');
+      var liveSync = typeof window !== 'undefined' && window.CapaSuiteCalendarSync;
+      var rawRev = liveSync && liveSync.state.authenticated ? (liveSync.state.data || {}).revenue_data_v2 : safeGetStorage('revenue_data_v2');
       if (!rawRev && typeof window !== 'undefined' && !window.CapaSuiteCalendarSync && window._capasuiteRevenueCache) {
         rawRev = window._capasuiteRevenueCache;
       }
       if (rawRev) {
-        var parsedRev = typeof rawRev === 'string' ? JSON.parse(rawRev) : rawRev;
+        if (rawRev !== lastRevenueRaw) {
+          lastRevenueParsed = typeof rawRev === 'string' ? JSON.parse(rawRev) : rawRev;
+          lastRevenueRaw = rawRev;
+        }
+        var parsedRev = lastRevenueParsed;
         var dayData = null;
         if (parsedRev) {
           if (Array.isArray(parsedRev)) {
@@ -185,48 +188,7 @@
         }
 
         if (dayData) {
-          // Buscar en hotels (PVP retail del día) o directamente en dayData
-          var hotelsMap = (dayData.hotels && typeof dayData.hotels === 'object') ? dayData.hotels : dayData;
-          if (hotelsMap && typeof hotelsMap === 'object') {
-            var hotelEntry = Object.entries(hotelsMap).find(function (entry) {
-              var h = String(entry[0]).toLowerCase();
-              return isCumbria ? (h.indexOf('cumbria') !== -1) : (h.indexOf('guadiana') !== -1);
-            });
-            if (hotelEntry) {
-              var val = hotelEntry[1];
-              var rawP = typeof val === 'object' && val !== null ? (val.price !== undefined ? val.price : (val.p !== undefined ? val.p : (val.rate !== undefined ? val.rate : val.tarifa))) : val;
-              var p = 0;
-              if (typeof rawP === 'number') {
-                p = rawP;
-              } else if (rawP !== null && rawP !== undefined && String(rawP).trim() !== '') {
-                p = parseFloat(String(rawP).replace(/[^\d.,]/g, '').replace(',', '.')) || 0;
-              }
-              var isSold = typeof val === 'object' && val !== null && (val.sold === true || val.soldOut === true || val.isSoldOut === true || String(rawP).toUpperCase() === 'SOLD');
-              if (p > 0 && !isSold) {
-                return {
-                  price: Math.round(p * 100) / 100,
-                  source: 'PVP CapaSuite (' + hotelEntry[0] + ')',
-                  isEstimated: false,
-                  hotel: hotelName,
-                  dateISO: iso
-                };
-              }
-            }
-          }
-
-          // Buscar si el propio dayData tiene propiedad price directa
-          if (dayData.price !== undefined && !dayData.hotels) {
-            var pDirect = typeof dayData.price === 'number' ? dayData.price : parseFloat(String(dayData.price).replace(/[^\d.,]/g, '').replace(',', '.')) || 0;
-            if (pDirect > 0) {
-              return {
-                price: Math.round(pDirect * 100) / 100,
-                source: 'PVP CapaSuite',
-                isEstimated: false,
-                hotel: hotelName,
-                dateISO: iso
-              };
-            }
-          }
+          return resolveDayPrice(hotelName, iso, dayData);
 
 
         }
@@ -235,7 +197,41 @@
       console.warn('Error leyendo revenue_data_v2 en CapaSuitePricingService:', e);
     }
 
-    return { price: 0, source: 'Sin PVP disponible', unavailable: true, isEstimated: false, hotel: hotelName, dateISO: iso };
+    var sync = typeof window !== 'undefined' && window.CapaSuiteCalendarSync;
+    var loading = sync && sync.state.authenticated && !sync.state.data;
+    return { price: 0, source: loading ? 'Cargando PVP de CapaSuite' : 'Sin PVP disponible', status: loading ? 'loading' : 'missing', unavailable: true, isEstimated: false, hotel: hotelName, dateISO: iso };
+  }
+
+  // Single interpretation of a sale price, shared with the Groups calendar.
+  function parseSalePrice(value) {
+    if (typeof value === 'number') return Number.isFinite(value) && value > 0 ? value : 0;
+    var text = String(value == null ? '' : value).trim().replace(/[^0-9.,-]/g, '');
+    if (text.includes(',') && text.includes('.')) {
+      text = text.lastIndexOf(',') > text.lastIndexOf('.') ? text.replace(/\./g, '').replace(',', '.') : text.replace(/,/g, '');
+    } else { text = text.replace(',', '.'); }
+    var price = Number(text);
+    return Number.isFinite(price) && price > 0 ? Math.round(price * 100) / 100 : 0;
+  }
+
+  function resolveDayPrice(hotelName, dateISO, dayData) {
+    var result = { price: 0, source: 'Sin PVP disponible', status: 'missing', unavailable: true, isEstimated: false, hotel: hotelName, dateISO: dateISO };
+    var key = String(hotelName || '').toLowerCase();
+    // Never silently select Guadiana for an unknown hotel.
+    var token = key.includes('cumbria') ? 'cumbria' : key.includes('guadiana') ? 'guadiana' : null;
+    if (!token) { result.status = 'unknown-hotel'; result.source = 'Hotel sin identificar'; return result; }
+    var hotels = dayData && (dayData.hotels || dayData);
+    var entry = hotels && Object.entries(hotels).find(function (item) { return item[0].toLowerCase().includes(token); });
+    // An unlabelled day-level price cannot be safely assigned to either hotel.
+    if (!entry) return result;
+    var value = entry[1];
+    var raw = value && typeof value === 'object' ? (value.price ?? value.p ?? value.rate ?? value.tarifa) : value;
+    var sold = value && typeof value === 'object' && (value.sold === true || value.soldOut === true || value.isSoldOut === true);
+    if (sold || String(raw).toUpperCase() === 'SOLD') {
+      result.status = 'sold-out'; result.source = 'Hotel completo'; return result;
+    }
+    result.price = parseSalePrice(raw);
+    if (result.price > 0) { result.status = 'available'; result.source = 'PVP CapaSuite (' + entry[0] + ')'; result.unavailable = false; }
+    return result;
   }
 
   // Same inventory and blocked-allotment rules as Calendario.html.
@@ -537,6 +533,8 @@
 
   return {
     roundRate: roundRate,
+    resolveDayPrice: resolveDayPrice,
+    parseSalePrice: parseSalePrice,
     getDayEvents: getDayEvents,
     getDayAvailability: getDayAvailability,
     DEFAULT_DISCOUNT_PERCENT: DEFAULT_DISCOUNT_PERCENT,

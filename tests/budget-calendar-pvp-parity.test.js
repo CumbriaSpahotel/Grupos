@@ -12,6 +12,7 @@ function evaluate(authenticated) {
     localStorage:{getItem:key=>key==='v3_revenue_data_v2'?JSON.stringify({data:[day]}):null}};
   vm.createContext(context);
   vm.runInContext(source,context);
+  context.window.CapaSuitePricingService = context.self.CapaSuitePricingService;
   vm.runInContext(html.slice(start,end),context);
   return {context,service:context.self.CapaSuitePricingService};
 }

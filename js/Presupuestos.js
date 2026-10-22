@@ -507,17 +507,7 @@ var isCompleteDate = NexusUtils.isCompleteDate || function (val) {
   return !isNaN(y) && y >= 1990 && y <= 2150;
 };
 var calcStayDays = function calcStayDays(inVal, outVal) {
-  var inStr = toInputDate(inVal);
-  var outStr = toInputDate(outVal);
-  if (!inStr || !outStr) return 1;
-  var dIn = new Date(inStr + "T00:00:00");
-  var dOut = new Date(outStr + "T00:00:00");
-  if (isNaN(dIn.getTime()) || isNaN(dOut.getTime())) return 1;
-  var yIn = dIn.getFullYear();
-  var yOut = dOut.getFullYear();
-  if (yIn < 1990 || yIn > 2150 || yOut < 1990 || yOut > 2150) return 1;
-  var diff = Math.round((dOut.getTime() - dIn.getTime()) / (1000 * 60 * 60 * 24));
-  return diff >= 1 && diff <= 366 ? diff : 1;
+  return generateDates(inVal, outVal).length;
 };
 var addStayDays = function addStayDays(inVal, days) {
   var inStr = toInputDate(inVal) || new Date().toISOString().split("T")[0];
@@ -1174,14 +1164,7 @@ var buildRoomingList = function buildRoomingList(group) {
   } catch (e) {
     existingList = [];
   }
-  var dates = [];
-  if (group.isMultiSegment && Array.isArray(group.segments) && group.segments.length > 0) {
-    dates = generateSeriesDates(group.segments);
-  } else if (group.DateRanges_JSON && Array.isArray(group.DateRanges_JSON) && group.DateRanges_JSON.length > 0) {
-    dates = generateSeriesDates(group.DateRanges_JSON);
-  } else {
-    dates = generateDates(group.Entrada, group.Salida);
-  }
+  var dates = NexusUtils.getStayDates(group);
   if (!dates || dates.length === 0) return [];
   var hotelName = group.Hotel_Asignado || group.Hotel || "Sercotel Guadiana";
   var newList = [];
@@ -1496,15 +1479,7 @@ var calculateTotal = function calculateTotal(rawGroupData) {
   if (!groupData || groupData.isRatesOnly) {
     return withBreakdown ? window.AgencyCommissionService.settle(0, 0, groupData || {}) : 0;
   }
-  var dates = [];
-  // PRIORIDAD: multi-segmento > DateRanges > Entrada/Salida simple
-  if (groupData.isMultiSegment && Array.isArray(groupData.segments) && groupData.segments.length > 0) {
-    dates = generateSeriesDates(groupData.segments);
-  } else if (groupData.DateRanges_JSON && Array.isArray(groupData.DateRanges_JSON) && groupData.DateRanges_JSON.length > 0) {
-    dates = generateSeriesDates(groupData.DateRanges_JSON);
-  } else {
-    dates = generateDates(groupData.Entrada, groupData.Salida);
-  }
+  var dates = NexusUtils.getStayDates(groupData);
   var total = 0;
   var commissionBase = 0;
   var services = groupData.agencyCommissionServices || [];
@@ -1852,14 +1827,7 @@ function App() {
   }, []);
   var getCurrentStayDates = function getCurrentStayDates() {
     var data = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : formData;
-    // PRIORIDAD: multi-segmento > DateRanges > Entrada/Salida simple
-    if (data.isMultiSegment && Array.isArray(data.segments) && data.segments.length > 0) {
-      return generateSeriesDates(data.segments);
-    }
-    if (data.DateRanges_JSON && Array.isArray(data.DateRanges_JSON) && data.DateRanges_JSON.length > 0) {
-      return generateSeriesDates(data.DateRanges_JSON);
-    }
-    return generateDates(data.Entrada, data.Salida);
+    return NexusUtils.getStayDates(data);
   };
   var _useState47 = useState(DEFAULT_FORM_DATA),
     _useState48 = _slicedToArray(_useState47, 2),
@@ -2668,6 +2636,10 @@ function App() {
     var parsedY = formData.Entrada ? new Date(toInputDate(formData.Entrada)).getFullYear() : 2027;
     var validYear = isNaN(parsedY) ? 2027 : parsedY;
     var hotel = formData.Hotel_Asignado || 'Sercotel Guadiana';
+    if (!getCurrentStayDates(formData).length) {
+      alert('Revisa las fechas de estancia antes de aplicar precios.');
+      return;
+    }
     var missingPvp = getCurrentStayDates(formData).some(function (date) {
       return !(getCapaSuiteHotelDayPrice(hotel, date).price > 0);
     });
@@ -2739,6 +2711,10 @@ function App() {
     if (stayDates.length === 0) return;
     var discount = customDiscount !== undefined ? customDiscount : formData.capaSuiteDiscountPercent !== undefined ? formData.capaSuiteDiscountPercent : 15;
     var hotel = formData.Hotel_Asignado || 'Sercotel Guadiana';
+    if (!getCurrentStayDates(formData).length) {
+      alert('Revisa las fechas de estancia antes de aplicar precios.');
+      return;
+    }
     var missingPvp = getCurrentStayDates(formData).some(function (date) {
       return !(getCapaSuiteHotelDayPrice(hotel, date).price > 0);
     });
@@ -2873,13 +2849,20 @@ function App() {
         while (1) switch (_context2.p = _context2.n) {
           case 0:
             e.preventDefault();
-            if (!(formData.averageStayCondition && JSON.stringify(getCurrentStayDates(formData)) !== JSON.stringify(formData.averageStayCondition.dates))) {
+            if (!(!formData.isMultiSegment && !calcStayDays(formData.Entrada, formData.Salida))) {
               _context2.n = 1;
+              break;
+            }
+            alert('Revisa las fechas: la salida debe ser posterior a la entrada (máximo 366 noches).');
+            return _context2.a(2);
+          case 1:
+            if (!(formData.averageStayCondition && JSON.stringify(getCurrentStayDates(formData)) !== JSON.stringify(formData.averageStayCondition.dates))) {
+              _context2.n = 2;
               break;
             }
             alert('La tarifa media estaba calculada para ' + formData.averageStayCondition.nights + ' noches y las fechas han cambiado. Reaplica Tarifa Media Estancia o elige tarifas de grupos/recomendadas antes de guardar.');
             return _context2.a(2);
-          case 1:
+          case 2:
             uidToCheck = formData.uid || ((_groups$find = groups.find(function (g) {
               return g.Reserva === formData.Reserva;
             })) === null || _groups$find === void 0 ? void 0 : _groups$find.uid);
@@ -2888,14 +2871,14 @@ function App() {
             }) : null;
             isHistoricalReadOnly = isLockedBudget(formData) || oldRec && isLockedBudget(oldRec);
             if (!(isHistoricalReadOnly && formData.uid)) {
-              _context2.n = 2;
+              _context2.n = 3;
               break;
             }
             lockedInfo = getBudgetLockedDetails(formData) || oldRec && getBudgetLockedDetails(oldRec);
             resNum = lockedInfo.pmsId || formData.Reserva;
             alert("⚠️ Este presupuesto ya está en estado " + lockedInfo.label + " y asignado a la Reserva PMS Nº " + resNum + ".\n\nLa referencia oficial y válida es el número de reserva del PMS. Este presupuesto queda bloqueado exclusivamente en modo de consulta y no se puede modificar.\n\nPara aplicar cambios o emitir una nueva oferta, por favor utiliza la opción 'Duplicar'.");
             return _context2.a(2);
-          case 2:
+          case 3:
             now = new Date();
             formattedDate = "".concat(now.getFullYear(), "-").concat(String(now.getMonth() + 1).padStart(2, '0'), "-").concat(String(now.getDate()).padStart(2, '0'), " ").concat(String(now.getHours()).padStart(2, '0'), ":").concat(String(now.getMinutes()).padStart(2, '0'));
             normalizedFormData = normalizeGroupData(formData);
@@ -2906,137 +2889,137 @@ function App() {
             finalTotal = calculateTotal(normalizedFormData);
             normalizedFormData.PaymentPlan_JSON = JSON.stringify(normalizePaymentPlan(normalizedFormData.PaymentPlan_JSON, finalTotal, normalizedFormData));
             if (!(Number(normalizedFormData.agencyCommissionPercent) > 0 && (!(normalizedFormData.agencyCommissionServices || []).length || (normalizedFormData.agencyCommissionServices || []).includes('Otros servicios') && !String(normalizedFormData.agencyCommissionOtherServices || '').trim()))) {
-              _context2.n = 3;
+              _context2.n = 4;
               break;
             }
             alert('Indica los servicios sujetos a comisión y especifica los otros servicios si los has seleccionado.');
             return _context2.a(2);
-          case 3:
+          case 4:
             // Validation: Mandatory Hotel
             hotelAsignado = normalizedFormData.Hotel_Asignado || normalizedFormData.Hotel || "";
             if (!(!hotelAsignado || hotelAsignado.toLowerCase().includes("pend") || hotelAsignado.trim() === "")) {
-              _context2.n = 4;
+              _context2.n = 5;
               break;
             }
             alert("⚠️ Error de Integridad: Debe asignar un hotel válido. No se permiten registros 'Pendientes'.");
             return _context2.a(2);
-          case 4:
+          case 5:
             // Validation: Dates
             entrada = String(normalizedFormData.Entrada || "").trim();
             salida = String(normalizedFormData.Salida || "").trim();
             if (!(!entrada || !salida)) {
-              _context2.n = 5;
+              _context2.n = 6;
               break;
             }
             alert("⚠️ Error: Debe especificar las fechas de entrada y salida.");
             return _context2.a(2);
-          case 5:
+          case 6:
             if (!(new Date(entrada) >= new Date(salida))) {
-              _context2.n = 6;
+              _context2.n = 7;
               break;
             }
             alert("⚠️ Error: La fecha de salida debe ser estrictamente posterior a la de entrada (mínimo 1 noche).");
             return _context2.a(2);
-          case 6:
+          case 7:
             if (!normalizedFormData.isMultiSegment) {
-              _context2.n = 19;
+              _context2.n = 20;
               break;
             }
             if (!(!Array.isArray(normalizedFormData.segments) || normalizedFormData.segments.length === 0)) {
-              _context2.n = 7;
+              _context2.n = 8;
               break;
             }
             alert("⚠️ Error: En modo multi-estancia debe haber al menos un segmento.");
             return _context2.a(2);
-          case 7:
-            i = 0;
           case 8:
+            i = 0;
+          case 9:
             if (!(i < normalizedFormData.segments.length)) {
-              _context2.n = 18;
+              _context2.n = 19;
               break;
             }
             seg = normalizedFormData.segments[i];
             if (!(!seg.in || !seg.out)) {
-              _context2.n = 9;
+              _context2.n = 10;
               break;
             }
             alert("\u26A0\uFE0F Error en Segmento ".concat(seg.id || i + 1, ": Debe especificar las fechas de entrada y salida."));
             return _context2.a(2);
-          case 9:
+          case 10:
             if (!(seg.in >= seg.out)) {
-              _context2.n = 10;
+              _context2.n = 11;
               break;
             }
             alert("\u26A0\uFE0F Error en Segmento ".concat(seg.id || i + 1, ": La fecha de salida (").concat(seg.out, ") debe ser posterior a la de entrada (").concat(seg.in, ")."));
             return _context2.a(2);
-          case 10:
+          case 11:
             if (!(Number(seg.pax || 0) <= 0)) {
-              _context2.n = 11;
+              _context2.n = 12;
               break;
             }
             alert("\u26A0\uFE0F Error en Segmento ".concat(seg.id || i + 1, ": El n\xFAmero de PAX debe ser mayor que 0."));
             return _context2.a(2);
-          case 11:
+          case 12:
             allocations = seg.roomAllocations || [];
             if (!(allocations.length === 0)) {
-              _context2.n = 12;
+              _context2.n = 13;
               break;
             }
             alert("\u26A0\uFE0F Error en Segmento ".concat(seg.id || i + 1, ": Debe tener al menos una asignaci\xF3n de habitaci\xF3n."));
             return _context2.a(2);
-          case 12:
+          case 13:
             totalRooms = allocations.reduce(function (sum, a) {
               return sum + Number(a.rooms || 0);
             }, 0);
             if (!(totalRooms <= 0)) {
-              _context2.n = 13;
+              _context2.n = 14;
               break;
             }
             alert("\u26A0\uFE0F Error en Segmento ".concat(seg.id || i + 1, ": El n\xFAmero total de habitaciones debe ser mayor que 0."));
             return _context2.a(2);
-          case 13:
-            j = 0;
           case 14:
+            j = 0;
+          case 15:
             if (!(j < allocations.length)) {
-              _context2.n = 17;
+              _context2.n = 18;
               break;
             }
             a = allocations[j];
             if (a.roomType) {
-              _context2.n = 15;
+              _context2.n = 16;
               break;
             }
             alert("\u26A0\uFE0F Error en Segmento ".concat(seg.id || i + 1, ": Tipo de habitaci\xF3n no especificado."));
             return _context2.a(2);
-          case 15:
+          case 16:
             if (!(Number(a.rooms || 0) <= 0)) {
-              _context2.n = 16;
+              _context2.n = 17;
               break;
             }
             alert("\u26A0\uFE0F Error en Segmento ".concat(seg.id || i + 1, ": La asignaci\xF3n para ").concat(a.roomType, " debe ser mayor que 0."));
             return _context2.a(2);
-          case 16:
-            j++;
-            _context2.n = 14;
-            break;
           case 17:
-            i++;
-            _context2.n = 8;
+            j++;
+            _context2.n = 15;
             break;
           case 18:
+            i++;
+            _context2.n = 9;
+            break;
+          case 19:
             // Warnings / Confirmations (non-blocking)
             metrics = buildMultiSegmentMetrics(normalizedFormData.segments, normalizedFormData.declaredPax);
             if (!(metrics.declaredPax > 0 && metrics.segmentPaxTotal > metrics.declaredPax)) {
-              _context2.n = 19;
+              _context2.n = 20;
               break;
             }
             confirmSave = window.confirm("\u26A0\uFE0F Advertencia: El n\xFAmero total de PAX en los segmentos (".concat(metrics.segmentPaxTotal, ") supera los PAX declarados por el cliente (").concat(metrics.declaredPax, "). \xBFDesea continuar?"));
             if (confirmSave) {
-              _context2.n = 19;
+              _context2.n = 20;
               break;
             }
             return _context2.a(2);
-          case 19:
+          case 20:
             reservaId = normalizedFormData.Reserva || "PRES-".concat(Math.floor(100000 + Math.random() * 900000));
             isNew = !normalizedFormData.uid;
             releaseDate = normalizedFormData.Com_Vencimiento_Rel || "";
@@ -3084,16 +3067,16 @@ function App() {
                 return newExt;
               });
             }
-            _context2.p = 20;
+            _context2.p = 21;
             if (!_handleSave.running) {
-              _context2.n = 21;
+              _context2.n = 22;
               break;
             }
             return _context2.a(2);
-          case 21:
+          case 22:
             _handleSave.running = true;
             if (!isNew) {
-              _context2.n = 25;
+              _context2.n = 26;
               break;
             }
             groupData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
@@ -3103,14 +3086,14 @@ function App() {
               date: formattedDate,
               text: "Presupuesto registrado (Alta Manual)."
             }];
-            _context2.n = 22;
+            _context2.n = 23;
             return db.collection("groups").doc(reservaId).set(groupData);
-          case 22:
+          case 23:
             if (!(groupData.Com_Estado_Interno === "CONFIRMADO")) {
-              _context2.n = 24;
+              _context2.n = 25;
               break;
             }
-            _context2.n = 23;
+            _context2.n = 24;
             return window.confirmBudget({
               budgetId: reservaId,
               requestedStatus: "CONFIRMADO",
@@ -3118,29 +3101,29 @@ function App() {
               db: db,
               confirmedBy: "Usuario"
             });
-          case 23:
+          case 24:
             res = _context2.v;
             if (res && res.split) {
               alert("\u2705 Serie confirmada y desglosada en reservas individuales: ".concat(res.childIds.join(', ')));
             }
-          case 24:
-            _context2.n = 31;
-            break;
           case 25:
+            _context2.n = 32;
+            break;
+          case 26:
             uidToUpdate = groupData.uid;
             oldDoc = groups.find(function (g) {
               return g.uid === uidToUpdate;
             }); // Si el presupuesto ya estaba confirmado o en tentativa / PMS, queda como referencia inmutable y no se debe sobreescribir
             isOldDocLocked = oldDoc && isLockedBudget(oldDoc);
             if (!isOldDocLocked) {
-              _context2.n = 26;
+              _context2.n = 27;
               break;
             }
             _lockedInfo = getBudgetLockedDetails(oldDoc);
             alert("⚠️ Este presupuesto ya está en estado " + _lockedInfo.label + " y se conserva como referencia histórica inmutable.\n\nEl presupuesto original último guardado no se debe modificar. Para aplicar cambios o emitir una nueva propuesta, por favor utiliza la opción 'Duplicar'.");
             _handleSave.running = false;
             return _context2.a(2);
-          case 26:
+          case 27:
             // History Tracking: Detect changes
             changes = [];
             fieldsToTrack = {
@@ -3189,26 +3172,26 @@ function App() {
             // Usar update en lugar de set({merge: true}) para que mapas
             // enteros (roomCounts, dailyConfig) se REEMPLACEN, no se deep-mergen.
             if (!(Object.keys(validUpdateData).length > 0)) {
-              _context2.n = 27;
-              break;
-            }
-            _context2.n = 27;
-            return db.collection("groups").doc(uidToUpdate).update(validUpdateData);
-          case 27:
-            if (!(Object.keys(fallbackData).length > 0)) {
               _context2.n = 28;
               break;
             }
             _context2.n = 28;
-            return db.collection("groups").doc(uidToUpdate).set(fallbackData, {
-              merge: true
-            });
+            return db.collection("groups").doc(uidToUpdate).update(validUpdateData);
           case 28:
-            if (!statusChangedToConfirmed) {
-              _context2.n = 30;
+            if (!(Object.keys(fallbackData).length > 0)) {
+              _context2.n = 29;
               break;
             }
             _context2.n = 29;
+            return db.collection("groups").doc(uidToUpdate).set(fallbackData, {
+              merge: true
+            });
+          case 29:
+            if (!statusChangedToConfirmed) {
+              _context2.n = 31;
+              break;
+            }
+            _context2.n = 30;
             return window.confirmBudget({
               budgetId: uidToUpdate,
               requestedStatus: "CONFIRMADO",
@@ -3216,21 +3199,21 @@ function App() {
               db: db,
               confirmedBy: "Usuario"
             });
-          case 29:
+          case 30:
             _res = _context2.v;
             if (_res && _res.split) {
               alert("\u2705 Serie confirmada y desglosada en reservas individuales: ".concat(_res.childIds.join(', ')));
             } else {
               alert("\u2705 Presupuesto confirmado con \xE9xito.");
             }
-            _context2.n = 31;
+            _context2.n = 32;
             break;
-          case 30:
+          case 31:
             if (!(targetStatus && targetStatus !== oldDoc.Com_Estado_Interno)) {
-              _context2.n = 31;
+              _context2.n = 32;
               break;
             }
-            _context2.n = 31;
+            _context2.n = 32;
             return window.confirmBudget({
               budgetId: uidToUpdate,
               requestedStatus: targetStatus,
@@ -3238,18 +3221,18 @@ function App() {
               db: db,
               confirmedBy: "Usuario"
             });
-          case 31:
-            setCurrentView('dashboard');
-            _context2.n = 33;
-            break;
           case 32:
-            _context2.p = 32;
+            setCurrentView('dashboard');
+            _context2.n = 34;
+            break;
+          case 33:
+            _context2.p = 33;
             _t2 = _context2.v;
             console.error("Error saving budget:", _t2);
-          case 33:
+          case 34:
             return _context2.a(2);
         }
-      }, _callee2, null, [[20, 32]]);
+      }, _callee2, null, [[21, 33]]);
     }));
     return function handleSave(_x) {
       return _ref43.apply(this, arguments);
@@ -4407,7 +4390,10 @@ function App() {
       },
       placeholder: "N\xFAmero de tel\xE9fono...",
       className: "w-full bg-slate-50/80 hover:bg-white focus:bg-white border border-slate-200 focus:border-indigo-500 rounded-lg px-3 py-1.5 text-xs font-bold outline-none focus:ring-1 focus:ring-indigo-500 transition-all text-slate-800 shadow-2xs"
-    }))), !formData.isMultiSegment ? /*#__PURE__*/React.createElement("div", {
+    }))), !formData.isMultiSegment && formData.Entrada && formData.Salida && !calcStayDays(formData.Entrada, formData.Salida) && /*#__PURE__*/React.createElement("div", {
+      role: "alert",
+      className: "bg-rose-50 border border-rose-300 text-rose-800 rounded-xl p-3 text-sm font-bold"
+    }, "Revisa las fechas: la salida debe ser posterior a la entrada y la estancia no puede superar 366 noches. No se pueden calcular precios con este rango."), !formData.isMultiSegment ? /*#__PURE__*/React.createElement("div", {
       className: "bg-slate-50/80 border border-slate-200/80 rounded-xl p-2.5 flex flex-wrap items-center justify-between gap-3 mt-1"
     }, /*#__PURE__*/React.createElement("div", {
       className: "flex flex-wrap items-center gap-3"
@@ -4419,30 +4405,12 @@ function App() {
       type: "date",
       value: toInputDate(formData.Entrada),
       onChange: function onChange(e) {
-        var newIn = e.target.value;
-        var newOut = formData.Salida;
-        if (isCompleteDate(newIn)) {
-          var currentDays = calcStayDays(formData.Entrada, formData.Salida);
-          var calculatedOut = addStayDays(newIn, currentDays);
-          if (calculatedOut) newOut = calculatedOut;
-        }
-        setFormData(_objectSpread(_objectSpread({}, formData), {}, {
-          Entrada: newIn,
-          Salida: newOut
-        }));
-      },
-      onBlur: function onBlur() {
-        if (isCompleteDate(formData.Entrada)) {
-          var currentDays = calcStayDays(formData.Entrada, formData.Salida);
-          var validOut = addStayDays(formData.Entrada, currentDays);
-          if (validOut && validOut !== formData.Salida) {
-            setFormData(function (prev) {
-              return _objectSpread(_objectSpread({}, prev), {}, {
-                Salida: validOut
-              });
-            });
-          }
-        }
+        return setFormData(function (prev) {
+          return _objectSpread(_objectSpread({}, prev), {}, {
+            Entrada: e.target.value,
+            DateRanges_JSON: []
+          });
+        });
       },
       className: "bg-white border border-slate-200 focus:border-indigo-500 rounded-lg px-2.5 py-1 text-xs font-bold text-slate-800 outline-none shadow-2xs w-[145px]"
     })), /*#__PURE__*/React.createElement("div", {
@@ -4455,7 +4423,7 @@ function App() {
       type: "number",
       min: "1",
       max: "365",
-      value: formData.Entrada && formData.Salida && isCompleteDate(formData.Entrada) && isCompleteDate(formData.Salida) ? calcStayDays(formData.Entrada, formData.Salida) : formData.Entrada ? 1 : '',
+      value: calcStayDays(formData.Entrada, formData.Salida) || '',
       onChange: function onChange(e) {
         var val = e.target.value;
         var days = Math.max(1, Math.min(365, parseInt(val, 10) || 1));
@@ -4463,7 +4431,8 @@ function App() {
         var newOut = addStayDays(inDate, days);
         setFormData(_objectSpread(_objectSpread({}, formData), {}, {
           Entrada: inDate,
-          Salida: newOut
+          Salida: newOut,
+          DateRanges_JSON: []
         }));
       },
       className: "bg-white border border-slate-200 focus:border-indigo-500 rounded-lg pl-2 pr-7 py-1 text-xs font-black text-slate-800 text-center outline-none shadow-2xs w-[68px]",
@@ -4471,7 +4440,7 @@ function App() {
       title: "N\xFAmero de noches de estancia"
     }), /*#__PURE__*/React.createElement("span", {
       className: "absolute right-1.5 top-1/2 -translate-y-1/2 text-[9px] font-bold text-slate-400 uppercase pointer-events-none"
-    }, "d\xEDas"))), /*#__PURE__*/React.createElement("div", {
+    }, "noches"))), /*#__PURE__*/React.createElement("div", {
       className: "flex items-center gap-1.5"
     }, /*#__PURE__*/React.createElement("label", {
       className: "text-[10px] font-black text-slate-500 uppercase tracking-tight shrink-0"
@@ -4480,21 +4449,12 @@ function App() {
       value: toInputDate(formData.Salida),
       min: isCompleteDate(formData.Entrada) ? addStayDays(formData.Entrada, 1) : undefined,
       onChange: function onChange(e) {
-        setFormData(_objectSpread(_objectSpread({}, formData), {}, {
-          Salida: e.target.value
-        }));
-      },
-      onBlur: function onBlur() {
-        if (isCompleteDate(formData.Entrada) && isCompleteDate(formData.Salida)) {
-          if (toInputDate(formData.Salida) <= toInputDate(formData.Entrada)) {
-            var validOut = addStayDays(formData.Entrada, 1);
-            setFormData(function (prev) {
-              return _objectSpread(_objectSpread({}, prev), {}, {
-                Salida: validOut
-              });
-            });
-          }
-        }
+        return setFormData(function (prev) {
+          return _objectSpread(_objectSpread({}, prev), {}, {
+            Salida: e.target.value,
+            DateRanges_JSON: []
+          });
+        });
       },
       className: "bg-white border border-slate-200 focus:border-indigo-500 rounded-lg px-2.5 py-1 text-xs font-bold text-slate-800 outline-none shadow-2xs w-[145px]"
     })), /*#__PURE__*/React.createElement("div", {
@@ -5042,18 +5002,23 @@ function App() {
       title: "Copiar precios y cupos del primer d\xEDa a todos los siguientes"
     }, /*#__PURE__*/React.createElement("i", {
       className: "fas fa-copy"
-    }), " Copiar 1\xBA D\xEDa a Todos"))), function (_window$CapaSuiteCale, _window$CapaSuiteCale2) {
+    }), " Copiar 1\xBA D\xEDa a Todos"))), function (_window$CapaSuiteCale, _window$CapaSuiteCale2, _window$CapaSuiteCale3) {
       var hotel = formData.Hotel_Asignado || 'Sercotel Guadiana';
       var discount = formData.capaSuiteDiscountPercent !== undefined ? formData.capaSuiteDiscountPercent : 15;
       var board = formData['Régimen'] || 'AD (Alojamiento y Desayuno)';
       var staySummary = getCapaSuiteStayTariffSummary(hotel, stayDates, board, discount, formData.dailyConfig || {});
       if (!staySummary) return null;
+      var completePvp = staySummary.comparisons.every(function (c) {
+        return c.hotelDayPrice > 0;
+      });
       return /*#__PURE__*/React.createElement("div", {
         className: "bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 rounded-2xl p-4 text-white shadow-sm border border-indigo-500/20 space-y-3"
       }, /*#__PURE__*/React.createElement("div", {
         role: "status",
         className: "text-xs text-indigo-200"
-      }, ((_window$CapaSuiteCale = window.CapaSuiteCalendarSync) === null || _window$CapaSuiteCale === void 0 ? void 0 : _window$CapaSuiteCale.state.status) || 'Conexión de PVP no disponible', !((_window$CapaSuiteCale2 = window.CapaSuiteCalendarSync) !== null && _window$CapaSuiteCale2 !== void 0 && _window$CapaSuiteCale2.state.authenticated) && /*#__PURE__*/React.createElement("button", {
+      }, ((_window$CapaSuiteCale = window.CapaSuiteCalendarSync) === null || _window$CapaSuiteCale === void 0 ? void 0 : _window$CapaSuiteCale.state.status) || 'Conexión de PVP no disponible', ((_window$CapaSuiteCale2 = window.CapaSuiteCalendarSync) === null || _window$CapaSuiteCale2 === void 0 ? void 0 : _window$CapaSuiteCale2.state.updatedAt) && /*#__PURE__*/React.createElement("span", {
+        className: "ml-2"
+      }, "\xDAltima recepci\xF3n: ", new Date(window.CapaSuiteCalendarSync.state.updatedAt).toLocaleString('es-ES')), !((_window$CapaSuiteCale3 = window.CapaSuiteCalendarSync) !== null && _window$CapaSuiteCale3 !== void 0 && _window$CapaSuiteCale3.state.authenticated) && /*#__PURE__*/React.createElement("button", {
         type: "button",
         className: "ml-2 underline",
         onClick: function onClick() {
@@ -5154,7 +5119,7 @@ function App() {
         return /*#__PURE__*/React.createElement("div", {
           key: date,
           className: "flex justify-between gap-2"
-        }, /*#__PURE__*/React.createElement("span", null, formatDate(date)), /*#__PURE__*/React.createElement("strong", null, pvp.price > 0 ? "".concat(pvp.price.toFixed(2), " \u20AC") : 'Sin PVP disponible'));
+        }, /*#__PURE__*/React.createElement("span", null, formatDate(date)), /*#__PURE__*/React.createElement("strong", null, pvp.price > 0 ? "".concat(pvp.price.toFixed(2), " \u20AC") : pvp.source));
       })), /*#__PURE__*/React.createElement("div", {
         className: "text-[7px] text-slate-400 truncate"
       }, "Habitaci\xF3n doble \xB7 solo alojamiento")), /*#__PURE__*/React.createElement("div", {
@@ -5175,13 +5140,13 @@ function App() {
         className: "text-sm font-black text-amber-300 mt-0.5"
       }, "-", discount, "%"), /*#__PURE__*/React.createElement("div", {
         className: "text-[7px] text-slate-400 truncate"
-      }, "Ahorro -", (staySummary.avgHotelPrice * (discount / 100)).toFixed(2), " \u20AC/hab")), /*#__PURE__*/React.createElement("div", {
+      }, completePvp ? "Ahorro -".concat((staySummary.avgHotelPrice * (discount / 100)).toFixed(2), " \u20AC/hab") : 'Falta PVP en alguna fecha')), /*#__PURE__*/React.createElement("div", {
         className: "bg-indigo-500/20 rounded-xl p-2 border border-indigo-400/30"
       }, /*#__PURE__*/React.createElement("div", {
         className: "text-[8px] font-bold text-indigo-300 uppercase tracking-wider"
       }, "Tarifa Recomendada"), /*#__PURE__*/React.createElement("div", {
         className: "text-sm font-black text-indigo-200 mt-0.5"
-      }, staySummary.avgRecommendedRate.toFixed(2), " \u20AC"), /*#__PURE__*/React.createElement("div", {
+      }, completePvp ? "".concat(staySummary.avgRecommendedRate.toFixed(2), " \u20AC") : 'PVP pendiente'), /*#__PURE__*/React.createElement("div", {
         className: "text-[7px] text-indigo-300/80 truncate"
       }, "Doble \xB7 media con r\xE9gimen de cada noche"))));
     }(), /*#__PURE__*/React.createElement("div", {
