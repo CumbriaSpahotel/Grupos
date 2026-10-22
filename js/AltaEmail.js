@@ -5,6 +5,10 @@ function _regenerator() { /*! regenerator-runtime -- Copyright (c) 2014-present,
 function _regeneratorDefine2(e, r, n, t) { var i = Object.defineProperty; try { i({}, "", {}); } catch (e) { i = 0; } _regeneratorDefine2 = function _regeneratorDefine(e, r, n, t) { function o(r, n) { _regeneratorDefine2(e, r, function (e) { return this._invoke(r, n, e); }); } r ? i ? i(e, r, { value: n, enumerable: !t, configurable: !t, writable: !t }) : e[r] = n : (o("next", 0), o("throw", 1), o("return", 2)); }, _regeneratorDefine2(e, r, n, t); }
 function asyncGeneratorStep(n, t, e, r, o, a, c) { try { var i = n[a](c), u = i.value; } catch (n) { return void e(n); } i.done ? t(u) : Promise.resolve(u).then(r, o); }
 function _asyncToGenerator(n) { return function () { var t = this, e = arguments; return new Promise(function (r, o) { var a = n.apply(t, e); function _next(n) { asyncGeneratorStep(a, r, o, _next, _throw, "next", n); } function _throw(n) { asyncGeneratorStep(a, r, o, _next, _throw, "throw", n); } _next(void 0); }); }; }
+function _toConsumableArray(r) { return _arrayWithoutHoles(r) || _iterableToArray(r) || _unsupportedIterableToArray(r) || _nonIterableSpread(); }
+function _nonIterableSpread() { throw new TypeError("Invalid attempt to spread non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method."); }
+function _iterableToArray(r) { if ("undefined" != typeof Symbol && null != r[Symbol.iterator] || null != r["@@iterator"]) return Array.from(r); }
+function _arrayWithoutHoles(r) { if (Array.isArray(r)) return _arrayLikeToArray(r); }
 function ownKeys(e, r) { var t = Object.keys(e); if (Object.getOwnPropertySymbols) { var o = Object.getOwnPropertySymbols(e); r && (o = o.filter(function (r) { return Object.getOwnPropertyDescriptor(e, r).enumerable; })), t.push.apply(t, o); } return t; }
 function _objectSpread(e) { for (var r = 1; r < arguments.length; r++) { var t = null != arguments[r] ? arguments[r] : {}; r % 2 ? ownKeys(Object(t), !0).forEach(function (r) { _defineProperty(e, r, t[r]); }) : Object.getOwnPropertyDescriptors ? Object.defineProperties(e, Object.getOwnPropertyDescriptors(t)) : ownKeys(Object(t)).forEach(function (r) { Object.defineProperty(e, r, Object.getOwnPropertyDescriptor(t, r)); }); } return e; }
 function _defineProperty(e, r, t) { return (r = _toPropertyKey(r)) in e ? Object.defineProperty(e, r, { value: t, enumerable: !0, configurable: !0, writable: !0 }) : e[r] = t, e; }
@@ -190,6 +194,14 @@ var App = function App() {
     _useState10 = _slicedToArray(_useState1, 2),
     isEditMode = _useState10[0],
     setIsEditMode = _useState10[1];
+  var _useState11 = useState(null),
+    _useState12 = _slicedToArray(_useState11, 2),
+    extractionMode = _useState12[0],
+    setExtractionMode = _useState12[1];
+  var _useState13 = useState(null),
+    _useState14 = _slicedToArray(_useState13, 2),
+    extractionNotice = _useState14[0],
+    setExtractionNotice = _useState14[1];
   useEffect(function () {
     var params = new URLSearchParams(window.location.search);
     var editId = params.get('edit') || params.get('reserva');
@@ -339,9 +351,212 @@ var App = function App() {
 
   // callGemini cargado desde js/gemini.js (window.callGemini)
 
+  var parseEmailTextLocally = function parseEmailTextLocally(text) {
+    if (!text || typeof text !== 'string') text = '';
+    var clean = text.trim();
+
+    // 1. Hotel
+    var hotel = 'Sercotel Guadiana';
+    if (/cumbria/i.test(clean)) {
+      hotel = 'Cumbria Spa & Hotel';
+    }
+
+    // 2. Fechas
+    var entrada = '';
+    var salida = '';
+    var monthsMap = {
+      'enero': '01',
+      'febrero': '02',
+      'marzo': '03',
+      'abril': '04',
+      'mayo': '05',
+      'junio': '06',
+      'julio': '07',
+      'agosto': '08',
+      'septiembre': '09',
+      'setiembre': '09',
+      'octubre': '10',
+      'noviembre': '11',
+      'diciembre': '12'
+    };
+    var rangeTextMatch = clean.match(/del\s+(\d{1,2})(?:\s+de\s+([a-záéíóú]+))?\s+al\s+(\d{1,2})\s+de\s+([a-záéíóú]+)(?:\s+de\s+(\d{4}))?/i);
+    if (rangeTextMatch) {
+      var currentYear = new Date().getFullYear();
+      var year = rangeTextMatch[5] || String(currentYear);
+      var mOutName = (rangeTextMatch[4] || '').toLowerCase();
+      var mInName = (rangeTextMatch[2] || rangeTextMatch[4] || '').toLowerCase();
+      var mOut = monthsMap[mOutName] || '01';
+      var mIn = monthsMap[mInName] || mOut;
+      var dIn = String(rangeTextMatch[1]).padStart(2, '0');
+      var dOut = String(rangeTextMatch[3]).padStart(2, '0');
+      entrada = "".concat(year, "-").concat(mIn, "-").concat(dIn);
+      salida = "".concat(year, "-").concat(mOut, "-").concat(dOut);
+    }
+    if (!entrada) {
+      var inMatch = clean.match(/(?:entrada|check[\s-]?in|llegada|desde|del)\s*[:=]?\s*(\d{1,2})[\/\.-](\d{1,2})[\/\.-](\d{2,4})/i) || clean.match(/(\d{1,2})[\/\.-](\d{1,2})[\/\.-](\d{4})/i);
+      if (inMatch) {
+        var y = inMatch[3];
+        if (y.length === 2) y = '20' + y;
+        var m = String(inMatch[2]).padStart(2, '0');
+        var d = String(inMatch[1]).padStart(2, '0');
+        entrada = "".concat(y, "-").concat(m, "-").concat(d);
+      }
+    }
+    if (!salida) {
+      var outMatch = clean.match(/(?:salida|check[\s-]?out|partida|hasta|al)\s*[:=]?\s*(\d{1,2})[\/\.-](\d{1,2})[\/\.-](\d{2,4})/i);
+      if (outMatch) {
+        var _y = outMatch[3];
+        if (_y.length === 2) _y = '20' + _y;
+        var _m = String(outMatch[2]).padStart(2, '0');
+        var _d = String(outMatch[1]).padStart(2, '0');
+        salida = "".concat(_y, "-").concat(_m, "-").concat(_d);
+      } else if (entrada) {
+        var allDates = _toConsumableArray(clean.matchAll(/(\d{1,2})[\/\.-](\d{1,2})[\/\.-](\d{4})/g));
+        if (allDates.length >= 2) {
+          var second = allDates[1];
+          var _y2 = second[3];
+          var _m2 = String(second[2]).padStart(2, '0');
+          var _d2 = String(second[1]).padStart(2, '0');
+          salida = "".concat(_y2, "-").concat(_m2, "-").concat(_d2);
+        }
+      }
+    }
+
+    // 3. Pax
+    var pax = 0;
+    var paxPrefixMatch = clean.match(/(?:pax|personas|viajeros|hu[eé]spedes|asistentes|adultos|total\s+personas)\s*[:=]\s*(\d+)/i);
+    var paxSuffixMatch = clean.match(/\b(\d{1,4})\s*(?:pax|personas|viajeros|hu[eé]spedes|asistentes|adultos)\b/i);
+    if (paxPrefixMatch) {
+      pax = parseInt(paxPrefixMatch[1], 10);
+    } else if (paxSuffixMatch) {
+      pax = parseInt(paxSuffixMatch[1], 10);
+    }
+
+    // 4. Régimen
+    var regimen = 'HD';
+    if (/\b(pc|pensi[oó]n\s+completa)\b/i.test(clean)) {
+      regimen = 'PC';
+    } else if (/\b(mp|media\s+pensi[oó]n)\b/i.test(clean)) {
+      regimen = 'MP';
+    } else if (/\b(ha|sa|solo\s+alojamiento|alojamiento\s+solo)\b/i.test(clean)) {
+      regimen = 'HA';
+    } else if (/\b(hd|ad|desayuno|alojamiento\s+y\s+desayuno)\b/i.test(clean)) {
+      regimen = 'HD';
+    }
+
+    // 5. Contacto
+    var emailMatch = clean.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
+    var comEmail = emailMatch ? emailMatch[0] : '';
+    var phoneMatch = clean.match(/(?:tel[eé]fono|tel|m[oó]vil|tfno)?\s*[:=]?\s*(?:\+?34\s*)?([6789]\d{2}[\s.-]?\d{3}[\s.-]?\d{3}|[6789]\d{8})/i);
+    var comTel = phoneMatch ? phoneMatch[1].replace(/[\s.-]/g, '') : '';
+    var cifMatch = clean.match(/\b([A-HJ-NP-SUVW]\d{7}[0-9A-J]|\d{8}[A-Z])\b/i);
+    var fiscalCif = cifMatch ? cifMatch[1].toUpperCase() : '';
+    var comNombre = '';
+    var nombreMatch = clean.match(/(?:contacto|atentamente|un\s+saludo|saludos|remite|de)\s*[:=]\s*([^\n\r,]+)/i);
+    if (nombreMatch && !/sercotel|cumbria|hola|estimad/i.test(nombreMatch[1])) {
+      comNombre = nombreMatch[1].trim();
+    }
+    var agencia = '';
+    var agenciaMatch = clean.match(/(?:agencia|empresa|de parte de)\s*[:=]\s*([^\n\r,]+)/i);
+    if (agenciaMatch) {
+      agencia = agenciaMatch[1].trim();
+    } else if (comEmail) {
+      var domain = comEmail.split('@')[1];
+      if (domain && !/gmail|hotmail|yahoo|outlook/i.test(domain)) {
+        agencia = domain.split('.')[0].toUpperCase();
+      }
+    }
+    var grupoNombre = '';
+    var grupoMatch = clean.match(/nombre\s*(?:del)?\s*grupo\s*[:=]\s*([^\n\r]+)/i) || clean.match(/(?:grupo|asunto|subject)\s*[:=]\s*([^\n\r]+)/i);
+    if (grupoMatch) {
+      grupoNombre = grupoMatch[1].trim().replace(/^grupo\s+/i, '').toUpperCase();
+    }
+    if (!grupoNombre) {
+      grupoNombre = agencia ? "GRUPO ".concat(agencia.toUpperCase()) : 'GRUPO NUEVO';
+    }
+
+    // 6. Habitaciones
+    var roomCounts = {
+      'DOBLE DE USO INDIVIDUAL': 0,
+      'DOBLE': 0,
+      'DOBLE + SUPLETORIA': 0,
+      'DOBLE + SUPLETORIA NIÑO': 0,
+      'CUÁDRUPLE': 0,
+      'SUITE': 0,
+      'SUITE SUPERIOR': 0
+    };
+    var duiMatch = clean.match(/(\d+)\s*(?:hab(?:itaci[oó]n|es)?\s*)?(?:dobles?\s*de\s*uso\s*individual|dui|individual(?:es)?)/i);
+    if (duiMatch) roomCounts['DOBLE DE USO INDIVIDUAL'] = parseInt(duiMatch[1], 10);
+    var dblMatch = clean.match(/(\d+)\s*(?:hab(?:itaci[oó]n|es)?\s*)?(?:dobles?|twin|matrimonio)/i);
+    if (dblMatch) roomCounts['DOBLE'] = parseInt(dblMatch[1], 10);
+    var trpNiñoMatch = clean.match(/(\d+)\s*(?:hab(?:itaci[oó]n|es)?\s*)?(?:triples?\s*con\s*ni[ñn]o|supletoria\s*ni[ñn]o)/i);
+    if (trpNiñoMatch) {
+      roomCounts['DOBLE + SUPLETORIA NIÑO'] = parseInt(trpNiñoMatch[1], 10);
+    } else {
+      var trpMatch = clean.match(/(\d+)\s*(?:hab(?:itaci[oó]n|es)?\s*)?(?:triples?|supletorias?|doble\s*\+\s*supletoria)/i);
+      if (trpMatch) roomCounts['DOBLE + SUPLETORIA'] = parseInt(trpMatch[1], 10);
+    }
+    var cuadMatch = clean.match(/(\d+)\s*(?:hab(?:itaci[oó]n|es)?\s*)?(?:cu[aá]druples?)/i);
+    if (cuadMatch) roomCounts['CUÁDRUPLE'] = parseInt(cuadMatch[1], 10);
+    var suiteMatch = clean.match(/(\d+)\s*(?:hab(?:itaci[oó]n|es)?\s*)?(?:suites?)/i);
+    if (suiteMatch) roomCounts['SUITE'] = parseInt(suiteMatch[1], 10);
+    var habParts = [];
+    if (roomCounts['DOBLE'] > 0) habParts.push("".concat(roomCounts['DOBLE'], " dobles"));
+    if (roomCounts['DOBLE DE USO INDIVIDUAL'] > 0) habParts.push("".concat(roomCounts['DOBLE DE USO INDIVIDUAL'], " individuales"));
+    if (roomCounts['DOBLE + SUPLETORIA'] > 0) habParts.push("".concat(roomCounts['DOBLE + SUPLETORIA'], " triples"));
+    if (roomCounts['DOBLE + SUPLETORIA NIÑO'] > 0) habParts.push("".concat(roomCounts['DOBLE + SUPLETORIA NIÑO'], " triples ni\xF1o"));
+    if (roomCounts['CUÁDRUPLE'] > 0) habParts.push("".concat(roomCounts['CUÁDRUPLE'], " cu\xE1druples"));
+    if (roomCounts['SUITE'] > 0) habParts.push("".concat(roomCounts['SUITE'], " suites"));
+    var habitacionesResumen = habParts.join(', ') || (pax ? "".concat(Math.ceil(pax / 2), " dobles aprox.") : '');
+    if (!pax) {
+      var calcPax = roomCounts['DOBLE'] * 2 + roomCounts['DOBLE DE USO INDIVIDUAL'] * 1 + roomCounts['DOBLE + SUPLETORIA'] * 3 + roomCounts['DOBLE + SUPLETORIA NIÑO'] * 3 + roomCounts['CUÁDRUPLE'] * 4 + roomCounts['SUITE'] * 2;
+      if (calcPax > 0) pax = calcPax;
+    }
+    var importe = 0;
+    var precioMatch = clean.match(/(\d+(?:[.,]\d{1,2})?)\s*(?:€|euros?)/i);
+    if (precioMatch) {
+      importe = parseFloat(precioMatch[1].replace(',', '.'));
+    }
+    return {
+      'Nombre del Grupo': grupoNombre,
+      'Entrada': entrada,
+      'Salida': salida,
+      'Pax.': pax || 0,
+      'Empresa/Agencia': agencia,
+      'Régimen': regimen,
+      'Habitaciones': habitacionesResumen,
+      'roomCounts': roomCounts,
+      'Hotel': hotel,
+      'Observaciones': clean,
+      'Com_Nombre_Contacto': comNombre,
+      'Com_Email_Contacto': comEmail,
+      'Com_Telefono_Contacto': comTel,
+      'Fiscal_RazonSocial': agencia,
+      'Fiscal_CIF': fiscalCif,
+      'Fiscal_Direccion': '',
+      'Fiscal_CP': '',
+      'Fiscal_Poblacion': '',
+      'Importe(*)': importe
+    };
+  };
+  var handleLocalExtract = function handleLocalExtract() {
+    if (!emailText.trim()) return;
+    setIsAnalyzing(true);
+    setExtractionNotice(null);
+    try {
+      var parsed = parseEmailTextLocally(emailText);
+      setExtractedData(parsed);
+      validateData(parsed);
+      setExtractionMode('local');
+    } catch (err) {
+      alert("Error en la extracción local: " + err.message);
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
   var handleAnalyze = /*#__PURE__*/function () {
     var _ref7 = _asyncToGenerator(/*#__PURE__*/_regenerator().m(function _callee() {
-      var prompt, aiResult, cleanJson, parsed, _t;
+      var prompt, aiFailed, aiErrorMessage, aiResult, cleanJson, parsed, localParsed, _t;
       return _regenerator().w(function (_context) {
         while (1) switch (_context.p = _context.n) {
           case 0:
@@ -352,37 +567,51 @@ var App = function App() {
             return _context.a(2);
           case 1:
             setIsAnalyzing(true);
-            setExtractedData(null);
+            setExtractionNotice(null);
             prompt = "Analiza el siguiente texto de un correo electr\xF3nico de reserva de grupo y extrae la informaci\xF3n en formato JSON estrictamente.\n                Campos requeridos (usa estos nombres exactos, si no encuentras el dato devuelve un string vac\xEDo \"\"):\n                - \"Nombre del Grupo\": nombre identificativo corto (ej. ADULTOS, JUBILADOS).\n                - \"Entrada\": fecha en formato YYYY-MM-DD.\n                - \"Salida\": fecha en formato YYYY-MM-DD.\n                - \"Pax.\": n\xFAmero total de personas (entero).\n                - \"Empresa/Agencia\": nombre de la empresa o agencia.\n                - \"R\xE9gimen\": (HA, HD, MP, PC).\n                - \"Habitaciones\": resumen en texto de la distribuci\xF3n solicitada (ej. 10 dobles, 5 triples).\n                - \"roomCounts\": objeto JSON con el desglose num\xE9rico por tipo de habitaci\xF3n. USA ESTOS TIPOS SEG\xDAN EL HOTEL SI SE IDENTIFICA (si no, usa los de Sercotel Guadiana):\n                  * Sercotel Guadiana: {\"DOBLE DE USO INDIVIDUAL\": 0, \"DOBLE\": 0, \"DOBLE + SUPLETORIA\": 0, \"DOBLE + SUPLETORIA NI\xD1O\": 0, \"CU\xC1DRUPLE\": 0, \"SUITE\": 0, \"SUITE SUPERIOR\": 0}\n                  * Cumbria Spa & Hotel: {\"DOBLE DE USO INDIVIDUAL\": 0, \"DOBLE\": 0, \"DOBLE + SUPLETORIA\": 0, \"DOBLE + SUPLETORIA NI\xD1O\": 0, \"SUITE\": 0}\n                  Extrae SOLO los n\xFAmeros que encuentres. Si mencionan ni\xF1os en supletorias o triples con ni\xF1os, usa \"DOBLE + SUPLETORIA NI\xD1O\".\n                - \"Importe(*)\": precio unitario o total si se menciona, si no 0.\n                - \"Hotel\": \"Sercotel Guadiana\" o \"Cumbria Spa & Hotel\" si se menciona o deduce.\n                - \"Observaciones\": copia TODO el texto relevante del correo original que explique peticiones.\n                - \"Com_Nombre_Contacto\": nombre del remitente.\n                - \"Com_Email_Contacto\": email del remitente.\n                - \"Com_Telefono_Contacto\": tel\xE9fono.\n                - \"Fiscal_RazonSocial\": datos fiscales si aparecen.\n                - \"Fiscal_CIF\": CIF/NIF.\n                - \"Fiscal_Direccion\": direcci\xF3n.\n                - \"Fiscal_CP\": CP.\n                - \"Fiscal_Poblacion\": poblaci\xF3n.\n\n                Responde \xFAnicamente con el bloque JSON.\n                TEXTO DEL EMAIL:\n                ".concat(emailText);
+            aiFailed = false;
+            aiErrorMessage = "";
             _context.p = 2;
             _context.n = 3;
             return callGemini(prompt);
           case 3:
             aiResult = _context.v;
-            if (aiResult !== null && aiResult !== void 0 && aiResult.ok) {
-              _context.n = 4;
-              break;
+            if (aiResult && aiResult.ok && aiResult.text) {
+              cleanJson = aiResult.text.replace(/```json/g, "").replace(/```/g, "").trim();
+              parsed = JSON.parse(cleanJson);
+              setExtractedData(parsed);
+              validateData(parsed);
+              setExtractionMode('ai');
+              setExtractionNotice(null);
+            } else {
+              aiFailed = true;
+              aiErrorMessage = aiResult && aiResult.error || "Error al conectar con la IA de Google.";
             }
-            throw new Error((aiResult === null || aiResult === void 0 ? void 0 : aiResult.error) || "Error al conectar con la IA.");
-          case 4:
-            cleanJson = aiResult.text.replace(/```json/g, "").replace(/```/g, "").trim();
-            parsed = JSON.parse(cleanJson);
-            setExtractedData(parsed);
-            validateData(parsed);
-            _context.n = 6;
+            _context.n = 5;
             break;
-          case 5:
-            _context.p = 5;
+          case 4:
+            _context.p = 4;
             _t = _context.v;
-            alert("Error en el análisis: " + _t.message);
-          case 6:
-            _context.p = 6;
+            aiFailed = true;
+            aiErrorMessage = _t.message || "Error al conectar con la IA.";
+          case 5:
+            if (aiFailed) {
+              console.warn("[AltaEmail] Fallo en Gemini (" + aiErrorMessage + "). Activando extractor inteligente local...");
+              try {
+                localParsed = parseEmailTextLocally(emailText);
+                setExtractedData(localParsed);
+                validateData(localParsed);
+                setExtractionMode('local');
+                setExtractionNotice("La IA de Google no respondió (" + aiErrorMessage + "). Se han extraído los datos automáticamente con el analizador local de respaldo.");
+              } catch (fallbackErr) {
+                alert("Error en el análisis local de respaldo: " + fallbackErr.message);
+              }
+            }
             setIsAnalyzing(false);
-            return _context.f(6);
-          case 7:
+          case 6:
             return _context.a(2);
         }
-      }, _callee, null, [[2, 5, 6, 7]]);
+      }, _callee, null, [[2, 4]]);
     }));
     return function handleAnalyze() {
       return _ref7.apply(this, arguments);
@@ -601,10 +830,12 @@ var App = function App() {
     onChange: function onChange(e) {
       return setEmailText(e.target.value);
     }
-  }), /*#__PURE__*/React.createElement("button", {
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "flex flex-col gap-2"
+  }, /*#__PURE__*/React.createElement("button", {
     onClick: handleAnalyze,
     disabled: isAnalyzing || !emailText.trim(),
-    className: "w-full py-4 rounded-2xl font-black text-white flex items-center justify-center gap-3 shadow-lg transition-all active:scale-95 ".concat(isAnalyzing ? 'bg-slate-400' : 'btn-ia')
+    className: "w-full py-3.5 rounded-2xl font-black text-white flex items-center justify-center gap-3 shadow-lg transition-all active:scale-95 ".concat(isAnalyzing ? 'bg-slate-400' : 'btn-ia')
   }, isAnalyzing ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     className: "w-5 h-5 border-4 border-white/20 border-t-white rounded-full animate-spin"
   }), /*#__PURE__*/React.createElement("span", {
@@ -614,7 +845,17 @@ var App = function App() {
     className: "w-5 h-5"
   }), /*#__PURE__*/React.createElement("span", {
     className: "text-sm uppercase tracking-widest"
-  }, "Extraer con IA"))))), /*#__PURE__*/React.createElement("div", {
+  }, "Extraer con IA"))), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: handleLocalExtract,
+    disabled: isAnalyzing || !emailText.trim(),
+    className: "w-full py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 transition-all flex items-center justify-center gap-2 shadow-sm active:scale-95 disabled:opacity-50",
+    title: "Extrae los datos inmediatamente usando el analizador local de tu navegador, sin usar API Key"
+  }, /*#__PURE__*/React.createElement(LucideIcon, {
+    name: "cpu",
+    size: 15,
+    className: "text-emerald-600"
+  }), /*#__PURE__*/React.createElement("span", null, "Extracci\xF3n Local (Sin IA / Offline)"))))), /*#__PURE__*/React.createElement("div", {
     className: "flex-1 min-w-0"
   }, /*#__PURE__*/React.createElement("div", {
     className: "glass rounded-3xl flex flex-col h-full shadow-2xl border-slate-200 bg-white/50 backdrop-blur-xl"
@@ -725,11 +966,40 @@ var App = function App() {
     className: "flex-1 overflow-y-auto py-8 px-6 md:px-10 lg:px-14"
   }, /*#__PURE__*/React.createElement("div", {
     className: "w-full max-w-4xl mx-auto space-y-10"
-  }, /*#__PURE__*/React.createElement("div", {
+  }, extractionNotice && /*#__PURE__*/React.createElement("div", {
+    className: "bg-amber-50 border border-amber-200 text-amber-900 rounded-2xl p-4 flex items-start gap-3 text-xs leading-relaxed shadow-sm"
+  }, /*#__PURE__*/React.createElement(LucideIcon, {
+    name: "alert-triangle",
+    className: "w-5 h-5 text-amber-500 shrink-0 mt-0.5"
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "flex-1"
+  }, /*#__PURE__*/React.createElement("p", {
+    className: "font-bold"
+  }, "Extracci\xF3n Local Activada"), /*#__PURE__*/React.createElement("p", {
+    className: "text-[11px] text-amber-800 mt-0.5"
+  }, extractionNotice)), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: function onClick() {
+      return setExtractionNotice(null);
+    },
+    className: "text-amber-500 hover:text-amber-800 font-black text-sm px-1"
+  }, "\u2715")), /*#__PURE__*/React.createElement("div", {
     className: "flex items-center justify-between border-b border-slate-100 pb-4"
-  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h2", {
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-2"
+  }, /*#__PURE__*/React.createElement("h2", {
     className: "text-lg font-black text-slate-800 tracking-tight"
-  }, "Ficha Detallada de Extracci\xF3n"), /*#__PURE__*/React.createElement("p", {
+  }, "Ficha Detallada de Extracci\xF3n"), extractionMode === 'ai' && /*#__PURE__*/React.createElement("span", {
+    className: "px-2.5 py-0.5 bg-indigo-50 border border-indigo-200 text-indigo-700 rounded-full text-[9px] font-black uppercase tracking-wider flex items-center gap-1"
+  }, /*#__PURE__*/React.createElement(LucideIcon, {
+    name: "sparkles",
+    size: 10
+  }), "IA Gemini"), extractionMode === 'local' && /*#__PURE__*/React.createElement("span", {
+    className: "px-2.5 py-0.5 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-full text-[9px] font-black uppercase tracking-wider flex items-center gap-1"
+  }, /*#__PURE__*/React.createElement(LucideIcon, {
+    name: "cpu",
+    size: 10
+  }), "Analizador Local")), /*#__PURE__*/React.createElement("p", {
     className: "text-[10px] text-slate-400 uppercase tracking-widest font-bold font-outfit"
   }, "Confirma los datos para generar el presupuesto")), Object.keys(validation).length > 0 && /*#__PURE__*/React.createElement("div", {
     className: "px-4 py-2 bg-amber-50 rounded-xl border border-amber-200 flex items-center gap-3 animate-pulse"

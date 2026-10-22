@@ -163,6 +163,8 @@
             const [saveStatus, setSaveStatus] = useState(null);
             const [validation, setValidation] = useState({});
             const [isEditMode, setIsEditMode] = useState(false);
+            const [extractionMode, setExtractionMode] = useState(null);
+            const [extractionNotice, setExtractionNotice] = useState(null);
 
             useEffect(() => {
                 const params = new URLSearchParams(window.location.search);
@@ -313,10 +315,230 @@
 
             // callGemini cargado desde js/gemini.js (window.callGemini)
 
+            const parseEmailTextLocally = (text) => {
+                if (!text || typeof text !== 'string') text = '';
+                const clean = text.trim();
+
+                // 1. Hotel
+                let hotel = 'Sercotel Guadiana';
+                if (/cumbria/i.test(clean)) {
+                    hotel = 'Cumbria Spa & Hotel';
+                }
+
+                // 2. Fechas
+                let entrada = '';
+                let salida = '';
+
+                const monthsMap = {
+                    'enero': '01', 'febrero': '02', 'marzo': '03', 'abril': '04',
+                    'mayo': '05', 'junio': '06', 'julio': '07', 'agosto': '08',
+                    'septiembre': '09', 'setiembre': '09', 'octubre': '10', 'noviembre': '11', 'diciembre': '12'
+                };
+
+                const rangeTextMatch = clean.match(/del\s+(\d{1,2})(?:\s+de\s+([a-záéíóú]+))?\s+al\s+(\d{1,2})\s+de\s+([a-záéíóú]+)(?:\s+de\s+(\d{4}))?/i);
+                if (rangeTextMatch) {
+                    const currentYear = new Date().getFullYear();
+                    const year = rangeTextMatch[5] || String(currentYear);
+                    const mOutName = (rangeTextMatch[4] || '').toLowerCase();
+                    const mInName = (rangeTextMatch[2] || rangeTextMatch[4] || '').toLowerCase();
+                    const mOut = monthsMap[mOutName] || '01';
+                    const mIn = monthsMap[mInName] || mOut;
+                    const dIn = String(rangeTextMatch[1]).padStart(2, '0');
+                    const dOut = String(rangeTextMatch[3]).padStart(2, '0');
+                    entrada = `${year}-${mIn}-${dIn}`;
+                    salida = `${year}-${mOut}-${dOut}`;
+                }
+
+                if (!entrada) {
+                    const inMatch = clean.match(/(?:entrada|check[\s-]?in|llegada|desde|del)\s*[:=]?\s*(\d{1,2})[\/\.-](\d{1,2})[\/\.-](\d{2,4})/i) ||
+                                    clean.match(/(\d{1,2})[\/\.-](\d{1,2})[\/\.-](\d{4})/i);
+                    if (inMatch) {
+                        let y = inMatch[3];
+                        if (y.length === 2) y = '20' + y;
+                        const m = String(inMatch[2]).padStart(2, '0');
+                        const d = String(inMatch[1]).padStart(2, '0');
+                        entrada = `${y}-${m}-${d}`;
+                    }
+                }
+
+                if (!salida) {
+                    const outMatch = clean.match(/(?:salida|check[\s-]?out|partida|hasta|al)\s*[:=]?\s*(\d{1,2})[\/\.-](\d{1,2})[\/\.-](\d{2,4})/i);
+                    if (outMatch) {
+                        let y = outMatch[3];
+                        if (y.length === 2) y = '20' + y;
+                        const m = String(outMatch[2]).padStart(2, '0');
+                        const d = String(outMatch[1]).padStart(2, '0');
+                        salida = `${y}-${m}-${d}`;
+                    } else if (entrada) {
+                        const allDates = [...clean.matchAll(/(\d{1,2})[\/\.-](\d{1,2})[\/\.-](\d{4})/g)];
+                        if (allDates.length >= 2) {
+                            const second = allDates[1];
+                            let y = second[3];
+                            const m = String(second[2]).padStart(2, '0');
+                            const d = String(second[1]).padStart(2, '0');
+                            salida = `${y}-${m}-${d}`;
+                        }
+                    }
+                }
+
+                // 3. Pax
+                let pax = 0;
+                const paxPrefixMatch = clean.match(/(?:pax|personas|viajeros|hu[eé]spedes|asistentes|adultos|total\s+personas)\s*[:=]\s*(\d+)/i);
+                const paxSuffixMatch = clean.match(/\b(\d{1,4})\s*(?:pax|personas|viajeros|hu[eé]spedes|asistentes|adultos)\b/i);
+                if (paxPrefixMatch) {
+                    pax = parseInt(paxPrefixMatch[1], 10);
+                } else if (paxSuffixMatch) {
+                    pax = parseInt(paxSuffixMatch[1], 10);
+                }
+
+                // 4. Régimen
+                let regimen = 'HD';
+                if (/\b(pc|pensi[oó]n\s+completa)\b/i.test(clean)) {
+                    regimen = 'PC';
+                } else if (/\b(mp|media\s+pensi[oó]n)\b/i.test(clean)) {
+                    regimen = 'MP';
+                } else if (/\b(ha|sa|solo\s+alojamiento|alojamiento\s+solo)\b/i.test(clean)) {
+                    regimen = 'HA';
+                } else if (/\b(hd|ad|desayuno|alojamiento\s+y\s+desayuno)\b/i.test(clean)) {
+                    regimen = 'HD';
+                }
+
+                // 5. Contacto
+                const emailMatch = clean.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
+                const comEmail = emailMatch ? emailMatch[0] : '';
+
+                const phoneMatch = clean.match(/(?:tel[eé]fono|tel|m[oó]vil|tfno)?\s*[:=]?\s*(?:\+?34\s*)?([6789]\d{2}[\s.-]?\d{3}[\s.-]?\d{3}|[6789]\d{8})/i);
+                const comTel = phoneMatch ? phoneMatch[1].replace(/[\s.-]/g, '') : '';
+
+                const cifMatch = clean.match(/\b([A-HJ-NP-SUVW]\d{7}[0-9A-J]|\d{8}[A-Z])\b/i);
+                const fiscalCif = cifMatch ? cifMatch[1].toUpperCase() : '';
+
+                let comNombre = '';
+                const nombreMatch = clean.match(/(?:contacto|atentamente|un\s+saludo|saludos|remite|de)\s*[:=]\s*([^\n\r,]+)/i);
+                if (nombreMatch && !/sercotel|cumbria|hola|estimad/i.test(nombreMatch[1])) {
+                    comNombre = nombreMatch[1].trim();
+                }
+
+                let agencia = '';
+                const agenciaMatch = clean.match(/(?:agencia|empresa|de parte de)\s*[:=]\s*([^\n\r,]+)/i);
+                if (agenciaMatch) {
+                    agencia = agenciaMatch[1].trim();
+                } else if (comEmail) {
+                    const domain = comEmail.split('@')[1];
+                    if (domain && !/gmail|hotmail|yahoo|outlook/i.test(domain)) {
+                        agencia = domain.split('.')[0].toUpperCase();
+                    }
+                }
+
+                let grupoNombre = '';
+                const grupoMatch = clean.match(/nombre\s*(?:del)?\s*grupo\s*[:=]\s*([^\n\r]+)/i) ||
+                                   clean.match(/(?:grupo|asunto|subject)\s*[:=]\s*([^\n\r]+)/i);
+                if (grupoMatch) {
+                    grupoNombre = grupoMatch[1].trim().replace(/^grupo\s+/i, '').toUpperCase();
+                }
+                if (!grupoNombre) {
+                    grupoNombre = agencia ? `GRUPO ${agencia.toUpperCase()}` : 'GRUPO NUEVO';
+                }
+
+                // 6. Habitaciones
+                const roomCounts = {
+                    'DOBLE DE USO INDIVIDUAL': 0,
+                    'DOBLE': 0,
+                    'DOBLE + SUPLETORIA': 0,
+                    'DOBLE + SUPLETORIA NIÑO': 0,
+                    'CUÁDRUPLE': 0,
+                    'SUITE': 0,
+                    'SUITE SUPERIOR': 0
+                };
+
+                const duiMatch = clean.match(/(\d+)\s*(?:hab(?:itaci[oó]n|es)?\s*)?(?:dobles?\s*de\s*uso\s*individual|dui|individual(?:es)?)/i);
+                if (duiMatch) roomCounts['DOBLE DE USO INDIVIDUAL'] = parseInt(duiMatch[1], 10);
+
+                const dblMatch = clean.match(/(\d+)\s*(?:hab(?:itaci[oó]n|es)?\s*)?(?:dobles?|twin|matrimonio)/i);
+                if (dblMatch) roomCounts['DOBLE'] = parseInt(dblMatch[1], 10);
+
+                const trpNiñoMatch = clean.match(/(\d+)\s*(?:hab(?:itaci[oó]n|es)?\s*)?(?:triples?\s*con\s*ni[ñn]o|supletoria\s*ni[ñn]o)/i);
+                if (trpNiñoMatch) {
+                    roomCounts['DOBLE + SUPLETORIA NIÑO'] = parseInt(trpNiñoMatch[1], 10);
+                } else {
+                    const trpMatch = clean.match(/(\d+)\s*(?:hab(?:itaci[oó]n|es)?\s*)?(?:triples?|supletorias?|doble\s*\+\s*supletoria)/i);
+                    if (trpMatch) roomCounts['DOBLE + SUPLETORIA'] = parseInt(trpMatch[1], 10);
+                }
+
+                const cuadMatch = clean.match(/(\d+)\s*(?:hab(?:itaci[oó]n|es)?\s*)?(?:cu[aá]druples?)/i);
+                if (cuadMatch) roomCounts['CUÁDRUPLE'] = parseInt(cuadMatch[1], 10);
+
+                const suiteMatch = clean.match(/(\d+)\s*(?:hab(?:itaci[oó]n|es)?\s*)?(?:suites?)/i);
+                if (suiteMatch) roomCounts['SUITE'] = parseInt(suiteMatch[1], 10);
+
+                const habParts = [];
+                if (roomCounts['DOBLE'] > 0) habParts.push(`${roomCounts['DOBLE']} dobles`);
+                if (roomCounts['DOBLE DE USO INDIVIDUAL'] > 0) habParts.push(`${roomCounts['DOBLE DE USO INDIVIDUAL']} individuales`);
+                if (roomCounts['DOBLE + SUPLETORIA'] > 0) habParts.push(`${roomCounts['DOBLE + SUPLETORIA']} triples`);
+                if (roomCounts['DOBLE + SUPLETORIA NIÑO'] > 0) habParts.push(`${roomCounts['DOBLE + SUPLETORIA NIÑO']} triples niño`);
+                if (roomCounts['CUÁDRUPLE'] > 0) habParts.push(`${roomCounts['CUÁDRUPLE']} cuádruples`);
+                if (roomCounts['SUITE'] > 0) habParts.push(`${roomCounts['SUITE']} suites`);
+                const habitacionesResumen = habParts.join(', ') || (pax ? `${Math.ceil(pax / 2)} dobles aprox.` : '');
+
+                if (!pax) {
+                    const calcPax = (roomCounts['DOBLE'] * 2) +
+                                    (roomCounts['DOBLE DE USO INDIVIDUAL'] * 1) +
+                                    (roomCounts['DOBLE + SUPLETORIA'] * 3) +
+                                    (roomCounts['DOBLE + SUPLETORIA NIÑO'] * 3) +
+                                    (roomCounts['CUÁDRUPLE'] * 4) +
+                                    (roomCounts['SUITE'] * 2);
+                    if (calcPax > 0) pax = calcPax;
+                }
+
+                let importe = 0;
+                const precioMatch = clean.match(/(\d+(?:[.,]\d{1,2})?)\s*(?:€|euros?)/i);
+                if (precioMatch) {
+                    importe = parseFloat(precioMatch[1].replace(',', '.'));
+                }
+
+                return {
+                    'Nombre del Grupo': grupoNombre,
+                    'Entrada': entrada,
+                    'Salida': salida,
+                    'Pax.': pax || 0,
+                    'Empresa/Agencia': agencia,
+                    'Régimen': regimen,
+                    'Habitaciones': habitacionesResumen,
+                    'roomCounts': roomCounts,
+                    'Hotel': hotel,
+                    'Observaciones': clean,
+                    'Com_Nombre_Contacto': comNombre,
+                    'Com_Email_Contacto': comEmail,
+                    'Com_Telefono_Contacto': comTel,
+                    'Fiscal_RazonSocial': agencia,
+                    'Fiscal_CIF': fiscalCif,
+                    'Fiscal_Direccion': '',
+                    'Fiscal_CP': '',
+                    'Fiscal_Poblacion': '',
+                    'Importe(*)': importe
+                };
+            };
+
+            const handleLocalExtract = () => {
+                if (!emailText.trim()) return;
+                setIsAnalyzing(true);
+                setExtractionNotice(null);
+                try {
+                    const parsed = parseEmailTextLocally(emailText);
+                    setExtractedData(parsed);
+                    validateData(parsed);
+                    setExtractionMode('local');
+                } catch (err) {
+                    alert("Error en la extracción local: " + err.message);
+                } finally {
+                    setIsAnalyzing(false);
+                }
+            };
+
             const handleAnalyze = async () => {
                 if (!emailText.trim()) return;
                 setIsAnalyzing(true);
-                setExtractedData(null);
+                setExtractionNotice(null);
 
                 const prompt = `Analiza el siguiente texto de un correo electrónico de reserva de grupo y extrae la información en formato JSON estrictamente.
                 Campos requeridos (usa estos nombres exactos, si no encuentras el dato devuelve un string vacío ""):
@@ -347,20 +569,41 @@
                 TEXTO DEL EMAIL:
                 ${emailText}`;
 
+                let aiFailed = false;
+                let aiErrorMessage = "";
+
                 try {
                     const aiResult = await callGemini(prompt);
-                    if (!aiResult?.ok) {
-                        throw new Error(aiResult?.error || "Error al conectar con la IA.");
+                    if (aiResult && aiResult.ok && aiResult.text) {
+                        const cleanJson = aiResult.text.replace(/```json/g, "").replace(/```/g, "").trim();
+                        const parsed = JSON.parse(cleanJson);
+                        setExtractedData(parsed);
+                        validateData(parsed);
+                        setExtractionMode('ai');
+                        setExtractionNotice(null);
+                    } else {
+                        aiFailed = true;
+                        aiErrorMessage = (aiResult && aiResult.error) || "Error al conectar con la IA de Google.";
                     }
-                    const cleanJson = aiResult.text.replace(/```json/g, "").replace(/```/g, "").trim();
-                    const parsed = JSON.parse(cleanJson);
-                    setExtractedData(parsed);
-                    validateData(parsed);
                 } catch (e) {
-                    alert("Error en el análisis: " + e.message);
-                } finally {
-                    setIsAnalyzing(false);
+                    aiFailed = true;
+                    aiErrorMessage = e.message || "Error al conectar con la IA.";
                 }
+
+                if (aiFailed) {
+                    console.warn("[AltaEmail] Fallo en Gemini (" + aiErrorMessage + "). Activando extractor inteligente local...");
+                    try {
+                        const localParsed = parseEmailTextLocally(emailText);
+                        setExtractedData(localParsed);
+                        validateData(localParsed);
+                        setExtractionMode('local');
+                        setExtractionNotice("La IA de Google no respondió (" + aiErrorMessage + "). Se han extraído los datos automáticamente con el analizador local de respaldo.");
+                    } catch (fallbackErr) {
+                        alert("Error en el análisis local de respaldo: " + fallbackErr.message);
+                    }
+                }
+
+                setIsAnalyzing(false);
             };
 
             const handleSave = async () => {
@@ -536,23 +779,35 @@
                                         value={emailText}
                                         onChange={(e) => setEmailText(e.target.value)}
                                     ></textarea>
-                                    <button
-                                        onClick={handleAnalyze}
-                                        disabled={isAnalyzing || !emailText.trim()}
-                                        className={`w-full py-4 rounded-2xl font-black text-white flex items-center justify-center gap-3 shadow-lg transition-all active:scale-95 ${isAnalyzing ? 'bg-slate-400' : 'btn-ia'}`}
-                                    >
-                                        {isAnalyzing ? (
-                                            <>
-                                                <div className="w-5 h-5 border-4 border-white/20 border-t-white rounded-full animate-spin"></div>
-                                                <span className="text-sm">Analizando...</span>
-                                            </>
-                                        ) : (
-                                            <>
-                                                <LucideIcon name="sparkles" className="w-5 h-5" />
-                                                <span className="text-sm uppercase tracking-widest">Extraer con IA</span>
-                                            </>
-                                        )}
-                                    </button>
+                                    <div className="flex flex-col gap-2">
+                                        <button
+                                            onClick={handleAnalyze}
+                                            disabled={isAnalyzing || !emailText.trim()}
+                                            className={`w-full py-3.5 rounded-2xl font-black text-white flex items-center justify-center gap-3 shadow-lg transition-all active:scale-95 ${isAnalyzing ? 'bg-slate-400' : 'btn-ia'}`}
+                                        >
+                                            {isAnalyzing ? (
+                                                <>
+                                                    <div className="w-5 h-5 border-4 border-white/20 border-t-white rounded-full animate-spin"></div>
+                                                    <span className="text-sm">Analizando...</span>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <LucideIcon name="sparkles" className="w-5 h-5" />
+                                                    <span className="text-sm uppercase tracking-widest">Extraer con IA</span>
+                                                </>
+                                            )}
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={handleLocalExtract}
+                                            disabled={isAnalyzing || !emailText.trim()}
+                                            className="w-full py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 transition-all flex items-center justify-center gap-2 shadow-sm active:scale-95 disabled:opacity-50"
+                                            title="Extrae los datos inmediatamente usando el analizador local de tu navegador, sin usar API Key"
+                                        >
+                                            <LucideIcon name="cpu" size={15} className="text-emerald-600" />
+                                            <span>Extracción Local (Sin IA / Offline)</span>
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
 
@@ -643,9 +898,39 @@
                                             <div className="flex-1 overflow-y-auto py-8 px-6 md:px-10 lg:px-14">
                                                 <div className="w-full max-w-4xl mx-auto space-y-10">
                                                     {/* Header row with validation badge */}
+                                                    {extractionNotice && (
+                                                        <div className="bg-amber-50 border border-amber-200 text-amber-900 rounded-2xl p-4 flex items-start gap-3 text-xs leading-relaxed shadow-sm">
+                                                            <LucideIcon name="alert-triangle" className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+                                                            <div className="flex-1">
+                                                                <p className="font-bold">Extracción Local Activada</p>
+                                                                <p className="text-[11px] text-amber-800 mt-0.5">{extractionNotice}</p>
+                                                            </div>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setExtractionNotice(null)}
+                                                                className="text-amber-500 hover:text-amber-800 font-black text-sm px-1"
+                                                            >
+                                                                ✕
+                                                            </button>
+                                                        </div>
+                                                    )}
                                                     <div className="flex items-center justify-between border-b border-slate-100 pb-4">
                                                         <div>
-                                                            <h2 className="text-lg font-black text-slate-800 tracking-tight">Ficha Detallada de Extracción</h2>
+                                                            <div className="flex items-center gap-2">
+                                                                <h2 className="text-lg font-black text-slate-800 tracking-tight">Ficha Detallada de Extracción</h2>
+                                                                {extractionMode === 'ai' && (
+                                                                    <span className="px-2.5 py-0.5 bg-indigo-50 border border-indigo-200 text-indigo-700 rounded-full text-[9px] font-black uppercase tracking-wider flex items-center gap-1">
+                                                                        <LucideIcon name="sparkles" size={10} />
+                                                                        IA Gemini
+                                                                    </span>
+                                                                )}
+                                                                {extractionMode === 'local' && (
+                                                                    <span className="px-2.5 py-0.5 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-full text-[9px] font-black uppercase tracking-wider flex items-center gap-1">
+                                                                        <LucideIcon name="cpu" size={10} />
+                                                                        Analizador Local
+                                                                    </span>
+                                                                )}
+                                                            </div>
                                                             <p className="text-[10px] text-slate-400 uppercase tracking-widest font-bold font-outfit">Confirma los datos para generar el presupuesto</p>
                                                         </div>
                                                         {Object.keys(validation).length > 0 && (
