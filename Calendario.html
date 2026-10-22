@@ -456,7 +456,7 @@
                         <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                     </span>
                     <span id="sync-status-badge" class="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">
-                        Sincronizado
+                        Conectando con CapaSuite...
                     </span>
                     <span class="text-slate-300">|</span>
                     <span id="sync-last-time" class="text-[10px] font-semibold text-slate-400 tabular-nums">
@@ -464,13 +464,8 @@
                     </span>
                 </div>
 
-                <!-- Botón Actualizar -->
-                <button id="btn-refresh" type="button" onclick="refreshCalendarData()"
-                        class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-700 hover:text-indigo-600 border border-slate-200 rounded-xl text-xs font-bold shadow-xs transition-all active:scale-95 cursor-pointer" 
-                        title="Recargar y sincronizar datos frescos de tarifas y ocupación">
-                    <i id="btn-refresh-icon" data-lucide="refresh-cw" class="w-3.5 h-3.5 text-slate-500"></i>
-                    <span>Actualizar</span>
-                </button>
+                <button id="capasuite-sign-in" type="button" hidden onclick="document.getElementById('capasuite-login').showModal()"
+                    class="px-3 py-1.5 bg-indigo-600 text-white rounded-xl text-xs font-bold">Iniciar sesión en CapaSuite</button>
 
                 <!-- Botón Pantalla Completa -->
                 <button id="btn-fullscreen" type="button" onclick="toggleFullScreen()"
@@ -644,6 +639,18 @@
     <script src="js/navigation.js?v=2-shared-listener"></script>
     <script src="js/firebase-init.js?v=2-persistent-cache"></script>
 
+    <script src="js/services/capaSuiteCalendarSync.js?v=1-direct-source"></script>
+    <dialog id="capasuite-login" class="rounded-xl p-6 shadow-xl" style="max-width:420px;width:90%">
+        <form id="capasuite-login-form" class="flex flex-col gap-3">
+            <h2 class="font-bold text-lg">Sesión de CapaSuite</h2>
+            <p class="text-sm">Utiliza la misma cuenta de CapaSuite para sincronizar su calendario automáticamente en este navegador.</p>
+            <label>Correo <input name="email" type="email" autocomplete="username" required class="border rounded p-2 w-full"></label>
+            <label>Contraseña <input name="password" type="password" autocomplete="current-password" required class="border rounded p-2 w-full"></label>
+            <p id="capasuite-login-error" role="alert" class="text-sm text-red-600"></p>
+            <button type="submit" class="bg-indigo-600 text-white rounded p-2">Iniciar sesión</button>
+            <button type="button" onclick="document.getElementById('capasuite-login-form').reset();document.getElementById('capasuite-login').close()">Cancelar</button>
+        </form>
+    </dialog>
     <!-- MOTOR Y LÓGICA DEL CALENDARIO ESTRATÉGICO -->
     <script>
         (function () {
@@ -662,6 +669,11 @@
             };
 
             function getStorageItem(key) {
+                var sync = window.CapaSuiteCalendarSync;
+                if (sync && sync.state.authenticated) {
+                    var value = (sync.state.data || {})[key];
+                    return value === undefined ? null : JSON.stringify(value);
+                }
                 try {
                     return localStorage.getItem("v3_" + key) || localStorage.getItem(key) || null;
                 } catch (e) {
@@ -684,13 +696,12 @@
             // Cálculo preciso de métricas de precio por día
             function getDayPriceMetrics(iso, dData, currentHotel) {
                 var hotelPrice = 0;
-                if (dData && dData.hotels && dData.hotels[currentHotel]) {
-                    var v = dData.hotels[currentHotel];
+                var hotelKey = dData && dData.hotels && Object.keys(dData.hotels).find(function (name) { return name.toLowerCase().includes(currentHotel.toLowerCase()); });
+                if (hotelKey) {
+                    var v = dData.hotels[hotelKey];
                     hotelPrice = (typeof v === 'object') ? (v.price || 0) : (Number(v) || 0);
                 }
-                if (hotelPrice <= 0 && dData && dData.occupancyData && dData.occupancyData[currentHotel] && dData.occupancyData[currentHotel].adr > 0) {
-                    hotelPrice = Math.round(dData.occupancyData[currentHotel].adr);
-                }
+
 
                 var allPrices = [];
                 var compPrices = [];
@@ -744,6 +755,9 @@
             function loadAllData() {
                 // 1. Competitor Data
                 revenueData = {};
+                db = {};
+                rawEvents = [];
+                manualCuposDB = {};
                 var rawComp = getStorageItem('revenue_data_v2');
                 if (rawComp) {
                     try {
@@ -787,7 +801,7 @@
                 } catch (e) {}
 
                 // Si no hay datos en localStorage, inicializar seed inteligente con tarifas base realistas
-                seedFallbackDataIfNeeded();
+
 
                 populateYearSelector();
                 enrichRevenueData();
@@ -797,19 +811,11 @@
 
                 var syncBadge = document.getElementById("sync-status-badge");
                 var syncLastTime = document.getElementById("sync-last-time");
-                if (syncBadge) syncBadge.textContent = "Sincronizado";
-                if (syncLastTime) syncLastTime.textContent = "Actualizado: " + formatTime(new Date());
-            }
-
-            // Generador de datos base para cuando se abre por primera vez sin caché
-            function seedFallbackDataIfNeeded() {
-                if (!rawEvents || rawEvents.length === 0) {
-                    rawEvents = [
-                        { start: "2026-10-12", end: "2026-10-12", desc: "Fiesta Nacional de España (Puente del Pilar)", prio: "Alta", impact: "Fuerte demanda de ocio", rec: "Mantener tarifa estándar alta sin descuentos" },
-                        { start: "2026-11-01", end: "2026-11-01", desc: "Todos los Santos", prio: "Media", impact: "Ocupación media-alta de familias", rec: "Promocionar fin de semana completo" },
-                        { start: "2026-12-06", end: "2026-12-08", desc: "Puente de la Constitución e Inmaculada", prio: "Muy Alta", impact: "Alta demanda hotelera en la región", rec: "Cierre de estancias cortas / Mínimo 2 noches" }
-                    ];
-                }
+                var sync = window.CapaSuiteCalendarSync;
+                if (syncBadge) syncBadge.textContent = sync ? sync.state.status : 'Copia guardada';
+                if (syncLastTime) syncLastTime.textContent = sync && sync.state.updatedAt ? 'Datos recibidos: ' + formatTime(sync.state.updatedAt) : 'Sin actualización confirmada';
+                var signIn = document.getElementById('capasuite-sign-in');
+                if (signIn) signIn.hidden = !sync || sync.state.authenticated || sync.state.status !== 'CapaSuite: inicia sesión para sincronizar';
             }
 
             function populateYearSelector() {
@@ -1419,6 +1425,7 @@
             };
 
             window.refreshCalendarData = function () {
+                if (window.CapaSuiteCalendarSync) return window.CapaSuiteCalendarSync.refresh();
                 var btnIcon = document.getElementById("btn-refresh-icon");
                 var syncBadge = document.getElementById("sync-status-badge");
                 if (btnIcon) btnIcon.classList.add("spinner-anim");
@@ -1567,13 +1574,33 @@
                 });
             }
 
+            document.getElementById('capasuite-login-form').addEventListener('submit', async function (event) {
+                event.preventDefault();
+                var form = event.currentTarget;
+                var button = form.querySelector('button[type="submit"]');
+                var error = document.getElementById('capasuite-login-error');
+                button.disabled = true;
+                error.textContent = '';
+                try {
+                    await window.CapaSuiteCalendarSync.signIn(form.elements.email.value.trim(), form.elements.password.value);
+                    document.getElementById('capasuite-login').close();
+                } catch (e) {
+                    error.textContent = 'No se pudo iniciar sesión. Revisa la cuenta de CapaSuite y la conexión.';
+                } finally {
+                    form.elements.password.value = '';
+                    button.disabled = false;
+                }
+            });
+
             // Keep the open calendar in sync with CapaSuite and other tabs.
             window.addEventListener('capasuite-data-synced', loadAllData);
+            window.addEventListener('capasuite-calendar-state', loadAllData);
             window.addEventListener('storage', function (event) {
                 if (!event.key || /^(v3_)?(revenue_data_v2|hotel_manager_db_v2|manual_cupos_v1|custom_events)$/.test(event.key)) loadAllData();
             });
             window.addEventListener('load', function () {
                 loadAllData();
+                if (window.CapaSuiteCalendarSync) return;
                 if (!window.db || typeof window.db.collection !== 'function') return;
                 var reference = window.db.collection('settings').doc('calendar_data');
                 if (typeof reference.onSnapshot !== 'function') {
