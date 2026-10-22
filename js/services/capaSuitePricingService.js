@@ -25,8 +25,15 @@
   function safeGetStorage(key) {
     var sync = typeof window !== 'undefined' && window.CapaSuiteCalendarSync;
     if (sync && ['revenue_data_v2', 'hotel_manager_db_v2', 'custom_events', 'manual_cupos_v1'].indexOf(key) !== -1) {
-      var value = (sync.state.data || {})[key];
-      return value === undefined ? null : JSON.stringify(value);
+      if (sync.state.authenticated) {
+        var value = (sync.state.data || {})[key];
+        return value === undefined ? null : JSON.stringify(value);
+      }
+      // Match the Groups calendar while restoring the session: its saved
+      // calendar copy takes priority over the old Firestore memory cache.
+      try {
+        return typeof localStorage === 'undefined' ? null : localStorage.getItem('v3_' + key) || localStorage.getItem(key) || null;
+      } catch (error) { return null; }
     }
     if (inMemoryStorage[key]) return inMemoryStorage[key];
     if (inMemoryStorage['v3_' + key]) return inMemoryStorage['v3_' + key];
