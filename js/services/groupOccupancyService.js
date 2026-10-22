@@ -780,7 +780,7 @@
         isDefinitive = true;
         revisionReasons = [];
         previousDistribution = null;
-      } else if (dateSaved && (dateSaved.dobles !== undefined || dateSaved.individuales !== undefined) && dateSaved.status !== "pendiente") {
+      } else if (dateSaved && (dateSaved.dobles !== undefined || dateSaved.individuales !== undefined)) {
         var savedInd = parseInt(dateSaved.individuales, 10) || 0;
         var savedDbl = parseInt(dateSaved.dobles, 10) || 0;
         var savedTpl = parseInt(dateSaved.triples, 10) || 0;
@@ -789,6 +789,8 @@
         var savedTotalRooms = savedInd + savedDbl + savedTpl + savedCua;
         if (savedRoomsPax > 0 && savedTotalRooms > 0) {
           entry.pax = savedRoomsPax;
+        } else if (dateSaved.pax && parseInt(dateSaved.pax, 10) > 0) {
+          entry.pax = parseInt(dateSaved.pax, 10);
         }
       } else if (entry.pax === 0 && (entry.maxSinglePax || 0) > 0) {
         entry.pax = entry.maxSinglePax;

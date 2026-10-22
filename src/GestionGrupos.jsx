@@ -6837,13 +6837,22 @@ const [customBudgetIdInput, setCustomBudgetIdInput] = useState("");
         const targetResId = normalizeId(dailyItem.reserva);
         const targetGroup = (groupedData || []).find(g => normalizeId(g.id) === targetResId || normalizeId(g.reserva) === targetResId);
         const matchRow = (data || []).find(r => normalizeId(r["Reserva"]) === targetResId);
-        const rawRL = targetGroup?.roomingList ||
-          targetGroup?.records?.find(r => r.RoomingList_JSON && r.RoomingList_JSON !== "[]")?.RoomingList_JSON ||
-          (data || []).find(r => normalizeId(r["Reserva"]) === targetResId && r.RoomingList_JSON && r.RoomingList_JSON !== "[]")?.RoomingList_JSON ||
-          matchRow?.RoomingList_JSON;
-        const existingRL = rawRL 
-          ? parseRoomingListSafe(rawRL, "open-dist-modal") 
-          : [];
+        const activeFichaRL = (selectedGroupFicha && normalizeId(selectedGroupFicha.id) === targetResId)
+          ? (typeof window.roomingCore !== "undefined" && window.roomingCore.getGroupEconomicItems
+              ? window.roomingCore.getGroupEconomicItems(selectedGroupFicha)
+              : parseRoomingListSafe(selectedGroupFicha.records?.[0]?.RoomingList_JSON || selectedGroupFicha.RoomingList_JSON, "open-dist-modal"))
+          : null;
+        const rawRL = (activeFichaRL && activeFichaRL.length > 0)
+          ? null
+          : (targetGroup?.roomingList ||
+             targetGroup?.records?.find(r => r.RoomingList_JSON && r.RoomingList_JSON !== "[]")?.RoomingList_JSON ||
+             (data || []).find(r => normalizeId(r["Reserva"]) === targetResId && r.RoomingList_JSON && r.RoomingList_JSON !== "[]")?.RoomingList_JSON ||
+             matchRow?.RoomingList_JSON);
+        const existingRL = (activeFichaRL && activeFichaRL.length > 0)
+          ? activeFichaRL
+          : (rawRL 
+              ? parseRoomingListSafe(rawRL, "open-dist-modal") 
+              : []);
         let initialFreeInd = 0;
         let initialFreeDbl = 0;
         let initialFreeTpl = 0;
@@ -6851,7 +6860,8 @@ const [customBudgetIdInput, setCustomBudgetIdInput] = useState("");
 
         // Intentar leer gratuidades guardadas previamente en DailyDistribution_JSON
         let distGratuities = null;
-        const targetDistMapRaw = targetGroup?.dailyDistribution ||
+        const targetDistMapRaw = (selectedGroupFicha && normalizeId(selectedGroupFicha.id) === targetResId && (selectedGroupFicha.DailyDistribution_JSON || selectedGroupFicha.dailyDistribution)) ||
+          targetGroup?.dailyDistribution ||
           targetGroup?.records?.find(r => r.DailyDistribution_JSON && r.DailyDistribution_JSON !== "{}" && r.DailyDistribution_JSON !== "[]")?.DailyDistribution_JSON ||
           matchRow?.DailyDistribution_JSON;
         if (targetDistMapRaw) {
@@ -7047,7 +7057,7 @@ const [customBudgetIdInput, setCustomBudgetIdInput] = useState("");
         let resolvedPax = dailyItem.pax;
         if (hasFichaRooms && rlPax > 0) {
           resolvedPax = rlPax;
-        } else if (savedRoomsPax > 0 && (dailyItem.isDefinitive || dailyItem.distributionStatus === "confirmada" || dailyItem.distributionStatus === "modificada")) {
+        } else if (savedRoomsPax > 0) {
           resolvedPax = savedRoomsPax;
         }
 
@@ -7132,8 +7142,10 @@ const [customBudgetIdInput, setCustomBudgetIdInput] = useState("");
           }, editingDistribution.pax);
 
           if (valRes && !valRes.isValid) {
-            if (!confirm(`La distribución configurada (${valRes.calculatedPax} pax en ${valRes.totalRooms} habitaciones) difiere de las ${editingDistribution.pax} personas registradas.\n\n¿Deseas guardar y confirmar esta distribución de todos modos?`)) {
-              setDistributionFormError("La distribución no coincide con el número total de personas.");
+            if (confirm(`La distribución configurada suma ${valRes.calculatedPax} Pax (${valRes.totalRooms} habitaciones), pero la ocupación registrada es de ${editingDistribution.pax} personas.\n\n¿Deseas guardar y actualizar la ocupación a ${valRes.calculatedPax} Pax?`)) {
+              editingDistribution.pax = valRes.calculatedPax;
+            } else {
+              setDistributionFormError("La distribución no coincide con el número total de personas. Ajuste las habitaciones o el número de personas.");
               return;
             }
           }
@@ -7183,7 +7195,7 @@ const [customBudgetIdInput, setCustomBudgetIdInput] = useState("");
             triples: finalTpl,
             cuadruples: finalCua,
             totalHabitaciones: finalStatus === "pendiente" ? null : (finalInd + finalDbl + finalTpl + finalCua),
-            pax: editingDistribution.pax,
+            pax: (finalInd * 1) + (finalDbl * 2) + (finalTpl * 3) + (finalCua * 4) > 0 ? ((finalInd * 1) + (finalDbl * 2) + (finalTpl * 3) + (finalCua * 4)) : editingDistribution.pax,
             regimen: editingDistribution.regimen || "HD",
             proposed: editingDistribution.proposal,
             observations: editingDistribution.observations || "",
@@ -19111,7 +19123,23 @@ const [customBudgetIdInput, setCustomBudgetIdInput] = useState("");
                         </div>
                         <div>
                           <span className="text-slate-400 block font-medium mb-0.5">Personas (Pax)</span>
-                          <span className="font-black text-blue-600 text-base block">{editingDistribution.pax} personas</span>
+                          <div className="flex items-center gap-1.5">
+                            <input
+                              type="number"
+                              min="1"
+                              value={editingDistribution.pax || ""}
+                              onChange={(e) => {
+                                const val = parseInt(e.target.value, 10);
+                                setEditingDistribution(prev => ({
+                                  ...prev,
+                                  pax: isNaN(val) ? 0 : val
+                                }));
+                              }}
+                              className="font-black text-blue-600 text-sm bg-white border border-slate-300 rounded-lg px-2 py-0.5 w-20 text-center focus:ring-2 focus:ring-blue-500 outline-none shadow-2xs"
+                              title="Número total de personas requeridas para este día"
+                            />
+                            <span className="text-xs font-bold text-slate-600">Pax</span>
+                          </div>
                           <span className="text-[10px] text-slate-500 font-medium">Ocupación requerida</span>
                         </div>
                         <div>
@@ -19588,7 +19616,7 @@ const [customBudgetIdInput, setCustomBudgetIdInput] = useState("");
                       </div>
 
                       {/* Validador de Pax en Tiempo Real Mejorado */}
-                      <div className={`p-4 rounded-xl border flex items-center justify-between transition-all ${
+                      <div className={`p-4 rounded-xl border flex flex-wrap items-center justify-between gap-3 transition-all ${
                         isPaxMatch 
                           ? "bg-emerald-50 border-emerald-300 text-emerald-900 shadow-2xs" 
                           : "bg-rose-50 border-rose-300 text-rose-900 shadow-2xs"
@@ -19609,9 +19637,22 @@ const [customBudgetIdInput, setCustomBudgetIdInput] = useState("");
                             </div>
                           </div>
                         </div>
-                        <div className="text-right pl-4 border-l border-current/20">
-                          <span className="text-[10px] font-bold uppercase tracking-wider block opacity-70">Total Hab.</span>
-                          <span className="text-xl font-black font-mono">{calcRooms}</span>
+                        <div className="flex items-center gap-3 ml-auto">
+                          {!isPaxMatch && calcPax > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => setEditingDistribution(prev => ({ ...prev, pax: calcPax }))}
+                              className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold shadow-xs transition cursor-pointer flex items-center gap-1.5"
+                              title="Ajustar la ocupación requerida a las plazas calculadas de las habitaciones"
+                            >
+                              <span>⚡</span>
+                              <span>Ajustar a {calcPax} Pax</span>
+                            </button>
+                          )}
+                          <div className="text-right pl-4 border-l border-current/20">
+                            <span className="text-[10px] font-bold uppercase tracking-wider block opacity-70">Total Hab.</span>
+                            <span className="text-xl font-black font-mono">{calcRooms}</span>
+                          </div>
                         </div>
                       </div>
 
@@ -19702,22 +19743,22 @@ const [customBudgetIdInput, setCustomBudgetIdInput] = useState("");
                             <span>✓</span> Reconfirmar anterior
                           </button>
                         )}
-                        {hasProposal && !isRevisionNecesaria && editingDistribution.status !== "pendiente" && (
+                        {hasProposal && !isRevisionNecesaria && editingDistribution.status === "propuesta" && curInd === (editingDistribution.proposal?.individuales || 0) && curDbl === (editingDistribution.proposal?.dobles || 0) && curTpl === (editingDistribution.proposal?.triples || 0) && curCua === (editingDistribution.proposal?.cuadruples || 0) && (
                           <button
                             type="button"
                             onClick={() => handleSaveDistribution("confirmar_propuesta")}
                             disabled={isSavingDistribution}
                             className="px-4 py-2 rounded-xl text-xs font-bold bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300 transition cursor-pointer"
                           >
-                            Confirmar sin cambios
+                            Confirmar propuesta estándar
                           </button>
                         )}
                         <button
                           type="button"
                           onClick={() => handleSaveDistribution("guardar")}
-                          disabled={!isPaxMatch || isSavingDistribution}
+                          disabled={isSavingDistribution || calcRooms <= 0}
                           className={`px-5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
-                            !isPaxMatch || isSavingDistribution
+                            isSavingDistribution || calcRooms <= 0
                               ? "bg-slate-200 text-slate-400 cursor-not-allowed"
                               : "bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-200"
                           }`}
