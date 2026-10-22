@@ -743,13 +743,16 @@
             // Carga y sincronización de datos locales y nube
             function loadAllData() {
                 // 1. Competitor Data
+                revenueData = {};
                 var rawComp = getStorageItem('revenue_data_v2');
                 if (rawComp) {
                     try {
                         var parsed = JSON.parse(rawComp);
                         revenueData = {};
-                        if (parsed && Array.isArray(parsed.data)) {
-                            parsed.data.forEach(function (d) { revenueData[d.dateISO] = d; });
+                        if (Array.isArray(parsed) || (parsed && Array.isArray(parsed.data))) {
+                            (Array.isArray(parsed) ? parsed : parsed.data).forEach(function (d) {
+                                if (d && (d.dateISO || d.date)) revenueData[d.dateISO || d.date] = d;
+                            });
                         } else if (parsed && typeof parsed === 'object') {
                             revenueData = parsed;
                         }
@@ -800,52 +803,6 @@
 
             // Generador de datos base para cuando se abre por primera vez sin caché
             function seedFallbackDataIfNeeded() {
-                var years = [2026, 2027];
-                var hasAnyData = Object.keys(revenueData).length > 0;
-                
-                if (!hasAnyData) {
-                    revenueData = {};
-                    years.forEach(function (year) {
-                        for (var m = 0; m < 12; m++) {
-                            var daysInM = new Date(year, m + 1, 0).getDate();
-                            var mPad = String(m + 1).padStart(2, '0');
-                            for (var d = 1; d <= daysInM; d++) {
-                                var iso = year + '-' + mPad + '-' + String(d).padStart(2, '0');
-                                var dateObj = new Date(year, m, d);
-                                var dayOfWeek = dateObj.getDay(); // 0: Dom, 5: Vie, 6: Sab
-                                var isWeekend = (dayOfWeek === 5 || dayOfWeek === 6);
-                                
-                                // Variación de temporada
-                                var baseRate = 65;
-                                if (m >= 4 && m <= 9) baseRate = 75; // Primavera-verano
-                                if (isWeekend) baseRate += 15;
-                                
-                                var gPrice = baseRate;
-                                var cPrice = baseRate - 6;
-                                var parador = baseRate + 35;
-                                var nh = baseRate + 12;
-                                var santaCecilia = baseRate - 2;
-
-                                revenueData[iso] = {
-                                    dateISO: iso,
-                                    hotels: {
-                                        'Hotel Guadiana': { price: gPrice },
-                                        'Hotel Cumbria': { price: cPrice },
-                                        'Parador de Almagro': { price: parador },
-                                        'Hotel NH Ciudad Real': { price: nh },
-                                        'Hotel Santa Cecilia': { price: santaCecilia }
-                                    },
-                                    occupancyData: {
-                                        Guadiana: { otb: Math.round(isWeekend ? 65 : 35), adr: gPrice, otb_prev: Math.round(isWeekend ? 60 : 32) },
-                                        Cumbria: { otb: Math.round(isWeekend ? 40 : 22), adr: cPrice, otb_prev: Math.round(isWeekend ? 38 : 20) }
-                                    }
-                                };
-                            }
-                        }
-                    });
-                    setStorageItem('revenue_data_v2', JSON.stringify(revenueData));
-                }
-
                 if (!rawEvents || rawEvents.length === 0) {
                     rawEvents = [
                         { start: "2026-10-12", end: "2026-10-12", desc: "Fiesta Nacional de España (Puente del Pilar)", prio: "Alta", impact: "Fuerte demanda de ocio", rec: "Mantener tarifa estándar alta sin descuentos" },
@@ -1483,6 +1440,7 @@
                                 rawEvents = d.customEvents;
                                 setStorageItem('custom_events', JSON.stringify(d.customEvents));
                             }
+                            if (d.manualCupos) setStorageItem('manual_cupos_v1', JSON.stringify(d.manualCupos));
                             if (d.hotelManagerDb) {
                                 db = d.hotelManagerDb;
                                 setStorageItem('hotel_manager_db_v2', JSON.stringify(d.hotelManagerDb));
@@ -1609,12 +1567,33 @@
                 });
             }
 
-            // Inicialización al cargar la página
+            // Keep the open calendar in sync with CapaSuite and other tabs.
+            window.addEventListener('capasuite-data-synced', loadAllData);
+            window.addEventListener('storage', function (event) {
+                if (!event.key || /^(v3_)?(revenue_data_v2|hotel_manager_db_v2|manual_cupos_v1|custom_events)$/.test(event.key)) loadAllData();
+            });
             window.addEventListener('load', function () {
                 loadAllData();
-                if (window.db && typeof window.db.collection === 'function') {
-                    refreshCalendarData();
+                if (!window.db || typeof window.db.collection !== 'function') return;
+                var reference = window.db.collection('settings').doc('calendar_data');
+                if (typeof reference.onSnapshot !== 'function') {
+                    window.refreshCalendarData();
+                    return;
                 }
+                var listen = window.nexusListen || function (ref, next, error) { return ref.onSnapshot(next, error); };
+                listen(reference, function (snapshot) {
+                    if (!snapshot.exists) return;
+                    var data = snapshot.data();
+                    var stores = { revenueData: 'revenue_data_v2', hotelManagerDb: 'hotel_manager_db_v2', customEvents: 'custom_events', manualCupos: 'manual_cupos_v1' };
+                    Object.keys(stores).forEach(function (field) {
+                        if (data[field] !== undefined) setStorageItem(stores[field], JSON.stringify(data[field]));
+                    });
+                    loadAllData();
+                }, function (error) {
+                    console.warn('Error sincronizando calendar_data:', error);
+                    var badge = document.getElementById('sync-status-badge');
+                    if (badge) badge.textContent = 'Error de sincronización';
+                });
             });
 
         })();
