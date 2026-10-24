@@ -6567,14 +6567,22 @@ const [customBudgetIdInput, setCustomBudgetIdInput] = useState("");
           healthByReserva.set(normalizeId(group.id), [...health.issues, ...health.warnings].map(issue => issue.message));
         });
         return matrix.map(item => {
-          const reasons = healthByReserva.get(normalizeId(item.reserva)) || [];
+          const isItemBudget = Boolean(
+            String(item.reserva || "").toUpperCase().startsWith("PRES-") ||
+            String(item.reserva || "").toUpperCase().startsWith("COT-") ||
+            (item.estadoReserva && String(item.estadoReserva).toLowerCase().includes("presup"))
+          );
+          const reasons = isItemBudget ? [] : (healthByReserva.get(normalizeId(item.reserva)) || []);
           return {
             ...item,
+            isBudget: isItemBudget,
             hotel: normalizeHotelNameLocal(item.hotel, item.hotel || 'Sercotel Guadiana'),
-            requiresAttention: !item.isDefinitive || reasons.length > 0,
-            hasFichaIssues: reasons.length > 0,
-            distributionStatus: reasons.length ? 'revision_necesaria' : item.distributionStatus,
-            revisionReasons: [...new Set([...(item.revisionReasons || []), ...reasons])],
+            requiresAttention: isItemBudget ? false : (!item.isDefinitive || reasons.length > 0),
+            hasFichaIssues: isItemBudget ? false : (reasons.length > 0),
+            distributionStatus: isItemBudget
+              ? (item.distributionStatus === 'revision_necesaria' ? 'validada_sin_cambios' : item.distributionStatus)
+              : (reasons.length ? 'revision_necesaria' : item.distributionStatus),
+            revisionReasons: isItemBudget ? [] : [...new Set([...(item.revisionReasons || []), ...reasons])],
           };
         });
       }, [processedData, savedDistributionsByReserva, groupedData]);
@@ -6593,8 +6601,22 @@ const [customBudgetIdInput, setCustomBudgetIdInput] = useState("");
           if (dailyHotelFilter && item.hotel !== dailyHotelFilter) return false;
           
           const isAnul = String(item.estadoReserva || "").toLowerCase().includes("anul");
-          if (dailyStatusFilter === "confirmada" && isAnul) return false;
-          if (dailyStatusFilter === "anulada" && !isAnul) return false;
+          const isBudget = Boolean(
+            item.isBudget ||
+            String(item.reserva || "").toUpperCase().startsWith("PRES-") ||
+            String(item.reserva || "").toUpperCase().startsWith("COT-") ||
+            String(item.estadoReserva || "").toLowerCase().includes("presup")
+          );
+
+          if (dailyStatusFilter === "confirmada") {
+            // Confirmadas (no anuladas): Solo reservas reales confirmadas del PMS (excluye presupuestos/cotizaciones sin confirmar y anuladas)
+            if (isAnul || isBudget) return false;
+          } else if (dailyStatusFilter === "presupuestos") {
+            // Solo presupuestos / cotizaciones
+            if (!isBudget || isAnul) return false;
+          } else if (dailyStatusFilter === "anulada") {
+            if (!isAnul) return false;
+          }
 
           if (dailyDistributionFilter === "requieren_atencion" && !item.requiresAttention) return false;
           if (dailyDistributionFilter === "confirmada_o_modificada" && !item.isDefinitive) return false;
@@ -13571,12 +13593,14 @@ const [customBudgetIdInput, setCustomBudgetIdInput] = useState("");
           dayMap[d].push(item);
         });
 
-        // 1. Días sin inventario de alojamiento
-        expectedDays.forEach((d) => {
-          if (!dayMap[d] || dayMap[d].length === 0) {
-            issues.push({ type: "missing_day", day: d, message: `El día ${d} no tiene habitaciones asignadas` });
-          }
-        });
+        // 1. Días sin inventario de alojamiento (solo para reservas reales, presupuestos aún no tienen rooming)
+        if (!isBudget) {
+          expectedDays.forEach((d) => {
+            if (!dayMap[d] || dayMap[d].length === 0) {
+              issues.push({ type: "missing_day", day: d, message: `El día ${d} no tiene habitaciones asignadas` });
+            }
+          });
+        }
 
         // 1b. Días con habitaciones fuera de las fechas de estancia (Entrada → Salida)
         Object.keys(dayMap).forEach((d) => {
@@ -13674,8 +13698,8 @@ const [customBudgetIdInput, setCustomBudgetIdInput] = useState("");
         let excelPax = 0;
 
         if (isBudget) {
-          // Para presupuestos internos de la aplicación:
-          if (contractedImporte > 0 && Math.abs(roomingTotal - contractedImporte) > 0.05) {
+          // Para presupuestos internos de la aplicación: solo comparar si se ha desglosado rooming y no cuadra ni con total ni con alojamiento
+          if (roomingTotal > 0 && contractedImporte > 0 && Math.abs(roomingTotal - contractedImporte) > 0.05 && Math.abs(lodgingTotal - contractedImporte) > 0.05) {
             warnings.push({
               type: "amount_mismatch",
               roomingTotal,
@@ -13853,8 +13877,8 @@ const [customBudgetIdInput, setCustomBudgetIdInput] = useState("");
             }
           }
 
-          // Incidencia F: Alertas de discrepancias de GroupOccupancyService
-          if (resEntry?.days && Array.isArray(resEntry.days)) {
+          // Incidencia F: Alertas de discrepancias de GroupOccupancyService (solo reservas reales de PMS, nunca presupuestos)
+          if (!isBudget && resEntry?.days && Array.isArray(resEntry.days)) {
             const occReasons = new Set();
             resEntry.days.forEach(d => {
               if (d.excelDifference?.hasDiff && Array.isArray(d.excelDifference.reasons)) {
@@ -17680,7 +17704,8 @@ const [customBudgetIdInput, setCustomBudgetIdInput] = useState("");
                                 className="bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-700 focus:outline-none focus:border-blue-500"
                               >
                                 <option value="confirmada">Confirmadas (no anuladas)</option>
-                                <option value="todos">Todas (incluye anuladas)</option>
+                                <option value="presupuestos">Presupuestos / Cotizaciones</option>
+                                <option value="todos">Todas (incluye presupuestos y anuladas)</option>
                                 <option value="anulada">Solo anuladas</option>
                               </select>
                             </div>
