@@ -20,6 +20,22 @@
 (function (global) {
   "use strict";
 
+  function parseNumSafe(val) {
+    if (typeof val === "number") return isNaN(val) ? 0.0 : val;
+    if (!val) return 0.0;
+    if (typeof window !== "undefined" && window.NexusUtils && typeof window.NexusUtils.parseNum === "function") {
+      return window.NexusUtils.parseNum(val);
+    }
+    var s = String(val).trim().replace(/€/g, "").replace(/\s/g, "");
+    if (s.includes(",") && s.includes(".")) {
+      s = (s.lastIndexOf(",") > s.lastIndexOf(".")) ? s.replace(/\./g, "").replace(",", ".") : s.replace(/,/g, "");
+    } else if (s.includes(",")) {
+      s = s.replace(",", ".");
+    }
+    var n = parseFloat(s);
+    return isNaN(n) ? 0.0 : n;
+  }
+
   // Catálogo base de regímenes: número de desayunos y comidas por persona y día
   var DEFAULT_REGIMEN_MEALS = {
     HA: { breakfasts: 0, meals: 0, label: "Solo Alojamiento" },
@@ -92,7 +108,7 @@
   function calculateDailyEconomicBreakdown(params) {
     var pax = parseInt(params.pax, 10) || 0;
     var regimen = params.regimen || "HA";
-    var dailyAmount = parseFloat(params.dailyAmount) || 0.0;
+    var dailyAmount = parseNumSafe(params.dailyAmount);
     var pricingConfig = params.pricingConfig || getPricingForHotelAndDate(params.hotel, params.fecha);
 
     var breakfastPrice = pricingConfig.breakfast;
@@ -238,11 +254,11 @@
         dayItem.contributingLines.forEach(function (line) {
           var noches = parseInt(line.noches, 10) || 1;
           if (noches <= 0) noches = 1;
-          var lineImp = parseFloat(line.importe) || 0.0;
+          var lineImp = parseNumSafe(line.importe);
           dailyAmount += (lineImp / noches);
         });
       } else if (dayItem.dailyAmount) {
-        dailyAmount = parseFloat(dayItem.dailyAmount) || 0.0;
+        dailyAmount = parseNumSafe(dayItem.dailyAmount);
       }
 
       var pricing = getPricingForHotelAndDate(dayItem.hotel, dayItem.fecha, configMap);

@@ -566,16 +566,57 @@
           label: days < 0 ? 'Pago pendiente vencido' : days === 0 ? 'Pago con vencimiento hoy' : 'Próximo vencimiento de pago' };
       };
 
+      // Consolidación de grupos por Reserva para evitar avisos duplicados por líneas múltiples
+      const consolidatedData = React.useMemo(() => {
+        if (!data || data.length === 0) return [];
+        const normalizeId = (id) => (typeof window !== "undefined" && window.NexusUtils?.normalizeId)
+          ? window.NexusUtils.normalizeId(id)
+          : String(id || "").trim().replace(/\.0$/, "").replace(/[\/\\]/g, "-");
+
+        const groupMap = new Map();
+        data.forEach(row => {
+          if (!row) return;
+          const resId = normalizeId(row.Reserva || row.Com_Id || row.id || row._docId);
+          if (!resId) return;
+
+          if (!groupMap.has(resId)) {
+            groupMap.set(resId, {
+              ...row,
+              id: resId,
+              Reserva: row.Reserva || resId,
+              records: [row]
+            });
+          } else {
+            const existing = groupMap.get(resId);
+            existing.records.push(row);
+            if (row.Logistica_Rooming) existing.Logistica_Rooming = true;
+            if (row.Logistica_MenuMP) existing.Logistica_MenuMP = true;
+            if (row.Logistica_MenuPC) existing.Logistica_MenuPC = true;
+            if (row.PaymentPlan_JSON && (!existing.PaymentPlan_JSON || existing.PaymentPlan_JSON === "[]")) {
+              existing.PaymentPlan_JSON = row.PaymentPlan_JSON;
+            }
+            if (row.RoomingList_JSON && (!existing.RoomingList_JSON || existing.RoomingList_JSON === "[]")) {
+              existing.RoomingList_JSON = row.RoomingList_JSON;
+            }
+            if (!existing.Com_Comercial && row.Com_Comercial) existing.Com_Comercial = row.Com_Comercial;
+            if (!existing.Comercial && row.Comercial) existing.Comercial = row.Comercial;
+            if (!existing["Nombre del Grupo"] && row["Nombre del Grupo"]) existing["Nombre del Grupo"] = row["Nombre del Grupo"];
+            if (row.Es_Credito === true || row.Com_Es_Credito === true) existing.Es_Credito = true;
+          }
+        });
+        return Array.from(groupMap.values());
+      }, [data]);
+
       // Filtrado por hotel seleccionado
       const filteredGroups = React.useMemo(() => {
-        if (selectedHotel === "todos") return data || [];
-        return (data || []).filter((g) => {
+        if (selectedHotel === "todos") return consolidatedData;
+        return consolidatedData.filter((g) => {
           const hotel = (g.Hotel_Asignado || g.Hotel || "").toLowerCase();
           if (selectedHotel === "guadiana") return hotel.includes("guad") || hotel.includes("guadiana");
           if (selectedHotel === "cumbria") return hotel.includes("cumb") || hotel.includes("cumbria");
           return true;
         });
-      }, [data, selectedHotel]);
+      }, [consolidatedData, selectedHotel]);
 
       // Cálculo de contadores para las pestañas de hotel (sobre el total sin filtrar por hotel)
       const counts = React.useMemo(() => {
@@ -593,7 +634,7 @@
         const twentyFiveDaysFromNow = new Date(startOfToday);
         twentyFiveDaysFromNow.setDate(twentyFiveDaysFromNow.getDate() + 25);
 
-        (data || []).forEach(g => {
+        consolidatedData.forEach(g => {
           if (selectedComercial !== "todos") {
             const cName = (g.Com_Comercial || g.Comercial || "").trim().toUpperCase();
             if (selectedComercial === "sin_asignar") {
@@ -668,11 +709,12 @@
         });
 
         return { total, cumbria, guadiana };
-      }, [data, selectedComercial]);
+      }, [consolidatedData, selectedComercial]);
 
       // 1. Todas las alertas consolidadas para el hotel seleccionado (sin duplicar grupos)
       const allHotelAlerts = React.useMemo(() => {
         const alertsList = [];
+        const seenReservas = new Set();
         const now = new Date();
         const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
         const fiveDaysFromNow = new Date(startOfToday);
@@ -683,7 +725,9 @@
         twentyFiveDaysFromNow.setDate(twentyFiveDaysFromNow.getDate() + 25);
 
         filteredGroups.forEach((g) => {
-          const resId = g.Reserva || g.Com_Id || "";
+          const resId = String(g.Reserva || g.Com_Id || g.id || "").trim();
+          if (!resId || seenReservas.has(resId)) return;
+          seenReservas.add(resId);
           const status = ((g.Com_Estado_Interno || g["Segment."] || "") + " " + (g.Estado || "")).toUpperCase();
           const isCancelled = ["CANCEL", "ANUL", "BAJA", "DESESTIMADO", "GASTOS", "DESGLOSADO", "CADUC"].some(s => status.includes(s)) || g.excludeFromStatistics === true;
           
@@ -881,14 +925,14 @@
         });
 
         // Asegurar que comerciales existentes en los datos también estén disponibles en la lista
-        (data || []).forEach(g => {
+        (consolidatedData || []).forEach(g => {
           const com = (g.Com_Comercial || g.Comercial || "").trim().toUpperCase();
           if (com) nameSet.add(com);
         });
 
         const list = Array.from(nameSet).sort((a, b) => a.localeCompare(b, "es", { sensitivity: "base" }));
         return { commercialList: list, commercialCounts: countsMap };
-      }, [allHotelAlerts, data]);
+      }, [allHotelAlerts, consolidatedData]);
 
       // 3. Cálculo de las 5 columnas filtradas según el comercial seleccionado
       const columnsData = React.useMemo(() => {

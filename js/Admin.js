@@ -621,16 +621,55 @@ var Dashboard = function Dashboard(_ref2) {
     };
   };
 
+  // Consolidación de grupos por Reserva para evitar avisos duplicados por líneas múltiples
+  var consolidatedData = React.useMemo(function () {
+    if (!data || data.length === 0) return [];
+    var normalizeId = function normalizeId(id) {
+      var _window$NexusUtils;
+      return typeof window !== "undefined" && (_window$NexusUtils = window.NexusUtils) !== null && _window$NexusUtils !== void 0 && _window$NexusUtils.normalizeId ? window.NexusUtils.normalizeId(id) : String(id || "").trim().replace(/\.0$/, "").replace(/[\/\\]/g, "-");
+    };
+    var groupMap = new Map();
+    data.forEach(function (row) {
+      if (!row) return;
+      var resId = normalizeId(row.Reserva || row.Com_Id || row.id || row._docId);
+      if (!resId) return;
+      if (!groupMap.has(resId)) {
+        groupMap.set(resId, _objectSpread(_objectSpread({}, row), {}, {
+          id: resId,
+          Reserva: row.Reserva || resId,
+          records: [row]
+        }));
+      } else {
+        var existing = groupMap.get(resId);
+        existing.records.push(row);
+        if (row.Logistica_Rooming) existing.Logistica_Rooming = true;
+        if (row.Logistica_MenuMP) existing.Logistica_MenuMP = true;
+        if (row.Logistica_MenuPC) existing.Logistica_MenuPC = true;
+        if (row.PaymentPlan_JSON && (!existing.PaymentPlan_JSON || existing.PaymentPlan_JSON === "[]")) {
+          existing.PaymentPlan_JSON = row.PaymentPlan_JSON;
+        }
+        if (row.RoomingList_JSON && (!existing.RoomingList_JSON || existing.RoomingList_JSON === "[]")) {
+          existing.RoomingList_JSON = row.RoomingList_JSON;
+        }
+        if (!existing.Com_Comercial && row.Com_Comercial) existing.Com_Comercial = row.Com_Comercial;
+        if (!existing.Comercial && row.Comercial) existing.Comercial = row.Comercial;
+        if (!existing["Nombre del Grupo"] && row["Nombre del Grupo"]) existing["Nombre del Grupo"] = row["Nombre del Grupo"];
+        if (row.Es_Credito === true || row.Com_Es_Credito === true) existing.Es_Credito = true;
+      }
+    });
+    return Array.from(groupMap.values());
+  }, [data]);
+
   // Filtrado por hotel seleccionado
   var filteredGroups = React.useMemo(function () {
-    if (selectedHotel === "todos") return data || [];
-    return (data || []).filter(function (g) {
+    if (selectedHotel === "todos") return consolidatedData;
+    return consolidatedData.filter(function (g) {
       var hotel = (g.Hotel_Asignado || g.Hotel || "").toLowerCase();
       if (selectedHotel === "guadiana") return hotel.includes("guad") || hotel.includes("guadiana");
       if (selectedHotel === "cumbria") return hotel.includes("cumb") || hotel.includes("cumbria");
       return true;
     });
-  }, [data, selectedHotel]);
+  }, [consolidatedData, selectedHotel]);
 
   // Cálculo de contadores para las pestañas de hotel (sobre el total sin filtrar por hotel)
   var counts = React.useMemo(function () {
@@ -646,7 +685,7 @@ var Dashboard = function Dashboard(_ref2) {
     fifteenDaysFromNow.setDate(fifteenDaysFromNow.getDate() + 15);
     var twentyFiveDaysFromNow = new Date(startOfToday);
     twentyFiveDaysFromNow.setDate(twentyFiveDaysFromNow.getDate() + 25);
-    (data || []).forEach(function (g) {
+    consolidatedData.forEach(function (g) {
       if (selectedComercial !== "todos") {
         var cName = (g.Com_Comercial || g.Comercial || "").trim().toUpperCase();
         if (selectedComercial === "sin_asignar") {
@@ -719,11 +758,12 @@ var Dashboard = function Dashboard(_ref2) {
       cumbria: cumbria,
       guadiana: guadiana
     };
-  }, [data, selectedComercial]);
+  }, [consolidatedData, selectedComercial]);
 
   // 1. Todas las alertas consolidadas para el hotel seleccionado (sin duplicar grupos)
   var allHotelAlerts = React.useMemo(function () {
     var alertsList = [];
+    var seenReservas = new Set();
     var now = new Date();
     var startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     var fiveDaysFromNow = new Date(startOfToday);
@@ -733,7 +773,9 @@ var Dashboard = function Dashboard(_ref2) {
     var twentyFiveDaysFromNow = new Date(startOfToday);
     twentyFiveDaysFromNow.setDate(twentyFiveDaysFromNow.getDate() + 25);
     filteredGroups.forEach(function (g) {
-      var resId = g.Reserva || g.Com_Id || "";
+      var resId = String(g.Reserva || g.Com_Id || g.id || "").trim();
+      if (!resId || seenReservas.has(resId)) return;
+      seenReservas.add(resId);
       var status = ((g.Com_Estado_Interno || g["Segment."] || "") + " " + (g.Estado || "")).toUpperCase();
       var isCancelled = ["CANCEL", "ANUL", "BAJA", "DESESTIMADO", "GASTOS", "DESGLOSADO", "CADUC"].some(function (s) {
         return status.includes(s);
@@ -929,7 +971,7 @@ var Dashboard = function Dashboard(_ref2) {
       });
 
       // Asegurar que comerciales existentes en los datos también estén disponibles en la lista
-      (data || []).forEach(function (g) {
+      (consolidatedData || []).forEach(function (g) {
         var com = (g.Com_Comercial || g.Comercial || "").trim().toUpperCase();
         if (com) nameSet.add(com);
       });
@@ -942,7 +984,7 @@ var Dashboard = function Dashboard(_ref2) {
         commercialList: list,
         commercialCounts: countsMap
       };
-    }, [allHotelAlerts, data]),
+    }, [allHotelAlerts, consolidatedData]),
     commercialList = _React$useMemo.commercialList,
     commercialCounts = _React$useMemo.commercialCounts;
 

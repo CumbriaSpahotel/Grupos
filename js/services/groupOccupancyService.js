@@ -558,6 +558,16 @@
                          savedDistributionsByReserva[entry.reserva] || {};
       var dateSaved = reservaSaved[entry.fecha] || null;
 
+      // Comprobar si la reserva es un presupuesto/cotización interno de la aplicación
+      var isBudgetRes = Boolean(
+        String(entry.reserva || "").toUpperCase().startsWith("PRES-") ||
+        String(entry.reserva || "").toUpperCase().startsWith("COT-") ||
+        (entry.estado && String(entry.estado).toLowerCase().includes("presup")) ||
+        (entry.contributingLines || []).some(function(cl) {
+          return cl.isBudget === true || (cl.estado && String(cl.estado).toLowerCase().includes("presup"));
+        })
+      );
+
       var proposal = generateDefaultProposal(entry.pax);
       var activeDist = null;
       var status = "propuesta"; // 'pendiente' | 'propuesta' | 'confirmada' | 'modificada' | 'validada_sin_cambios' | 'revision_necesaria'
@@ -574,24 +584,29 @@
         reviewedAt = dateSaved.reviewedAt || "";
 
         // Si tiene snapshot de validación previa, comparar huella y campos clave (Req 12)
+        // REGLA: Los presupuestos creados en la aplicación no sufren cambios de origen de Excel
         if (dateSaved.validationSnapshot && (status === "confirmada" || status === "modificada" || status === "validada_sin_cambios")) {
-          var comp = compareOriginWithSnapshot(entry.contributingLines, dateSaved.validationSnapshot);
-          if (!comp.isMatch) {
-            status = "revision_necesaria";
-            revisionReasons = comp.reasons;
-            previousDistribution = {
-              individuales: parseInt(dateSaved.individuales, 10) || 0,
-              dobles: parseInt(dateSaved.dobles, 10) || 0,
-              triples: parseInt(dateSaved.triples, 10) || 0,
-              cuadruples: parseInt(dateSaved.cuadruples, 10) || 0,
-              totalHabitaciones: (parseInt(dateSaved.individuales, 10) || 0) +
-                                 (parseInt(dateSaved.dobles, 10) || 0) +
-                                 (parseInt(dateSaved.triples, 10) || 0) +
-                                 (parseInt(dateSaved.cuadruples, 10) || 0),
-              status: dateSaved.status
-            };
-          } else {
+          if (isBudgetRes) {
             status = "validada_sin_cambios";
+          } else {
+            var comp = compareOriginWithSnapshot(entry.contributingLines, dateSaved.validationSnapshot);
+            if (!comp.isMatch) {
+              status = "revision_necesaria";
+              revisionReasons = comp.reasons;
+              previousDistribution = {
+                individuales: parseInt(dateSaved.individuales, 10) || 0,
+                dobles: parseInt(dateSaved.dobles, 10) || 0,
+                triples: parseInt(dateSaved.triples, 10) || 0,
+                cuadruples: parseInt(dateSaved.cuadruples, 10) || 0,
+                totalHabitaciones: (parseInt(dateSaved.individuales, 10) || 0) +
+                                   (parseInt(dateSaved.dobles, 10) || 0) +
+                                   (parseInt(dateSaved.triples, 10) || 0) +
+                                   (parseInt(dateSaved.cuadruples, 10) || 0),
+                status: dateSaved.status
+              };
+            } else {
+              status = "validada_sin_cambios";
+            }
           }
         }
 
@@ -851,14 +866,18 @@
         if (typeof impVal === "number") {
           imp = isNaN(impVal) ? 0 : impVal;
         } else if (impVal) {
-          var s = String(impVal).trim().replace(/€/g, "").replace(/\s/g, "");
-          if (s.includes(",") && s.includes(".")) {
-            s = (s.lastIndexOf(",") > s.lastIndexOf(".")) ? s.replace(/\./g, "").replace(",", ".") : s.replace(/,/g, "");
-          } else if (s.includes(",")) {
-            s = s.replace(",", ".");
+          if (typeof window !== "undefined" && window.NexusUtils && typeof window.NexusUtils.parseNum === "function") {
+            imp = window.NexusUtils.parseNum(impVal);
+          } else {
+            var s = String(impVal).trim().replace(/€/g, "").replace(/\s/g, "");
+            if (s.includes(",") && s.includes(".")) {
+              s = (s.lastIndexOf(",") > s.lastIndexOf(".")) ? s.replace(/\./g, "").replace(",", ".") : s.replace(/,/g, "");
+            } else if (s.includes(",")) {
+              s = s.replace(",", ".");
+            }
+            var n = parseFloat(s);
+            imp = isNaN(n) ? 0 : n;
           }
-          var n = parseFloat(s);
-          imp = isNaN(n) ? 0 : n;
         }
         excelDayAmount += (imp / nch);
       });
@@ -867,112 +886,120 @@
       var hasExcelDiff = false;
       var excelDiffReasons = [];
 
-      // Comprobar si el grupo tiene aceptadas las diferencias en su registro
-      var acceptedApprovals = {};
-      (entry.contributingLines || []).forEach(function (cl) {
-        if (cl.acceptedDifferences) {
-          try {
-            var parsedAcc = typeof cl.acceptedDifferences === "string" ? JSON.parse(cl.acceptedDifferences) : cl.acceptedDifferences;
-            if (parsedAcc && typeof parsedAcc === "object") {
-              Object.assign(acceptedApprovals, parsedAcc);
-            }
-          } catch(e) {}
-        }
-      });
-      var isMissingDayAccepted = Boolean(
-        acceptedApprovals["missing_day:" + entry.fecha] ||
-        acceptedApprovals["missing_day"] ||
-        Object.values(acceptedApprovals).some(function(v){
-          return v && (v.category === "missing_day:" + entry.fecha || (v.type === "missing_day" && (!v.day || v.day === entry.fecha)));
-        })
-      );
-      if (!hasRoomingDayLodging && isMissingDayAccepted) {
-        return;
-      }
-      var isRegimenAccepted = Boolean(
-        acceptedApprovals["excel_regimen_mismatch"] ||
-        Object.values(acceptedApprovals).some(function(v){
-          return v && (v.category === "excel_regimen_mismatch" || v.type === "excel_regimen_mismatch");
-        })
-      );
-      var isAmountAccepted = Boolean(
-        acceptedApprovals["excel_amount_mismatch"] ||
-        Object.values(acceptedApprovals).some(function(v){
-          return v && (v.category === "excel_amount_mismatch" || v.type === "excel_amount_mismatch");
-        })
-      );
-
-      var normFichaReg = normalizeRegimenLocal(foundRoomingReg || finalRegimen);
-      var normExcelReg = normalizeRegimenLocal(excelRegimen);
-      if (normFichaReg && normExcelReg && normFichaReg !== normExcelReg && !isRegimenAccepted) {
-        hasExcelDiff = true;
-        excelDiffReasons.push("Régimen: Ficha (" + (foundRoomingReg || finalRegimen) + ") vs Excel (" + excelRegimen + ")");
-      }
-      var totalStayRoomingSum = 0;
-      var totalStayLodgingSum = 0;
-      var totalStayServicesSum = 0;
-      var totalStayExcelSum = 0;
-      var seenStayRooming = new Set();
-      (entry.contributingLines || []).forEach(function (cl) {
-        var impVal = cl.importe;
-        var imp = 0;
-        if (typeof impVal === "number") {
-          imp = isNaN(impVal) ? 0 : impVal;
-        } else if (impVal) {
-          var s = String(impVal).trim().replace(/€/g, "").replace(/\s/g, "");
-          if (s.includes(",") && s.includes(".")) {
-            s = (s.lastIndexOf(",") > s.lastIndexOf(".")) ? s.replace(/\./g, "").replace(",", ".") : s.replace(/,/g, "");
-          } else if (s.includes(",")) {
-            s = s.replace(",", ".");
-          }
-          var n = parseFloat(s);
-          imp = isNaN(n) ? 0 : n;
-        }
-        totalStayExcelSum += imp;
-
-        if (cl.roomingList) {
-          var rk = typeof cl.roomingList === "string" ? cl.roomingList.trim() : JSON.stringify(cl.roomingList);
-          if (rk && rk !== "[]" && rk !== "{}" && !seenStayRooming.has(rk)) {
-            seenStayRooming.add(rk);
+      // REGLA: Un presupuesto / cotización de la aplicación NUNCA puede estar en diferencias con el Excel
+      // porque solo se realiza desde la app y no existe en el PMS ni en el Excel hasta que se confirma.
+      if (!isBudgetRes) {
+        // Comprobar si el grupo tiene aceptadas las diferencias en su registro
+        var acceptedApprovals = {};
+        (entry.contributingLines || []).forEach(function (cl) {
+          if (cl.acceptedDifferences) {
             try {
-              var rArr = typeof cl.roomingList === "string" ? JSON.parse(cl.roomingList) : cl.roomingList;
-              if (Array.isArray(rArr)) {
-                rArr.forEach(function(rm) {
-                  var t = String(rm.type || rm.roomType || "").toUpperCase();
-                  var tClean = t.replace(/^(HAB\.|HABITACIÓN|HABITACION|HAB)\s+/i, "").trim();
-                  var isPureService = rm.isService === true && !(/IND|DUI|SINGLE|DOB|DBL|TWIN|TRI|TPL|CUA|SUI|HAB/i.test(tClean));
-                  var p = parseFloat(rm.total !== undefined ? rm.total : (parseFloat(rm.price) * (parseInt(rm.qty, 10) || 1) * (parseInt(rm.nights, 10) || 1))) || 0;
-                  if (!isPureService) {
-                    totalStayLodgingSum += p;
-                  } else {
-                    totalStayServicesSum += p;
-                  }
-                  totalStayRoomingSum += p;
-                });
+              var parsedAcc = typeof cl.acceptedDifferences === "string" ? JSON.parse(cl.acceptedDifferences) : cl.acceptedDifferences;
+              if (parsedAcc && typeof parsedAcc === "object") {
+                Object.assign(acceptedApprovals, parsedAcc);
               }
             } catch(e) {}
           }
+        });
+        var isMissingDayAccepted = Boolean(
+          acceptedApprovals["missing_day:" + entry.fecha] ||
+          acceptedApprovals["missing_day"] ||
+          Object.values(acceptedApprovals).some(function(v){
+            return v && (v.category === "missing_day:" + entry.fecha || (v.type === "missing_day" && (!v.day || v.day === entry.fecha)));
+          })
+        );
+        if (!hasRoomingDayLodging && isMissingDayAccepted) {
+          return;
         }
-      });
-      totalStayExcelSum = Math.round(totalStayExcelSum * 100) / 100;
-      totalStayRoomingSum = Math.round(totalStayRoomingSum * 100) / 100;
-      totalStayLodgingSum = Math.round(totalStayLodgingSum * 100) / 100;
-      totalStayServicesSum = Math.round(totalStayServicesSum * 100) / 100;
+        var isRegimenAccepted = Boolean(
+          acceptedApprovals["excel_regimen_mismatch"] ||
+          Object.values(acceptedApprovals).some(function(v){
+            return v && (v.category === "excel_regimen_mismatch" || v.type === "excel_regimen_mismatch");
+          })
+        );
+        var isAmountAccepted = Boolean(
+          acceptedApprovals["excel_amount_mismatch"] ||
+          Object.values(acceptedApprovals).some(function(v){
+            return v && (v.category === "excel_amount_mismatch" || v.type === "excel_amount_mismatch");
+          })
+        );
 
-      if (hasRoomingDayLodging && roomingDaySum > 0 && excelDayAmount > 0) {
-        if (totalStayRoomingSum > 0 && totalStayExcelSum > 0) {
-          var lodgingDiff = Math.abs(totalStayLodgingSum - totalStayExcelSum);
-          var totalDiff = Math.abs(totalStayRoomingSum - totalStayExcelSum);
-          // Solo marcar diferencia con Excel si NI el alojamiento NI el total cuadran con Excel
-          if (lodgingDiff > 1.0 && totalDiff > 1.0 && !isAmountAccepted) {
-            hasExcelDiff = true;
-            excelDiffReasons.push("Importe reserva: Ficha (" + (totalStayLodgingSum > 0 ? totalStayLodgingSum.toFixed(2) : totalStayRoomingSum.toFixed(2)) + " €) vs Excel (" + totalStayExcelSum.toFixed(2) + " €)");
+        var normFichaReg = normalizeRegimenLocal(foundRoomingReg || finalRegimen);
+        var normExcelReg = normalizeRegimenLocal(excelRegimen);
+        if (normFichaReg && normExcelReg && normFichaReg !== normExcelReg && !isRegimenAccepted) {
+          hasExcelDiff = true;
+          excelDiffReasons.push("Régimen: Ficha (" + (foundRoomingReg || finalRegimen) + ") vs Excel (" + excelRegimen + ")");
+        }
+        var totalStayRoomingSum = 0;
+        var totalStayLodgingSum = 0;
+        var totalStayServicesSum = 0;
+        var totalStayExcelSum = 0;
+        var seenStayRooming = new Set();
+        (entry.contributingLines || []).forEach(function (cl) {
+          var impVal = cl.importe;
+          var imp = 0;
+          if (typeof impVal === "number") {
+            imp = isNaN(impVal) ? 0 : impVal;
+          } else if (impVal) {
+            if (typeof window !== "undefined" && window.NexusUtils && typeof window.NexusUtils.parseNum === "function") {
+              imp = window.NexusUtils.parseNum(impVal);
+            } else {
+              var s = String(impVal).trim().replace(/€/g, "").replace(/\s/g, "");
+              if (s.includes(",") && s.includes(".")) {
+                s = (s.lastIndexOf(",") > s.lastIndexOf(".")) ? s.replace(/\./g, "").replace(",", ".") : s.replace(/,/g, "");
+              } else if (s.includes(",")) {
+                s = s.replace(",", ".");
+              }
+              var n = parseFloat(s);
+              imp = isNaN(n) ? 0 : n;
+            }
           }
-        } else {
-          var diffAmt = Math.abs(roomingDaySum - excelDayAmount);
-          if (diffAmt > 1.0 && !isAmountAccepted) {
-            hasExcelDiff = true;
-            excelDiffReasons.push("Importe día: Ficha (" + roomingDaySum.toFixed(2) + " €) vs Excel (" + excelDayAmount.toFixed(2) + " €)");
+          totalStayExcelSum += imp;
+
+          if (cl.roomingList) {
+            var rk = typeof cl.roomingList === "string" ? cl.roomingList.trim() : JSON.stringify(cl.roomingList);
+            if (rk && rk !== "[]" && rk !== "{}" && !seenStayRooming.has(rk)) {
+              seenStayRooming.add(rk);
+              try {
+                var rArr = typeof cl.roomingList === "string" ? JSON.parse(cl.roomingList) : cl.roomingList;
+                if (Array.isArray(rArr)) {
+                  rArr.forEach(function(rm) {
+                    var t = String(rm.type || rm.roomType || "").toUpperCase();
+                    var tClean = t.replace(/^(HAB\.|HABITACIÓN|HABITACION|HAB)\s+/i, "").trim();
+                    var isPureService = rm.isService === true && !(/IND|DUI|SINGLE|DOB|DBL|TWIN|TRI|TPL|CUA|SUI|HAB/i.test(tClean));
+                    var p = parseFloat(rm.total !== undefined ? rm.total : (parseFloat(rm.price) * (parseInt(rm.qty, 10) || 1) * (parseInt(rm.nights, 10) || 1))) || 0;
+                    if (!isPureService) {
+                      totalStayLodgingSum += p;
+                    } else {
+                      totalStayServicesSum += p;
+                    }
+                    totalStayRoomingSum += p;
+                  });
+                }
+              } catch(e) {}
+            }
+          }
+        });
+        totalStayExcelSum = Math.round(totalStayExcelSum * 100) / 100;
+        totalStayRoomingSum = Math.round(totalStayRoomingSum * 100) / 100;
+        totalStayLodgingSum = Math.round(totalStayLodgingSum * 100) / 100;
+        totalStayServicesSum = Math.round(totalStayServicesSum * 100) / 100;
+
+        if (hasRoomingDayLodging && roomingDaySum > 0 && excelDayAmount > 0) {
+          if (totalStayRoomingSum > 0 && totalStayExcelSum > 0) {
+            var lodgingDiff = Math.abs(totalStayLodgingSum - totalStayExcelSum);
+            var totalDiff = Math.abs(totalStayRoomingSum - totalStayExcelSum);
+            // Solo marcar diferencia con Excel si NI el alojamiento NI el total cuadran con Excel
+            if (lodgingDiff > 1.0 && totalDiff > 1.0 && !isAmountAccepted) {
+              hasExcelDiff = true;
+              excelDiffReasons.push("Importe reserva: Ficha (" + (totalStayLodgingSum > 0 ? totalStayLodgingSum.toFixed(2) : totalStayRoomingSum.toFixed(2)) + " €) vs Excel (" + totalStayExcelSum.toFixed(2) + " €)");
+            }
+          } else {
+            var diffAmt = Math.abs(roomingDaySum - excelDayAmount);
+            if (diffAmt > 1.0 && !isAmountAccepted) {
+              hasExcelDiff = true;
+              excelDiffReasons.push("Importe día: Ficha (" + roomingDaySum.toFixed(2) + " €) vs Excel (" + excelDayAmount.toFixed(2) + " €)");
+            }
           }
         }
       }

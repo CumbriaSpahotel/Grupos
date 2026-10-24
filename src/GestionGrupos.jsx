@@ -6685,7 +6685,7 @@ const [customBudgetIdInput, setCustomBudgetIdInput] = useState("");
             } else if (day.contributingLines && day.contributingLines.length > 0) {
               day.contributingLines.forEach(l => {
                 const nch = parseInt(l.noches, 10) || 1;
-                dayImp += ((parseFloat(l.importe) || 0) / Math.max(1, nch));
+                dayImp += ((parseNum(l.importe) || 0) / Math.max(1, nch));
               });
             }
             totalImp += dayImp;
@@ -18015,7 +18015,7 @@ const [customBudgetIdInput, setCustomBudgetIdInput] = useState("");
                                            } else if (day.contributingLines && day.contributingLines.length > 0) {
                                              day.contributingLines.forEach(l => {
                                                const nch = parseInt(l.noches, 10) || 1;
-                                               dayImp += ((parseFloat(l.importe) || 0) / Math.max(1, nch));
+                                               dayImp += ((parseNum(l.importe) || 0) / Math.max(1, nch));
                                              });
                                            }
 
