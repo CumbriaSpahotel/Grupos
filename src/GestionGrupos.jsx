@@ -17619,18 +17619,14 @@ const [customBudgetIdInput, setCustomBudgetIdInput] = useState("");
                   </div>
 
                   <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowAgencyDepositsModal(true);
-                        loadAgencyDeposits();
-                      }}
+                    <a
+                      href="Depositos.html"
                       className="px-3.5 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 rounded-xl text-xs font-bold transition flex items-center gap-2 border border-emerald-200 shadow-2xs"
-                      title="Gestión de Depósitos y Saldos de Agencias a lo largo del año"
+                      title="Abrir Módulo de Depósitos y Saldos de Agencias"
                     >
                       <span className="text-sm">💰</span>
                       <span>Depósitos de Agencias</span>
-                    </button>
+                    </a>
                     {groupsSubView === "daily" && (
                       <div className="flex items-center bg-slate-100 p-1 rounded-xl gap-1">
                         <button

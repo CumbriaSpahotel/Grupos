@@ -276,7 +276,7 @@
                   if (item.id === "groups")
                     window.location.href = "Gestion-de-Grupos.html";
                   else if (item.id === "deposits")
-                    window.location.href = "Gestion-de-Grupos.html?modal=depositos";
+                    window.location.href = "Depositos.html";
                   else if (item.id === "peticiones")
                     window.location.href = "Peticiones.html";
                   else if (item.id === "budgets")

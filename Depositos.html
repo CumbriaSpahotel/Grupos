@@ -1,0 +1,1025 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nexus Groups - Depósitos y Saldos de Agencias</title>
+    <link rel="icon" type="image/png" href="Nexus Groups/Nexus_Groups_ICO-removebg-preview.png" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ["Inter", "ui-sans-serif", "system-ui"],
+                        outfit: ["Outfit", "sans-serif"],
+                    },
+                },
+            },
+        };
+    </script>
+    <link rel="stylesheet" href="style.css?v=1.2.0-full-width" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Outfit:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+    <script src="https://cdn.jsdelivr.net/npm/lucide/dist/umd/lucide.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
+
+    <style>
+        :root {
+            --nexus-bg: #f8fafc;
+            --nexus-card: #ffffff;
+            --nexus-accent: #059669;
+            --nexus-accent-light: rgba(16, 185, 129, 0.1);
+            --nexus-border: #e2e8f0;
+            --nexus-text: #0f172a;
+            --nexus-text-dim: #64748b;
+        }
+        body {
+            font-family: "Outfit", sans-serif;
+            background-color: var(--nexus-bg);
+            color: var(--nexus-text);
+            margin: 0;
+            overflow-x: hidden;
+        }
+        .premium-card {
+            background: var(--nexus-card);
+            border: 1px solid var(--nexus-border);
+            border-radius: 1.5rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.04), 0 2px 4px -1px rgba(0, 0, 0, 0.02);
+        }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        
+        @media print {
+            header, .no-print, nav, .nexus-header {
+                display: none !important;
+            }
+            body {
+                background: white !important;
+                color: black !important;
+            }
+            .print-only {
+                display: block !important;
+            }
+            .print-card {
+                box-shadow: none !important;
+                border: 1px solid #ccc !important;
+            }
+        }
+    </style>
+</head>
+<body class="bg-slate-50 min-h-screen text-slate-800 flex flex-col">
+
+    <!-- Configuración Firebase y Servicios -->
+    <script src="js/firebase-config.js"></script>
+    <script src="js/firebase-init.js"></script>
+    <script src="js/services/agencyDepositService.js"></script>
+    <script src="js/navigation.js?v=2-shared-listener"></script>
+
+    <!-- Contenedor Principal -->
+    <main class="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 flex flex-col gap-6">
+
+        <!-- Cabecera de Página -->
+        <header class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 pt-2">
+            <div>
+                <div class="flex items-center gap-2 text-emerald-600 text-xs font-black uppercase tracking-wider">
+                    <span>💼 MÓDULO FINANCIERO</span>
+                    <span>·</span>
+                    <span>CUENTAS CORRIENTES Y PREPAGOS</span>
+                </div>
+                <h1 class="text-2xl sm:text-3xl font-black text-slate-900 font-outfit tracking-tight flex items-center gap-2">
+                    Depósitos y Saldos de Agencias
+                </h1>
+                <p class="text-xs sm:text-sm text-slate-500 font-medium">
+                    Gestión de bolsas de depósito anuales · Descuento directo en habitaciones individuales y reservas de grupo
+                </p>
+            </div>
+
+            <div class="flex items-center gap-2 flex-wrap">
+                <button
+                    onclick="openNewDepositModal()"
+                    class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl font-black text-xs uppercase tracking-wider transition shadow-lg shadow-emerald-600/20 active:scale-95 flex items-center gap-2"
+                >
+                    <i data-lucide="plus" class="w-4 h-4"></i>
+                    <span>Ingresar Saldo</span>
+                </button>
+
+                <button
+                    onclick="openDeductModal()"
+                    class="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-2xl font-black text-xs uppercase tracking-wider transition shadow-lg shadow-slate-900/10 active:scale-95 flex items-center gap-2"
+                >
+                    <i data-lucide="minus" class="w-4 h-4"></i>
+                    <span>Descontar Reserva / Habitación</span>
+                </button>
+
+                <button
+                    onclick="window.print()"
+                    class="px-3.5 py-2.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-2xl font-black text-xs transition shadow-xs flex items-center gap-1.5"
+                    title="Imprimir extracto para la agencia"
+                >
+                    <i data-lucide="printer" class="w-4 h-4"></i>
+                    <span class="hidden sm:inline">Imprimir Extracto</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- KPIs Resumen Global -->
+        <section class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+            <div class="premium-card p-4 sm:p-5 flex flex-col justify-between">
+                <div class="flex items-center justify-between text-slate-400">
+                    <span class="text-[11px] font-bold uppercase tracking-wider">Saldo Total Disponible</span>
+                    <i data-lucide="wallet" class="w-4 h-4 text-emerald-500"></i>
+                </div>
+                <div id="kpi-total-balance" class="text-2xl sm:text-3xl font-black text-emerald-600 font-outfit mt-2">
+                    0,00 €
+                </div>
+                <div class="text-[10px] text-slate-400 font-medium mt-1">Fondos disponibles para descontar</div>
+            </div>
+
+            <div class="premium-card p-4 sm:p-5 flex flex-col justify-between">
+                <div class="flex items-center justify-between text-slate-400">
+                    <span class="text-[11px] font-bold uppercase tracking-wider">Total Ingresado en el Año</span>
+                    <i data-lucide="arrow-down-left" class="w-4 h-4 text-slate-600"></i>
+                </div>
+                <div id="kpi-total-deposited" class="text-2xl sm:text-3xl font-black text-slate-800 font-outfit mt-2">
+                    0,00 €
+                </div>
+                <div class="text-[10px] text-slate-400 font-medium mt-1">Depósitos recibidos acumulados</div>
+            </div>
+
+            <div class="premium-card p-4 sm:p-5 flex flex-col justify-between">
+                <div class="flex items-center justify-between text-slate-400">
+                    <span class="text-[11px] font-bold uppercase tracking-wider">Total Consumido / Descontado</span>
+                    <i data-lucide="arrow-up-right" class="w-4 h-4 text-indigo-600"></i>
+                </div>
+                <div id="kpi-total-consumed" class="text-2xl sm:text-3xl font-black text-indigo-600 font-outfit mt-2">
+                    0,00 €
+                </div>
+                <div class="text-[10px] text-slate-400 font-medium mt-1">Imputado a habitaciones y grupos</div>
+            </div>
+
+            <div class="premium-card p-4 sm:p-5 flex flex-col justify-between">
+                <div class="flex items-center justify-between text-slate-400">
+                    <span class="text-[11px] font-bold uppercase tracking-wider">Agencias con Saldo</span>
+                    <i data-lucide="building-2" class="w-4 h-4 text-slate-500"></i>
+                </div>
+                <div id="kpi-total-agencies" class="text-2xl sm:text-3xl font-black text-slate-800 font-outfit mt-2">
+                    0
+                </div>
+                <div class="text-[10px] text-slate-400 font-medium mt-1">Cuentas activas en el sistema</div>
+            </div>
+        </section>
+
+        <!-- Zona Principal: Dos Columnas -->
+        <section class="grid grid-cols-1 lg:grid-cols-12 gap-6 flex-1 min-h-[500px]">
+
+            <!-- Columna Izquierda: Listado de Agencias (4 de 12) -->
+            <div class="lg:col-span-4 flex flex-col gap-3">
+                <div class="premium-card p-4 flex flex-col gap-3 h-full">
+                    <div class="flex items-center justify-between">
+                        <h2 class="text-sm font-black text-slate-800 font-outfit uppercase tracking-wider flex items-center gap-2">
+                            <span>Agencias Registradas</span>
+                            <span id="agencies-count-badge" class="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[10px]">0</span>
+                        </h2>
+                        <button
+                            onclick="openNewDepositModal()"
+                            class="text-xs text-emerald-600 hover:text-emerald-700 font-black flex items-center gap-1"
+                        >
+                            + Nueva
+                        </button>
+                    </div>
+
+                    <!-- Buscador de agencias -->
+                    <div class="relative">
+                        <i data-lucide="search" class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                        <input
+                            type="text"
+                            id="agency-search-input"
+                            oninput="filterAgenciesList()"
+                            placeholder="Buscar agencia..."
+                            class="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                        />
+                    </div>
+
+                    <!-- Lista con scroll -->
+                    <div id="agencies-list-container" class="flex-1 overflow-y-auto space-y-2 max-h-[600px] custom-scrollbar pr-1">
+                        <div class="p-8 text-center text-xs text-slate-400">Cargando agencias...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Columna Derecha: Detalle y Extracto Contable (8 de 12) -->
+            <div class="lg:col-span-8 flex flex-col gap-3">
+                <div class="premium-card p-5 sm:p-6 flex flex-col gap-4 flex-1">
+
+                    <!-- Cabecera de la Agencia Seleccionada -->
+                    <div id="selected-agency-header" class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-4 border-b border-slate-100">
+                        <div>
+                            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Extracto de Cuenta Corriente</span>
+                            <h3 id="selected-agency-name" class="text-xl sm:text-2xl font-black text-slate-900 font-outfit">
+                                Selecciona una Agencia
+                            </h3>
+                            <div id="selected-agency-subtext" class="text-xs text-slate-500 font-medium mt-0.5">
+                                Consulta los depósitos recibidos y habitaciones o grupos descontados.
+                            </div>
+                        </div>
+
+                        <div id="selected-agency-balance-box" class="flex items-center gap-3 bg-emerald-50/70 border border-emerald-200 px-4 py-2.5 rounded-2xl shrink-0 hidden">
+                            <div class="text-right">
+                                <div class="text-[9px] font-bold text-emerald-700 uppercase tracking-wider">Saldo Disponible</div>
+                                <div id="selected-agency-balance" class="text-xl font-black text-emerald-700 font-outfit">0,00 €</div>
+                            </div>
+                            <button
+                                onclick="openDeductModal()"
+                                class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black uppercase tracking-wider transition shadow-xs"
+                                title="Descontar reserva o habitación"
+                            >
+                                ➖ Descontar
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Filtros rápidos de movimientos -->
+                    <div id="movements-toolbar" class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs hidden">
+                        <div class="flex items-center gap-2">
+                            <span class="text-[11px] font-bold text-slate-400 uppercase">Filtrar:</span>
+                            <button onclick="setMovementsFilter('all')" id="filter-all" class="px-2.5 py-1 rounded-lg font-bold bg-slate-900 text-white transition text-xs">Todos</button>
+                            <button onclick="setMovementsFilter('charges')" id="filter-charges" class="px-2.5 py-1 rounded-lg font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition text-xs">Cargos / Estancias</button>
+                            <button onclick="setMovementsFilter('deposits')" id="filter-deposits" class="px-2.5 py-1 rounded-lg font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition text-xs">Depósitos Recibidos</button>
+                        </div>
+                        <div class="text-slate-400 text-[11px]" id="movements-count-label">0 movimientos</div>
+                    </div>
+
+                    <!-- Tabla de Movimientos / Ledger -->
+                    <div class="flex-1 overflow-x-auto">
+                        <table class="w-full text-left text-xs border-collapse">
+                            <thead>
+                                <tr class="border-b border-slate-200 text-slate-400 text-[10px] font-black uppercase tracking-wider">
+                                    <th class="py-2.5 px-3">Fecha</th>
+                                    <th class="py-2.5 px-3">Tipo / Concepto</th>
+                                    <th class="py-2.5 px-3">Detalle / Estancia</th>
+                                    <th class="py-2.5 px-3">Ref. / Localizador</th>
+                                    <th class="py-2.5 px-3 text-right">Importe</th>
+                                    <th class="py-2.5 px-3 text-right">Saldo Restante</th>
+                                </tr>
+                            </thead>
+                            <tbody id="movements-table-body" class="divide-y divide-slate-100 font-medium">
+                                <tr>
+                                    <td colspan="6" class="py-12 text-center text-slate-400">
+                                        Selecciona una agencia de la izquierda para ver su historial completo de movimientos.
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                </div>
+            </div>
+
+        </section>
+
+    </main>
+
+    <!-- ==================== MODAL 1: REGISTRAR NUEVO INGRESO DE SALDO ==================== -->
+    <div id="modal-new-deposit" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 hidden">
+        <div class="bg-white rounded-3xl shadow-2xl max-w-md w-full p-6 border border-slate-200 space-y-4 animate-fade-in">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div class="flex items-center gap-2">
+                    <span class="text-xl">💰</span>
+                    <h3 class="text-base font-black text-slate-900 font-outfit">Registrar Ingreso de Depósito</h3>
+                </div>
+                <button onclick="closeNewDepositModal()" class="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 font-bold text-xs">✕</button>
+            </div>
+
+            <form onsubmit="handleSaveNewDeposit(event)" class="space-y-3 text-xs">
+                <div>
+                    <label class="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">
+                        Nombre de la Agencia *
+                    </label>
+                    <input
+                        type="text"
+                        id="form-dep-agency"
+                        required
+                        placeholder="Ej: SAC Eventos, Viajes Halcón..."
+                        list="agencies-datalist"
+                        class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
+                    <datalist id="agencies-datalist"></datalist>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">
+                            Importe Recibido (€) *
+                        </label>
+                        <input
+                            type="number"
+                            id="form-dep-amount"
+                            step="0.01"
+                            min="0.01"
+                            required
+                            placeholder="5000.00"
+                            class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-black text-emerald-600 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                        />
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">
+                            Fecha de Ingreso
+                        </label>
+                        <input
+                            type="date"
+                            id="form-dep-date"
+                            class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                        />
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">
+                            Método de Pago
+                        </label>
+                        <select
+                            id="form-dep-method"
+                            class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                        >
+                            <option value="Transferencia Bancaria">Transferencia Bancaria</option>
+                            <option value="Tarjeta de Crédito">Tarjeta de Crédito</option>
+                            <option value="Pagaré / Cheque">Pagaré / Cheque</option>
+                            <option value="Efectivo">Efectivo</option>
+                            <option value="Otro">Otro</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">
+                            Ref. / Justificante Bancario
+                        </label>
+                        <input
+                            type="text"
+                            id="form-dep-ref"
+                            placeholder="Ej: TRANSF-8829"
+                            class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                        />
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">
+                        Concepto
+                    </label>
+                    <input
+                        type="text"
+                        id="form-dep-concept"
+                        value="Depósito inicial / Recarga anual"
+                        class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
+                </div>
+
+                <div>
+                    <label class="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">
+                        Observaciones (Opcional)
+                    </label>
+                    <textarea
+                        id="form-dep-notes"
+                        rows="2"
+                        placeholder="Condiciones acordadas o detalles..."
+                        class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    ></textarea>
+                </div>
+
+                <div class="pt-2 flex justify-end gap-2">
+                    <button type="button" onclick="closeNewDepositModal()" class="px-4 py-2 text-slate-500 font-bold hover:text-slate-700 text-xs">
+                        Cancelar
+                    </button>
+                    <button type="submit" id="btn-save-deposit" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-black uppercase tracking-wider text-xs shadow-md shadow-emerald-600/20 transition">
+                        Guardar Ingreso
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ==================== MODAL 2: DESCONTAR RESERVA / HABITACIÓN ==================== -->
+    <div id="modal-deduct" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 hidden">
+        <div class="bg-white rounded-3xl shadow-2xl max-w-lg w-full p-6 border border-slate-200 space-y-4 animate-fade-in">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div class="flex items-center gap-2">
+                    <span class="text-xl">🏨</span>
+                    <div>
+                        <h3 class="text-base font-black text-slate-900 font-outfit">Descontar Reserva de Depósito</h3>
+                        <p class="text-[11px] text-slate-500">Imputar cargo por habitación individual o reserva de grupo</p>
+                    </div>
+                </div>
+                <button onclick="closeDeductModal()" class="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 font-bold text-xs">✕</button>
+            </div>
+
+            <!-- Selector de Agencia si no hay una fija -->
+            <div class="p-3 bg-slate-50 border border-slate-200 rounded-2xl flex items-center justify-between text-xs">
+                <div>
+                    <span class="text-[10px] font-bold text-slate-400 uppercase">Agencia a Imputar</span>
+                    <div id="deduct-agency-display" class="font-black text-slate-900">Seleccionar...</div>
+                </div>
+                <div class="text-right">
+                    <span class="text-[10px] font-bold text-slate-400 uppercase">Saldo Disponible</span>
+                    <div id="deduct-agency-balance-display" class="font-black text-emerald-600 font-outfit">0,00 €</div>
+                </div>
+            </div>
+
+            <!-- Selector de Modo: Habitación Individual vs Reserva de Grupo -->
+            <div class="flex p-1 bg-slate-100 rounded-xl gap-1 text-xs font-bold">
+                <button
+                    type="button"
+                    id="tab-mode-individual"
+                    onclick="setDeductMode('individual')"
+                    class="flex-1 py-1.5 rounded-lg bg-white text-slate-900 shadow-xs transition"
+                >
+                    👤 Habitación Individual / Varios Días
+                </button>
+                <button
+                    type="button"
+                    id="tab-mode-group"
+                    onclick="setDeductMode('group')"
+                    class="flex-1 py-1.5 rounded-lg text-slate-500 hover:text-slate-800 transition"
+                >
+                    👥 Reserva de Grupo
+                </button>
+            </div>
+
+            <form onsubmit="handleSaveDeduction(event)" class="space-y-3 text-xs">
+
+                <!-- Campos de Habitación Individual -->
+                <div id="deduct-individual-fields" class="space-y-3">
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">
+                                Nombre del Huésped / Titular *
+                            </label>
+                            <input
+                                type="text"
+                                id="ind-guest-name"
+                                required
+                                placeholder="Ej: Carlos Gómez"
+                                class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                            />
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">
+                                Hotel *
+                            </label>
+                            <select
+                                id="ind-hotel"
+                                class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                            >
+                                <option value="Sercotel Guadiana">Sercotel Guadiana</option>
+                                <option value="Cumbria Spa&Hotel">Cumbria Spa&Hotel</option>
+                                <option value="Otro">Otro</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">
+                                Fecha de Entrada *
+                            </label>
+                            <input
+                                type="date"
+                                id="ind-checkin"
+                                required
+                                onchange="calculateNights()"
+                                class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                            />
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">
+                                Fecha de Salida *
+                            </label>
+                            <input
+                                type="date"
+                                id="ind-checkout"
+                                required
+                                onchange="calculateNights()"
+                                class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                            />
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-3 gap-2">
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                                Localizador / Ref.
+                            </label>
+                            <input
+                                type="text"
+                                id="ind-resid"
+                                placeholder="Ej: 49021"
+                                class="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-700"
+                            />
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                                Noches
+                            </label>
+                            <input
+                                type="number"
+                                id="ind-nights"
+                                min="1"
+                                value="1"
+                                class="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-700 text-center"
+                            />
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                                Habitación
+                            </label>
+                            <input
+                                type="text"
+                                id="ind-roomtype"
+                                placeholder="DUI / Doble"
+                                class="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-700"
+                            />
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Campos de Reserva de Grupo -->
+                <div id="deduct-group-fields" class="space-y-3 hidden">
+                    <div>
+                        <label class="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">
+                            Localizador / ID de Grupo en el Sistema *
+                        </label>
+                        <input
+                            type="text"
+                            id="grp-resid"
+                            placeholder="Introduce el localizador (ej: 77046)"
+                            class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                        />
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">
+                            Nombre del Grupo (Opcional)
+                        </label>
+                        <input
+                            type="text"
+                            id="grp-name"
+                            placeholder="Ej: Gpo Jubilados Guadalajara"
+                            class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-700"
+                        />
+                    </div>
+                </div>
+
+                <!-- Importe común a descontar -->
+                <div class="p-3 bg-emerald-50/50 border border-emerald-200 rounded-2xl space-y-1">
+                    <label class="block text-[11px] font-black text-emerald-800 uppercase tracking-wider">
+                        Importe a Descontar del Depósito (€) *
+                    </label>
+                    <input
+                        type="number"
+                        id="deduct-amount"
+                        step="0.01"
+                        min="0.01"
+                        required
+                        placeholder="240.00"
+                        class="w-full px-3 py-2 bg-white border border-emerald-300 rounded-xl font-black text-emerald-700 text-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
+                </div>
+
+                <div>
+                    <label class="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">
+                        Observaciones / Notas
+                    </label>
+                    <input
+                        type="text"
+                        id="deduct-notes"
+                        placeholder="Detalles adicionales..."
+                        class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-700"
+                    />
+                </div>
+
+                <div class="pt-2 flex justify-end gap-2">
+                    <button type="button" onclick="closeDeductModal()" class="px-4 py-2 text-slate-500 font-bold hover:text-slate-700 text-xs">
+                        Cancelar
+                    </button>
+                    <button type="submit" id="btn-save-deduct" class="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-black uppercase tracking-wider text-xs shadow-md transition">
+                        Confirmar Descuento
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Script de Control del Módulo -->
+    <script>
+        let allAgencies = [];
+        let selectedAgency = null;
+        let currentMovements = [];
+        let activeFilter = 'all';
+        let deductMode = 'individual'; // 'individual' | 'group'
+
+        async function initPage() {
+            lucide.createIcons();
+            document.getElementById('form-dep-date').value = new Date().toISOString().split('T')[0];
+            await loadAllAgencies();
+        }
+
+        async function loadAllAgencies() {
+            if (!window.AgencyDepositService || !window.db) {
+                setTimeout(loadAllAgencies, 300);
+                return;
+            }
+            try {
+                allAgencies = await window.AgencyDepositService.getAllAgencyDeposits(window.db);
+                renderKPIs();
+                renderAgenciesList();
+                populateDatalist();
+
+                // Si hay agencias y no hay seleccionada, seleccionar la primera
+                if (allAgencies.length > 0) {
+                    const urlParams = new URLSearchParams(window.location.search);
+                    const targetAgency = urlParams.get('agency');
+                    if (targetAgency) {
+                        const found = allAgencies.find(a => a.agencyKey === window.AgencyDepositService.normalizeAgencyKey(targetAgency));
+                        selectAgency(found || allAgencies[0]);
+                    } else if (!selectedAgency) {
+                        selectAgency(allAgencies[0]);
+                    }
+                }
+            } catch (err) {
+                console.error("Error al cargar depósitos:", err);
+            }
+        }
+
+        function renderKPIs() {
+            const totalBalance = allAgencies.reduce((acc, a) => acc + (a.currentBalance || 0), 0);
+            const totalDeposited = allAgencies.reduce((acc, a) => acc + (a.totalDeposited || 0), 0);
+            const totalConsumed = allAgencies.reduce((acc, a) => acc + (a.totalConsumed || 0), 0);
+
+            document.getElementById('kpi-total-balance').textContent = totalBalance.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' });
+            document.getElementById('kpi-total-deposited').textContent = totalDeposited.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' });
+            document.getElementById('kpi-total-consumed').textContent = totalConsumed.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' });
+            document.getElementById('kpi-total-agencies').textContent = allAgencies.length;
+            document.getElementById('agencies-count-badge').textContent = allAgencies.length;
+        }
+
+        function populateDatalist() {
+            const dl = document.getElementById('agencies-datalist');
+            dl.innerHTML = '';
+            allAgencies.forEach(a => {
+                const opt = document.createElement('option');
+                opt.value = a.agencyName;
+                dl.appendChild(opt);
+            });
+        }
+
+        function renderAgenciesList() {
+            const container = document.getElementById('agencies-list-container');
+            const searchVal = (document.getElementById('agency-search-input').value || '').toLowerCase().trim();
+
+            const filtered = allAgencies.filter(a => (a.agencyName || '').toLowerCase().includes(searchVal));
+
+            if (filtered.length === 0) {
+                container.innerHTML = `
+                    <div class="p-8 text-center text-xs text-slate-400 space-y-2">
+                        <span class="text-3xl">📭</span>
+                        <p>No se encontraron agencias.</p>
+                        <button onclick="openNewDepositModal()" class="px-3 py-1.5 bg-emerald-600 text-white rounded-xl text-xs font-bold">
+                            + Crear Depósito
+                        </button>
+                    </div>`;
+                return;
+            }
+
+            container.innerHTML = filtered.map(ag => {
+                const isSelected = selectedAgency && selectedAgency.agencyKey === ag.agencyKey;
+                return `
+                    <div
+                        onclick="selectAgencyByKey('${ag.agencyKey}')"
+                        class="p-3.5 rounded-2xl cursor-pointer transition border ${
+                            isSelected
+                                ? 'bg-white border-emerald-500 shadow-md ring-2 ring-emerald-500/20'
+                                : 'bg-white hover:bg-slate-50 border-slate-200/80 shadow-2xs'
+                        }"
+                    >
+                        <div class="flex items-start justify-between gap-2">
+                            <h4 class="font-black text-xs text-slate-900 line-clamp-1">${ag.agencyName}</h4>
+                            <span class="text-[11px] font-black px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0 font-outfit">
+                                ${ag.currentBalance.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}
+                            </span>
+                        </div>
+                        <div class="mt-1.5 flex items-center justify-between text-[10px] text-slate-400 font-medium">
+                            <span>Ingresado: ${ag.totalDeposited.toFixed(0)} €</span>
+                            <span>Consumido: ${ag.totalConsumed.toFixed(0)} €</span>
+                        </div>
+                    </div>`;
+            }).join('');
+        }
+
+        function filterAgenciesList() {
+            renderAgenciesList();
+        }
+
+        function selectAgencyByKey(key) {
+            const ag = allAgencies.find(a => a.agencyKey === key);
+            if (ag) selectAgency(ag);
+        }
+
+        async function selectAgency(ag) {
+            selectedAgency = ag;
+            renderAgenciesList();
+
+            document.getElementById('selected-agency-name').textContent = ag.agencyName;
+            document.getElementById('selected-agency-subtext').textContent = `Total ingresado: ${ag.totalDeposited.toFixed(2)} € · Total consumido: ${ag.totalConsumed.toFixed(2)} €`;
+            document.getElementById('selected-agency-balance').textContent = ag.currentBalance.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' });
+            document.getElementById('selected-agency-balance-box').classList.remove('hidden');
+            document.getElementById('movements-toolbar').classList.remove('hidden');
+
+            // Cargar movimientos
+            const tbody = document.getElementById('movements-table-body');
+            tbody.innerHTML = '<tr><td colspan="6" class="py-8 text-center text-slate-400">Cargando movimientos...</td></tr>';
+
+            try {
+                currentMovements = await window.AgencyDepositService.getAgencyMovements(window.db, ag.agencyName);
+                renderMovements();
+            } catch (err) {
+                tbody.innerHTML = '<tr><td colspan="6" class="py-8 text-center text-rose-500">Error al cargar movimientos: ' + err.message + '</td></tr>';
+            }
+        }
+
+        function setMovementsFilter(type) {
+            activeFilter = type;
+            ['all', 'charges', 'deposits'].forEach(t => {
+                const btn = document.getElementById(`filter-${t}`);
+                if (t === type) {
+                    btn.className = "px-2.5 py-1 rounded-lg font-bold bg-slate-900 text-white transition text-xs";
+                } else {
+                    btn.className = "px-2.5 py-1 rounded-lg font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition text-xs";
+                }
+            });
+            renderMovements();
+        }
+
+        function renderMovements() {
+            const tbody = document.getElementById('movements-table-body');
+            let list = [...currentMovements];
+
+            if (activeFilter === 'charges') {
+                list = list.filter(m => (m.amount || 0) < 0);
+            } else if (activeFilter === 'deposits') {
+                list = list.filter(m => (m.amount || 0) > 0);
+            }
+
+            document.getElementById('movements-count-label').textContent = `${list.length} movimientos`;
+
+            if (list.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="py-12 text-center text-slate-400">No hay movimientos registrados para este filtro.</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = list.map(m => {
+                const isIncome = m.type === 'DEPOSIT_IN' || (m.amount || 0) > 0;
+                const isIndividual = m.isIndividual || m.type === 'INDIVIDUAL_RESERVATION';
+                const isRefund = m.type === 'RESERVATION_REFUND';
+
+                let typeBadge = '';
+                if (isIncome) {
+                    typeBadge = '<span class="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 text-[10px] font-black uppercase">Ingreso</span>';
+                } else if (isIndividual) {
+                    typeBadge = '<span class="px-2 py-0.5 rounded-md bg-purple-100 text-purple-800 text-[10px] font-black uppercase">Hab. Individual</span>';
+                } else if (isRefund) {
+                    typeBadge = '<span class="px-2 py-0.5 rounded-md bg-blue-100 text-blue-800 text-[10px] font-black uppercase">Reintegro</span>';
+                } else {
+                    typeBadge = '<span class="px-2 py-0.5 rounded-md bg-rose-100 text-rose-800 text-[10px] font-black uppercase">Grupo</span>';
+                }
+
+                // Detalle de la estancia o concepto
+                let detailHtml = '';
+                if (isIndividual) {
+                    const guest = m.guestName ? `<strong>${m.guestName}</strong>` : '';
+                    const hotel = m.hotel ? `<span class="text-slate-500">· ${m.hotel}</span>` : '';
+                    const stay = (m.checkIn && m.checkOut) ? `<div class="text-[10px] text-slate-500">📅 ${m.checkIn} → ${m.checkOut} (${m.nights || 1} noches)</div>` : '';
+                    detailHtml = `<div>${guest} ${hotel}</div>${stay}`;
+                } else if (m.groupName) {
+                    detailHtml = `<strong>${m.groupName}</strong>`;
+                } else {
+                    detailHtml = m.concept || 'Movimiento de saldo';
+                }
+
+                const ref = m.reservationId ? `#${m.reservationId}` : (m.reference || '—');
+                const amtFormatted = (m.amount || 0).toLocaleString('es-ES', { style: 'currency', currency: 'EUR' });
+                const balFormatted = m.balanceAfter !== undefined ? Number(m.balanceAfter).toLocaleString('es-ES', { style: 'currency', currency: 'EUR' }) : '—';
+
+                return `
+                    <tr class="hover:bg-slate-50/80 transition">
+                        <td class="py-3 px-3 text-slate-500 whitespace-nowrap">${m.date || m.timestamp?.split('T')[0] || '—'}</td>
+                        <td class="py-3 px-3 whitespace-nowrap">${typeBadge}</td>
+                        <td class="py-3 px-3">${detailHtml}${m.notes ? `<div class="text-[10px] text-slate-400 italic">"${m.notes}"</div>` : ''}</td>
+                        <td class="py-3 px-3 text-slate-700 font-mono text-[11px] whitespace-nowrap">${ref}</td>
+                        <td class="py-3 px-3 text-right font-black font-outfit text-sm whitespace-nowrap ${isIncome ? 'text-emerald-600' : 'text-rose-600'}">
+                            ${isIncome ? '+' : ''}${amtFormatted}
+                        </td>
+                        <td class="py-3 px-3 text-right font-black font-outfit text-slate-700 whitespace-nowrap">${balFormatted}</td>
+                    </tr>`;
+            }).join('');
+        }
+
+        // --- Modales ---
+        function openNewDepositModal() {
+            if (selectedAgency) {
+                document.getElementById('form-dep-agency').value = selectedAgency.agencyName;
+            }
+            document.getElementById('modal-new-deposit').classList.remove('hidden');
+        }
+
+        function closeNewDepositModal() {
+            document.getElementById('modal-new-deposit').classList.add('hidden');
+        }
+
+        async function handleSaveNewDeposit(e) {
+            e.preventDefault();
+            const btn = document.getElementById('btn-save-deposit');
+            const agency = document.getElementById('form-dep-agency').value.trim();
+            const amount = parseFloat(document.getElementById('form-dep-amount').value);
+            const date = document.getElementById('form-dep-date').value;
+            const method = document.getElementById('form-dep-method').value;
+            const ref = document.getElementById('form-dep-ref').value;
+            const concept = document.getElementById('form-dep-concept').value;
+            const notes = document.getElementById('form-dep-notes').value;
+
+            if (!agency || !amount || amount <= 0) {
+                alert("Por favor completa los campos obligatorios.");
+                return;
+            }
+
+            btn.disabled = true;
+            btn.textContent = "Guardando...";
+
+            try {
+                await window.AgencyDepositService.registerDepositPayment({
+                    db: window.db,
+                    agencyName: agency,
+                    amount,
+                    date,
+                    paymentMethod: method,
+                    reference: ref,
+                    concept,
+                    notes
+                });
+
+                alert("¡Depósito registrado con éxito!");
+                closeNewDepositModal();
+                document.getElementById('form-dep-amount').value = '';
+                document.getElementById('form-dep-ref').value = '';
+                document.getElementById('form-dep-notes').value = '';
+
+                await loadAllAgencies();
+                const updated = allAgencies.find(a => a.agencyKey === window.AgencyDepositService.normalizeAgencyKey(agency));
+                if (updated) selectAgency(updated);
+            } catch (err) {
+                alert("Error al guardar depósito: " + err.message);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = "Guardar Ingreso";
+            }
+        }
+
+        function openDeductModal() {
+            if (!selectedAgency) {
+                alert("Por favor selecciona primero una agencia de la lista izquierda.");
+                return;
+            }
+            document.getElementById('deduct-agency-display').textContent = selectedAgency.agencyName;
+            document.getElementById('deduct-agency-balance-display').textContent = selectedAgency.currentBalance.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' });
+            
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('ind-checkin').value = today;
+            const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
+            document.getElementById('ind-checkout').value = tomorrow;
+            document.getElementById('ind-nights').value = '1';
+
+            setDeductMode('individual');
+            document.getElementById('modal-deduct').classList.remove('hidden');
+        }
+
+        function closeDeductModal() {
+            document.getElementById('modal-deduct').classList.add('hidden');
+        }
+
+        function setDeductMode(mode) {
+            deductMode = mode;
+            const tabInd = document.getElementById('tab-mode-individual');
+            const tabGrp = document.getElementById('tab-mode-group');
+            const fieldsInd = document.getElementById('deduct-individual-fields');
+            const fieldsGrp = document.getElementById('deduct-group-fields');
+
+            if (mode === 'individual') {
+                tabInd.className = "flex-1 py-1.5 rounded-lg bg-white text-slate-900 shadow-xs transition";
+                tabGrp.className = "flex-1 py-1.5 rounded-lg text-slate-500 hover:text-slate-800 transition";
+                fieldsInd.classList.remove('hidden');
+                fieldsGrp.classList.add('hidden');
+                document.getElementById('ind-guest-name').required = true;
+            } else {
+                tabGrp.className = "flex-1 py-1.5 rounded-lg bg-white text-slate-900 shadow-xs transition";
+                tabInd.className = "flex-1 py-1.5 rounded-lg text-slate-500 hover:text-slate-800 transition";
+                fieldsGrp.classList.remove('hidden');
+                fieldsInd.classList.add('hidden');
+                document.getElementById('ind-guest-name').required = false;
+            }
+        }
+
+        function calculateNights() {
+            const inDate = new Date(document.getElementById('ind-checkin').value);
+            const outDate = new Date(document.getElementById('ind-checkout').value);
+            if (inDate && outDate && outDate > inDate) {
+                const diff = Math.round((outDate - inDate) / (1000 * 60 * 60 * 24));
+                document.getElementById('ind-nights').value = diff > 0 ? diff : 1;
+            }
+        }
+
+        async function handleSaveDeduction(e) {
+            e.preventDefault();
+            if (!selectedAgency) return;
+
+            const btn = document.getElementById('btn-save-deduct');
+            const amount = parseFloat(document.getElementById('deduct-amount').value);
+            const notes = document.getElementById('deduct-notes').value;
+
+            if (!amount || amount <= 0) {
+                alert("Introduce un importe válido a descontar.");
+                return;
+            }
+            if (amount > selectedAgency.currentBalance) {
+                alert(`El importe (${amount.toFixed(2)} €) supera el saldo disponible de la agencia (${selectedAgency.currentBalance.toFixed(2)} €).`);
+                return;
+            }
+
+            btn.disabled = true;
+            btn.textContent = "Descontando...";
+
+            try {
+                if (deductMode === 'individual') {
+                    // Descontar habitación individual
+                    const guestName = document.getElementById('ind-guest-name').value.trim();
+                    const hotel = document.getElementById('ind-hotel').value;
+                    const checkIn = document.getElementById('ind-checkin').value;
+                    const checkOut = document.getElementById('ind-checkout').value;
+                    const resId = document.getElementById('ind-resid').value.trim();
+                    const nights = parseInt(document.getElementById('ind-nights').value) || 1;
+                    const roomType = document.getElementById('ind-roomtype').value.trim();
+
+                    await window.AgencyDepositService.deductIndividualReservation({
+                        db: window.db,
+                        agencyName: selectedAgency.agencyName,
+                        amount,
+                        guestName,
+                        hotel,
+                        checkIn,
+                        checkOut,
+                        reservationId: resId,
+                        nights,
+                        roomType,
+                        notes
+                    });
+                } else {
+                    // Descontar reserva de grupo
+                    const resId = document.getElementById('grp-resid').value.trim();
+                    const groupName = document.getElementById('grp-name').value.trim();
+
+                    if (!resId) {
+                        alert("Debes indicar el localizador de la reserva.");
+                        btn.disabled = false;
+                        btn.textContent = "Confirmar Descuento";
+                        return;
+                    }
+
+                    await window.AgencyDepositService.applyDepositToReservation({
+                        db: window.db,
+                        agencyName: selectedAgency.agencyName,
+                        reservationId: resId,
+                        amount,
+                        groupName,
+                        notes
+                    });
+                }
+
+                alert(`¡Se han descontado ${amount.toFixed(2)} € con éxito del depósito de ${selectedAgency.agencyName}!`);
+                closeDeductModal();
+                document.getElementById('deduct-amount').value = '';
+                document.getElementById('deduct-notes').value = '';
+
+                await loadAllAgencies();
+                const updated = allAgencies.find(a => a.agencyKey === selectedAgency.agencyKey);
+                if (updated) selectAgency(updated);
+            } catch (err) {
+                alert("Error al descontar: " + err.message);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = "Confirmar Descuento";
+            }
+        }
+
+        window.addEventListener('DOMContentLoaded', initPage);
+    </script>
+</body>
+</html>
