@@ -10,39 +10,11 @@
 (function () {
     "use strict";
 
-    // ─── Registro de Versiones de Nexus Groups ───────────────────────────────
-    var NexusVersionRegistry = window.NexusVersionRegistry || {
-        system: "2.9.0",
-        lastBuild: "27/10/2026 18:20",
-        modules: {
-            "admin.html": { code: "PANEL", name: "Panel de Control", version: "v2.9.0", date: "27/10/2026 18:20" },
-            "gestion-de-grupos.html": { code: "GRUPOS", name: "Directorio Grupos", version: "v2.5.0", date: "27/10/2026 18:20" },
-            "depositos.html": { code: "DEPOSITOS", name: "Depósitos y Saldos", version: "v1.1.0", date: "27/10/2026 18:20" },
-            "presupuestos.html": { code: "PRESUPUESTOS", name: "Seguimiento Presupuestos", version: "v2.4.0", date: "27/10/2026 18:20" },
-            "proformas.html": { code: "PROFORMAS", name: "Facturas Proforma", version: "v1.6.0", date: "27/10/2026 18:20" },
-            "objetivos-grupos.html": { code: "OBJETIVOS", name: "Objetivos y Tarifas", version: "v1.5.0", date: "27/10/2026 18:20" },
-            "calendario.html": { code: "CALENDARIO", name: "Calendario Operativo", version: "v2.0.0", date: "27/10/2026 18:20" },
-            "configuracion.html": { code: "CONFIG", name: "Configuración", version: "v1.7.0", date: "27/10/2026 18:20" },
-            "altaemail.html": { code: "ALTA_EMAIL", name: "Alta por Email", version: "v1.3.0", date: "27/10/2026 18:20" },
-            "peticiones.html": { code: "PETICIONES", name: "Peticiones", version: "v1.4.0", date: "27/10/2026 18:20" },
-            "fac prof.html": { code: "FAC_PROF", name: "Factura Proforma Doc", version: "v1.5.0", date: "27/10/2026 18:20" },
-            "orden servicio.html": { code: "ORDEN_SERV", name: "Orden de Servicio", version: "v1.8.0", date: "27/10/2026 18:20" },
-            "rooming-servicios.html": { code: "ROOMING", name: "Rooming y Servicios", version: "v1.3.0", date: "27/10/2026 18:20" }
-        },
-        getCurrentModule: function () {
-            var path = window.location.pathname || "";
-            var page = "";
-            try {
-                page = decodeURIComponent(path.substring(path.lastIndexOf('/') + 1)).toLowerCase();
-            } catch (e) {
-                page = path.substring(path.lastIndexOf('/') + 1).toLowerCase();
-            }
-            page = page.split('?')[0].split('#')[0];
-            if (!page) page = "admin.html";
-            return this.modules[page] || { code: "NEXUS", name: "Nexus Groups", version: "v" + this.system, date: this.lastBuild };
-        }
-    };
-    window.NexusVersionRegistry = NexusVersionRegistry;
+    
+    // ─── Versión Única Global de Nexus Groups ───────────────────────────────
+    var NEXUS_GLOBAL_VERSION = (window.NEXUS_SYSTEM_INFO && window.NEXUS_SYSTEM_INFO.version) || window.NEXUS_VERSION || "V2.5.0";
+    var NEXUS_GLOBAL_DATE = (window.NEXUS_SYSTEM_INFO && window.NEXUS_SYSTEM_INFO.buildDate) || "27/10/2026";
+    window.NEXUS_VERSION = NEXUS_GLOBAL_VERSION;
 
 
     // ─── Helpers de formato ───────────────────────────────────────────────────
@@ -78,11 +50,6 @@
         html += '<span class="px-1.5 py-0.5 bg-sky-50 text-sky-700 border border-sky-200 rounded text-[8px] font-bold uppercase tracking-wider flex items-center gap-1 whitespace-nowrap">' +
                 '<span class="inline-block w-1.5 h-1.5 rounded-full bg-sky-500"></span>' +
                 'Cumbria: ' + (cStr || 'Sin actualización') + '</span>';
-
-        var modInfo = NexusVersionRegistry.getCurrentModule();
-        html += '<span class="px-1.5 py-0.5 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded text-[8px] font-bold uppercase tracking-wider flex items-center gap-1 whitespace-nowrap" title="' + modInfo.name + ' · Versión: ' + modInfo.version + ' · Actualizado: ' + modInfo.date + '">' +
-                '<span class="inline-block w-1.5 h-1.5 rounded-full bg-indigo-500"></span>' +
-                modInfo.version + '</span>';
 
         badge.innerHTML = html;
 
@@ -397,8 +364,8 @@
                                 <h1 class="text-xs sm:text-sm font-black text-slate-800 leading-none font-outfit whitespace-nowrap">
                                     Nexus <span class="text-emerald-600">Groups</span>
                                 </h1>
-                                <span class="px-1.5 py-0.5 bg-slate-900 text-white rounded text-[8.5px] font-black uppercase tracking-wider shadow-2xs select-none" title="${NexusVersionRegistry.getCurrentModule().name} · Versión: ${NexusVersionRegistry.getCurrentModule().version} (${NexusVersionRegistry.getCurrentModule().date})">
-                                    ${NexusVersionRegistry.getCurrentModule().version}
+                                <span class="px-1.5 py-0.5 bg-slate-900 text-white rounded text-[8.5px] font-black uppercase tracking-wider shadow-2xs select-none" title="Versión Nexus Groups: ${NEXUS_GLOBAL_VERSION} (${NEXUS_GLOBAL_DATE})">
+                                    ${NEXUS_GLOBAL_VERSION}
                                 </span>
                             </div>
                             <div id="nexus-header-import-badge" class="flex items-center gap-1.5 whitespace-nowrap mt-0.5"></div>
