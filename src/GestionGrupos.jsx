@@ -10933,6 +10933,16 @@ const [customBudgetIdInput, setCustomBudgetIdInput] = useState("");
         }
       }, [showFichaModal, selectedGroupFicha?.id]);
 
+      useEffect(() => {
+        try {
+          const params = new URLSearchParams(window.location.search);
+          if (params.get("modal") === "depositos" || params.get("tab") === "depositos") {
+            setShowAgencyDepositsModal(true);
+            loadAgencyDeposits();
+          }
+        } catch (e) {}
+      }, []);
+
       const handleConfirmApplyDeposit = async () => {
         if (!window.AgencyDepositService || !window.db || !selectedGroupFicha || !currentGroupAgencyDeposit) return;
         const amt = parseFloat(applyDepositAmount);

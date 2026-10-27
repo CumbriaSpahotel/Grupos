@@ -211,6 +211,7 @@
           label: "Panel de Control",
         },
         { id: "groups", icon: "users", label: "Directorio Grupos" },
+        { id: "deposits", icon: "wallet", label: "Depósitos Agencias" },
         { id: "peticiones", icon: "mail", label: "Peticiones" },
         {
           id: "budgets",
@@ -274,6 +275,8 @@
                 onClick={() => {
                   if (item.id === "groups")
                     window.location.href = "Gestion-de-Grupos.html";
+                  else if (item.id === "deposits")
+                    window.location.href = "Gestion-de-Grupos.html?modal=depositos";
                   else if (item.id === "peticiones")
                     window.location.href = "Peticiones.html";
                   else if (item.id === "budgets")
