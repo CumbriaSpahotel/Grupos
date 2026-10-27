@@ -375,6 +375,12 @@
                         <span class="hidden xl:inline">Grupos</span>
                     </a>
 
+                    <a href="Gestion-de-Grupos.html?modal=depositos"
+                       class="nexus-nav-btn flex items-center gap-1 px-2 py-1 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition-all text-[10px] font-bold uppercase tracking-wider" title="Depósitos y Saldos de Agencias">
+                        <i data-lucide="wallet" class="w-3.5 h-3.5 flex-shrink-0"></i>
+                        <span class="hidden xl:inline">Depósitos</span>
+                    </a>
+
                     <a href="Presupuestos.html"
                        class="nexus-nav-btn flex items-center gap-1 px-2 py-1 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all text-[10px] font-bold uppercase tracking-wider" title="Seguimiento Presupuestos">
                         <i data-lucide="clipboard-list" class="w-3.5 h-3.5 flex-shrink-0"></i>

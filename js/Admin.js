@@ -267,6 +267,10 @@ var Sidebar = function Sidebar(_ref) {
     icon: "users",
     label: "Directorio Grupos"
   }, {
+    id: "deposits",
+    icon: "wallet",
+    label: "Depósitos Agencias"
+  }, {
     id: "peticiones",
     icon: "mail",
     label: "Peticiones"
@@ -335,7 +339,7 @@ var Sidebar = function Sidebar(_ref) {
     return /*#__PURE__*/React.createElement("button", {
       key: item.id,
       onClick: function onClick() {
-        if (item.id === "groups") window.location.href = "Gestion-de-Grupos.html";else if (item.id === "peticiones") window.location.href = "Peticiones.html";else if (item.id === "budgets") window.location.href = "Presupuestos.html";else if (item.id === "alta-email") window.location.href = "AltaEmail.html";else if (item.id === "invoices") {
+        if (item.id === "groups") window.location.href = "Gestion-de-Grupos.html";else if (item.id === "deposits") window.location.href = "Gestion-de-Grupos.html?modal=depositos";else if (item.id === "peticiones") window.location.href = "Peticiones.html";else if (item.id === "budgets") window.location.href = "Presupuestos.html";else if (item.id === "alta-email") window.location.href = "AltaEmail.html";else if (item.id === "invoices") {
           window.location.href = "Proformas.html";
         } else if (item.id === "calendario") {
           window.location.href = "Calendario.html";
