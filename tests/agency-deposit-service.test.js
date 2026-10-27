@@ -219,3 +219,41 @@ test('reembolsa importe al depósito de la agencia por cancelación', async () =
   assert.equal(groupAfter.Com_Pagado, '0.00');
   assert.equal(groupAfter.depositDeducted, 0);
 });
+
+test('descuenta habitación individual con estancia de varios días', async () => {
+  const db = createMockFirestore({
+    'agency_deposits/viajes_halcon': {
+      agencyKey: 'viajes_halcon',
+      agencyName: 'Viajes Halcón',
+      currentBalance: 5000,
+      totalDeposited: 5000,
+      totalConsumed: 0
+    }
+  });
+
+  const res = await agencyService.deductIndividualReservation({
+    db,
+    agencyName: 'Viajes Halcón',
+    amount: 320,
+    reservationId: 'IND-9021',
+    guestName: 'Carlos Gómez',
+    hotel: 'Sercotel Guadiana',
+    checkIn: '2026-11-10',
+    checkOut: '2026-11-14',
+    roomType: 'Doble Uso Individual',
+    nights: 4,
+    rooms: 1,
+    notes: 'Reserva individual confirmada por email'
+  });
+
+  assert.equal(res.success, true);
+  assert.equal(res.newBalance, 4680);
+  assert.equal(res.movement.guestName, 'Carlos Gómez');
+  assert.equal(res.movement.amount, -320);
+  assert.match(res.movement.concept, /Carlos Gómez/);
+  assert.match(res.movement.concept, /2026-11-10 → 2026-11-14/);
+
+  const agencyAfter = await agencyService.getAgencyDeposit(db, 'Viajes Halcón');
+  assert.equal(agencyAfter.currentBalance, 4680);
+  assert.equal(agencyAfter.totalConsumed, 320);
+});

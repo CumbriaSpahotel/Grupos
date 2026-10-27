@@ -58,7 +58,7 @@
     return result.sort((a, b) => b.currentBalance - a.currentBalance);
   }
 
-  async function getAgencyMovements(db, agencyName, limit = 50) {
+  async function getAgencyMovements(db, agencyName, limit = 100) {
     const key = normalizeAgencyKey(agencyName);
     if (!key) return [];
     const agencyRef = db.collection("agency_deposits").doc(key);
@@ -71,7 +71,6 @@
     }
     const snap = await query.get();
     const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-    // Si no vino ordenado desde la base de datos, ordenar en memoria
     return list.sort((a, b) => String(b.timestamp || "").localeCompare(String(a.timestamp || "")));
   }
 
@@ -141,6 +140,100 @@
     });
   }
 
+  /* Descontar reserva individual (habitaciones sueltas, particulares, estancias de varios días) */
+  async function deductIndividualReservation({
+    db,
+    agencyName,
+    amount,
+    reservationId = "",
+    guestName = "",
+    hotel = "",
+    checkIn = "",
+    checkOut = "",
+    roomType = "",
+    nights = 1,
+    rooms = 1,
+    notes = "",
+    timestamp = () => new Date().toISOString()
+  }) {
+    const cleanAgency = (agencyName || "").trim();
+    const key = normalizeAgencyKey(cleanAgency);
+    if (!key) throw new Error("Debes indicar la agencia.");
+    const numAmount = roundMoney(amount);
+    if (numAmount <= 0) throw new Error("El importe a descontar debe ser mayor que 0.");
+
+    const ts = timestamp();
+    const dateStr = ts.split("T")[0];
+    const agencyRef = db.collection("agency_deposits").doc(key);
+
+    return db.runTransaction(async (transaction) => {
+      const agencySnap = await transaction.get(agencyRef);
+      if (!agencySnap.exists) {
+        throw new Error(`La agencia "${cleanAgency}" no tiene cuenta de depósito.`);
+      }
+      const agencyData = agencySnap.data();
+      const currentBal = roundMoney(agencyData.currentBalance || 0);
+
+      if (currentBal < numAmount) {
+        throw new Error(
+          `Saldo insuficiente en el depósito de ${cleanAgency}. Saldo disponible: ${currentBal.toFixed(2)} €, importe a descontar: ${numAmount.toFixed(2)} €.`
+        );
+      }
+
+      const newBal = roundMoney(currentBal - numAmount);
+      const newCons = roundMoney((agencyData.totalConsumed || 0) + numAmount);
+
+      transaction.update(agencyRef, {
+        currentBalance: newBal,
+        totalConsumed: newCons,
+        updatedAt: ts
+      });
+
+      const movRef = agencyRef.collection("movements").doc();
+      const stayParts = [];
+      if (checkIn && checkOut) stayParts.push(`${checkIn} → ${checkOut}`);
+      else if (checkIn) stayParts.push(`Entrada: ${checkIn}`);
+      if (nights && Number(nights) > 1) stayParts.push(`${nights} noches`);
+      if (rooms && Number(rooms) > 1) stayParts.push(`${rooms} hab.`);
+      if (roomType) stayParts.push(roomType);
+
+      const stayDetail = stayParts.length ? ` (${stayParts.join(" · ")})` : "";
+      const titular = guestName ? guestName.trim() : (reservationId ? `Reserva #${reservationId}` : "Habitación individual");
+      const hotelLabel = hotel ? ` [${hotel.trim()}]` : "";
+
+      const concept = `Habitación Indiv: ${titular}${hotelLabel}${stayDetail}`;
+
+      const movementData = {
+        id: movRef.id,
+        type: "INDIVIDUAL_RESERVATION",
+        isIndividual: true,
+        amount: -numAmount,
+        reservationId: (reservationId || "").trim(),
+        guestName: (guestName || "").trim(),
+        hotel: (hotel || "").trim(),
+        checkIn: checkIn || "",
+        checkOut: checkOut || "",
+        roomType: (roomType || "").trim(),
+        nights: Number(nights) || 1,
+        rooms: Number(rooms) || 1,
+        concept,
+        balanceAfter: newBal,
+        date: dateStr,
+        timestamp: ts,
+        notes: (notes || "").trim()
+      };
+      transaction.set(movRef, movementData);
+
+      return {
+        success: true,
+        agencyKey: key,
+        newBalance: newBal,
+        movement: movementData
+      };
+    });
+  }
+
+  /* Descontar reserva de grupo existente en el sistema */
   async function applyDepositToReservation({
     db,
     agencyName,
@@ -181,11 +274,6 @@
         );
       }
 
-      if (!groupSnap.exists) {
-        throw new Error(`No se ha encontrado la reserva con localizador "${cleanResId}".`);
-      }
-      const groupData = groupSnap.data();
-
       // 1. Actualizar el saldo de la agencia
       const newBal = roundMoney(currentBal - numAmount);
       const newCons = roundMoney((agencyData.totalConsumed || 0) + numAmount);
@@ -196,9 +284,11 @@
         updatedAt: ts
       });
 
-      // 2. Registrar movimiento en la subcolección de movimientos de la agencia
-      const movRef = agencyRef.collection("movements").doc();
+      const groupData = groupSnap.exists ? groupSnap.data() : {};
       const resolvedGroupName = groupName || groupData.Nombre_Grupo || groupData["Nombre del Grupo"] || "";
+
+      // 2. Registrar movimiento en la agencia
+      const movRef = agencyRef.collection("movements").doc();
       const movementData = {
         id: movRef.id,
         type: "RESERVATION_CHARGE",
@@ -213,51 +303,54 @@
       };
       transaction.set(movRef, movementData);
 
-      // 3. Actualizar la reserva: Com_Pagado y PaymentPlan_JSON
-      const prevPaid = roundMoney(parseFloat(groupData.Com_Pagado || 0) || 0);
-      const newPaid = roundMoney(prevPaid + numAmount);
+      // 3. Si existe en la colección de grupos, actualizar Com_Pagado y PaymentPlan_JSON
+      let prevPaid = 0;
+      let newPaid = numAmount;
+      if (groupSnap.exists) {
+        prevPaid = roundMoney(parseFloat(groupData.Com_Pagado || 0) || 0);
+        newPaid = roundMoney(prevPaid + numAmount);
 
-      let plan = [];
-      try {
-        plan = JSON.parse(groupData.PaymentPlan_JSON || "[]");
-        if (!Array.isArray(plan)) plan = [];
-      } catch (e) {
-        plan = [];
-      }
+        let plan = [];
+        try {
+          plan = JSON.parse(groupData.PaymentPlan_JSON || "[]");
+          if (!Array.isArray(plan)) plan = [];
+        } catch (e) {
+          plan = [];
+        }
 
-      // Buscar si hay una fila de depósito pendiente para absorberlo, o crear fila nueva cobrada
-      const existingPendingDeposit = plan.find(
-        (p) =>
-          p.status !== "Cobrado" &&
-          p.status !== "Pagado" &&
-          (p.label === "Depósito" || p.label === "Primer Pago" || p.label === "Depósito Inicial")
-      );
+        const existingPendingDeposit = plan.find(
+          (p) =>
+            p.status !== "Cobrado" &&
+            p.status !== "Pagado" &&
+            (p.label === "Depósito" || p.label === "Primer Pago" || p.label === "Depósito Inicial")
+        );
 
-      if (existingPendingDeposit && Math.abs(parseFloat(existingPendingDeposit.amount) - numAmount) < 0.05) {
-        existingPendingDeposit.status = "Cobrado";
-        existingPendingDeposit.paid = numAmount;
-        existingPendingDeposit.paymentMethod = "Depósito Agencia";
-        existingPendingDeposit.date = dateStr;
-      } else {
-        plan.unshift({
-          id: "dep-agencia-" + Date.now(),
-          label: "Cobro Depósito Agencia",
-          amount: numAmount.toFixed(2),
-          percent: 0,
-          paid: numAmount,
-          date: dateStr,
-          status: "Cobrado",
-          paymentMethod: "Depósito Agencia",
-          notes: notes.trim()
+        if (existingPendingDeposit && Math.abs(parseFloat(existingPendingDeposit.amount) - numAmount) < 0.05) {
+          existingPendingDeposit.status = "Cobrado";
+          existingPendingDeposit.paid = numAmount;
+          existingPendingDeposit.paymentMethod = "Depósito Agencia";
+          existingPendingDeposit.date = dateStr;
+        } else {
+          plan.unshift({
+            id: "dep-agencia-" + Date.now(),
+            label: "Cobro Depósito Agencia",
+            amount: numAmount.toFixed(2),
+            percent: 0,
+            paid: numAmount,
+            date: dateStr,
+            status: "Cobrado",
+            paymentMethod: "Depósito Agencia",
+            notes: notes.trim()
+          });
+        }
+
+        transaction.update(groupRef, {
+          Com_Pagado: newPaid.toFixed(2),
+          PaymentPlan_JSON: JSON.stringify(plan),
+          depositDeducted: roundMoney((parseFloat(groupData.depositDeducted || 0) || 0) + numAmount),
+          updatedAt: ts
         });
       }
-
-      transaction.update(groupRef, {
-        Com_Pagado: newPaid.toFixed(2),
-        PaymentPlan_JSON: JSON.stringify(plan),
-        depositDeducted: roundMoney((parseFloat(groupData.depositDeducted || 0) || 0) + numAmount),
-        updatedAt: ts
-      });
 
       return {
         success: true,
@@ -281,22 +374,17 @@
     const cleanAgency = (agencyName || "").trim();
     const key = normalizeAgencyKey(cleanAgency);
     if (!key) throw new Error("Debes especificar la agencia.");
-    const cleanResId = String(reservationId || "").trim();
-    if (!cleanResId) throw new Error("Debes indicar el localizador de la reserva.");
     const numAmount = roundMoney(amount);
     if (numAmount <= 0) throw new Error("El importe a reembolsar debe ser mayor que 0.");
 
     const ts = timestamp();
     const dateStr = ts.split("T")[0];
     const agencyRef = db.collection("agency_deposits").doc(key);
-    const groupRef = db.collection("groups").doc(cleanResId);
+    const cleanResId = String(reservationId || "").trim();
+    const groupRef = cleanResId ? db.collection("groups").doc(cleanResId) : null;
 
     return db.runTransaction(async (transaction) => {
-      const [agencySnap, groupSnap] = await Promise.all([
-        transaction.get(agencyRef),
-        transaction.get(groupRef)
-      ]);
-
+      const agencySnap = await transaction.get(agencyRef);
       if (!agencySnap.exists) {
         throw new Error(`La agencia "${cleanAgency}" no tiene cuenta de depósito.`);
       }
@@ -311,10 +399,14 @@
         updatedAt: ts
       });
 
-      const groupData = groupSnap.exists ? groupSnap.data() : {};
+      let groupSnap = null;
+      let groupData = {};
+      if (groupRef) {
+        groupSnap = await transaction.get(groupRef);
+        if (groupSnap.exists) groupData = groupSnap.data();
+      }
       const resolvedGroupName = groupData.Nombre_Grupo || groupData["Nombre del Grupo"] || "";
 
-      // Movimiento de devolución en la agencia
       const movRef = agencyRef.collection("movements").doc();
       const movementData = {
         id: movRef.id,
@@ -322,7 +414,7 @@
         amount: numAmount,
         reservationId: cleanResId,
         groupName: resolvedGroupName,
-        concept: `Reintegro por reserva ${cleanResId}${resolvedGroupName ? ` (${resolvedGroupName})` : ""}: ${reason}`,
+        concept: `Reintegro ${cleanResId ? `reserva ${cleanResId}` : ""}${resolvedGroupName ? ` (${resolvedGroupName})` : ""}: ${reason}`,
         balanceAfter: newBal,
         date: dateStr,
         timestamp: ts,
@@ -330,8 +422,7 @@
       };
       transaction.set(movRef, movementData);
 
-      // Si existe el grupo, descontar de Com_Pagado y registrar en tracking
-      if (groupSnap.exists) {
+      if (groupSnap && groupSnap.exists) {
         const prevPaid = roundMoney(parseFloat(groupData.Com_Pagado || 0) || 0);
         const newPaid = roundMoney(Math.max(0, prevPaid - numAmount));
 
@@ -379,6 +470,7 @@
     getAllAgencyDeposits,
     getAgencyMovements,
     registerDepositPayment,
+    deductIndividualReservation,
     applyDepositToReservation,
     refundDepositToAgency
   };
