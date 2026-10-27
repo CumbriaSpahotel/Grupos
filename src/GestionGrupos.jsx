@@ -10804,6 +10804,183 @@ const [customBudgetIdInput, setCustomBudgetIdInput] = useState("");
       const [isSaving, setIsSaving] = useState(false); // Spinner mientras acceptChanges guarda
       const [mesachefUnlinkedServices, setMesachefUnlinkedServices] = useState([]);
 
+      // --- ESTADOS Y FUNCIONES PARA DEPÓSITOS DE AGENCIA ---
+      const [showAgencyDepositsModal, setShowAgencyDepositsModal] = useState(false);
+      const [agencyDepositsList, setAgencyDepositsList] = useState([]);
+      const [selectedAgencyKey, setSelectedAgencyKey] = useState(null);
+      const [agencyMovementsList, setAgencyMovementsList] = useState([]);
+      const [isLoadingDeposits, setIsLoadingDeposits] = useState(false);
+      const [agencySearchFilter, setAgencySearchFilter] = useState("");
+      const [showNewDepositForm, setShowNewDepositForm] = useState(false);
+      const [newDepositForm, setNewDepositForm] = useState({
+        agencyName: "",
+        amount: "",
+        date: new Date().toISOString().split("T")[0],
+        paymentMethod: "Transferencia Bancaria",
+        reference: "",
+        concept: "Depósito inicial / Recarga anual",
+        notes: ""
+      });
+      const [currentGroupAgencyDeposit, setCurrentGroupAgencyDeposit] = useState(null);
+      const [showApplyDepositModal, setShowApplyDepositModal] = useState(false);
+      const [applyDepositAmount, setApplyDepositAmount] = useState("");
+      const [applyDepositNotes, setApplyDepositNotes] = useState("");
+      const [isApplyingDeposit, setIsApplyingDeposit] = useState(false);
+
+      const loadAgencyDeposits = async () => {
+        if (!window.AgencyDepositService || !window.db) return;
+        setIsLoadingDeposits(true);
+        try {
+          const list = await window.AgencyDepositService.getAllAgencyDeposits(window.db);
+          setAgencyDepositsList(list || []);
+          if (list && list.length > 0) {
+            const activeKey = selectedAgencyKey && list.some(a => a.agencyKey === selectedAgencyKey)
+              ? selectedAgencyKey
+              : list[0].agencyKey;
+            setSelectedAgencyKey(activeKey);
+            const activeAg = list.find(a => a.agencyKey === activeKey) || list[0];
+            const movs = await window.AgencyDepositService.getAgencyMovements(window.db, activeAg.agencyName);
+            setAgencyMovementsList(movs || []);
+          } else {
+            setAgencyMovementsList([]);
+          }
+        } catch (err) {
+          console.error("Error loading agency deposits:", err);
+        } finally {
+          setIsLoadingDeposits(false);
+        }
+      };
+
+      const selectAgencyForMovements = async (agencyKey, agencyName) => {
+        setSelectedAgencyKey(agencyKey);
+        if (!window.AgencyDepositService || !window.db) return;
+        try {
+          const movs = await window.AgencyDepositService.getAgencyMovements(window.db, agencyName);
+          setAgencyMovementsList(movs || []);
+        } catch (err) {
+          console.error("Error loading movements:", err);
+        }
+      };
+
+      const handleRegisterNewDeposit = async (e) => {
+        if (e && e.preventDefault) e.preventDefault();
+        if (!window.AgencyDepositService || !window.db) return;
+        const amt = parseFloat(newDepositForm.amount);
+        if (!amt || amt <= 0) {
+          alert("Por favor introduce un importe válido mayor que cero.");
+          return;
+        }
+        if (!newDepositForm.agencyName.trim()) {
+          alert("Debes indicar el nombre de la agencia.");
+          return;
+        }
+        try {
+          await window.AgencyDepositService.registerDepositPayment({
+            db: window.db,
+            agencyName: newDepositForm.agencyName,
+            amount: amt,
+            date: newDepositForm.date,
+            paymentMethod: newDepositForm.paymentMethod,
+            reference: newDepositForm.reference,
+            concept: newDepositForm.concept,
+            notes: newDepositForm.notes
+          });
+          alert("¡Depósito registrado con éxito!");
+          setShowNewDepositForm(false);
+          setNewDepositForm({
+            agencyName: "",
+            amount: "",
+            date: new Date().toISOString().split("T")[0],
+            paymentMethod: "Transferencia Bancaria",
+            reference: "",
+            concept: "Depósito inicial / Recarga anual",
+            notes: ""
+          });
+          await loadAgencyDeposits();
+          if (selectedGroupFicha) {
+            refreshGroupAgencyDeposit(selectedGroupFicha);
+          }
+        } catch (err) {
+          alert("Error al registrar depósito: " + err.message);
+        }
+      };
+
+      const refreshGroupAgencyDeposit = async (group) => {
+        if (!window.AgencyDepositService || !window.db || !group) {
+          setCurrentGroupAgencyDeposit(null);
+          return;
+        }
+        const rec0 = group.records?.[0] || {};
+        const agencyName = rec0["Empresa/Agencia"] || rec0["Empresa"] || rec0["Fiscal_RazonSocial"] || group.agency || "";
+        if (!agencyName) {
+          setCurrentGroupAgencyDeposit(null);
+          return;
+        }
+        try {
+          const dep = await window.AgencyDepositService.getAgencyDeposit(window.db, agencyName);
+          setCurrentGroupAgencyDeposit(dep);
+        } catch (err) {
+          console.error("Error fetching group agency deposit:", err);
+          setCurrentGroupAgencyDeposit(null);
+        }
+      };
+
+      useEffect(() => {
+        if (showFichaModal && selectedGroupFicha) {
+          refreshGroupAgencyDeposit(selectedGroupFicha);
+        } else {
+          setCurrentGroupAgencyDeposit(null);
+        }
+      }, [showFichaModal, selectedGroupFicha?.id]);
+
+      const handleConfirmApplyDeposit = async () => {
+        if (!window.AgencyDepositService || !window.db || !selectedGroupFicha || !currentGroupAgencyDeposit) return;
+        const amt = parseFloat(applyDepositAmount);
+        if (!amt || amt <= 0) {
+          alert("Por favor introduce un importe válido a descontar.");
+          return;
+        }
+        if (amt > currentGroupAgencyDeposit.currentBalance) {
+          alert("El importe (" + amt.toFixed(2) + " €) supera el saldo disponible de la agencia (" + currentGroupAgencyDeposit.currentBalance.toFixed(2) + " €).");
+          return;
+        }
+        setIsApplyingDeposit(true);
+        try {
+          const res = await window.AgencyDepositService.applyDepositToReservation({
+            db: window.db,
+            agencyName: currentGroupAgencyDeposit.agencyName,
+            reservationId: selectedGroupFicha.id,
+            amount: amt,
+            groupName: selectedGroupFicha.records?.[0]?.Nombre_Grupo || selectedGroupFicha.records?.[0]?.["Nombre del Grupo"] || "",
+            notes: applyDepositNotes
+          });
+          
+          alert("¡Cobro de " + amt.toFixed(2) + " € aplicado con éxito desde el depósito de " + currentGroupAgencyDeposit.agencyName + "!\nNuevo saldo de la agencia: " + res.newAgencyBalance.toFixed(2) + " €");
+          setShowApplyDepositModal(false);
+          setApplyDepositAmount("");
+          setApplyDepositNotes("");
+
+          setSelectedGroupFicha(prev => {
+            if (!prev) return prev;
+            const updatedRecords = (prev.records || []).map(r => ({
+              ...r,
+              Com_Pagado: res.totalPaid.toFixed(2)
+            }));
+            return {
+              ...prev,
+              Com_Pagado: res.totalPaid.toFixed(2),
+              records: updatedRecords
+            };
+          });
+
+          await refreshGroupAgencyDeposit(selectedGroupFicha);
+        } catch (err) {
+          alert("Error al aplicar depósito: " + err.message);
+        } finally {
+          setIsApplyingDeposit(false);
+        }
+      };
+
       // Detección de servicios desvinculados manualmente en MesaChef y alineación de estado
       useEffect(() => {
         if (showFichaModal && selectedGroupFicha && selectedGroupFicha.id && window.MesaChefService) {
@@ -17432,6 +17609,18 @@ const [customBudgetIdInput, setCustomBudgetIdInput] = useState("");
                   </div>
 
                   <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowAgencyDepositsModal(true);
+                        loadAgencyDeposits();
+                      }}
+                      className="px-3.5 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 rounded-xl text-xs font-bold transition flex items-center gap-2 border border-emerald-200 shadow-2xs"
+                      title="Gestión de Depósitos y Saldos de Agencias a lo largo del año"
+                    >
+                      <span className="text-sm">💰</span>
+                      <span>Depósitos de Agencias</span>
+                    </button>
                     {groupsSubView === "daily" && (
                       <div className="flex items-center bg-slate-100 p-1 rounded-xl gap-1">
                         <button
@@ -25278,6 +25467,23 @@ const [customBudgetIdInput, setCustomBudgetIdInput] = useState("");
                                               </span>
                                             </div>
                                           
+                                              {currentGroupAgencyDeposit && currentGroupAgencyDeposit.currentBalance > 0 && (
+                                                <button
+                                                  type="button"
+                                                  onClick={() => {
+                                                    const pending = Math.max(0, hotelTotal - (parseFloat(hotelRecord["Com_Pagado"] || 0) || 0));
+                                                    const initialAmt = Math.min(pending, currentGroupAgencyDeposit.currentBalance);
+                                                    setApplyDepositAmount(initialAmt > 0 ? initialAmt.toFixed(2) : "0.00");
+                                                    setApplyDepositNotes("Cargo a cuenta de depósito de " + currentGroupAgencyDeposit.agencyName);
+                                                    setShowApplyDepositModal(true);
+                                                  }}
+                                                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[9px] font-black uppercase tracking-wider transition-all border bg-emerald-50 border-emerald-300 text-emerald-800 hover:bg-emerald-100 shadow-xs"
+                                                  title={"Saldo disponible en depósito de " + currentGroupAgencyDeposit.agencyName + ": " + currentGroupAgencyDeposit.currentBalance.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' }) + ". Clic para descontar."}
+                                                >
+                                                  <span className="text-[10px]">💰</span>
+                                                  <span>Descontar de Depósito ({currentGroupAgencyDeposit.currentBalance.toFixed(0)} € disp.)</span>
+                                                </button>
+                                              )}
                                               <button
                                                 type="button"
                                                 onClick={() => {
@@ -28703,7 +28909,489 @@ const base =
 
             {/* Modal Selección de Hotel para Importación */}
 
-            {isHotelModalOpen && (
+            
+            {/* --- MODAL DE GESTIÓN DE DEPÓSITOS Y SALDOS DE AGENCIAS --- */}
+            {showAgencyDepositsModal && (
+              <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-[150] p-4 animate-fade-in">
+                <div className="bg-white rounded-3xl shadow-2xl max-w-5xl w-full max-h-[92vh] flex flex-col overflow-hidden border border-slate-200">
+                  {/* Header */}
+                  <div className="px-6 py-4 bg-slate-900 text-white flex items-center justify-between shrink-0">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-2xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-xl">
+                        💰
+                      </div>
+                      <div>
+                        <h3 className="text-base font-black font-outfit tracking-wide flex items-center gap-2">
+                          Depósitos y Saldos de Agencias
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 uppercase tracking-widest">
+                            Anual / Prepagos
+                          </span>
+                        </h3>
+                        <p className="text-xs text-slate-400">
+                          Bolsas de depósito entregadas por agencias para ir descontando automáticamente de sus reservas.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setShowNewDepositForm(true)}
+                        className="px-3.5 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 rounded-xl text-xs font-black uppercase tracking-wider transition shadow-md shadow-emerald-500/20 flex items-center gap-1.5"
+                      >
+                        <span className="text-sm font-bold">+</span>
+                        <span>Nuevo Ingreso</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowAgencyDepositsModal(false)}
+                        className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white font-bold text-sm transition"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Resumen de KPIs Superiores */}
+                  {(() => {
+                    const totalBalance = agencyDepositsList.reduce((acc, a) => acc + (a.currentBalance || 0), 0);
+                    const totalDeposited = agencyDepositsList.reduce((acc, a) => acc + (a.totalDeposited || 0), 0);
+                    const totalConsumed = agencyDepositsList.reduce((acc, a) => acc + (a.totalConsumed || 0), 0);
+
+                    return (
+                      <div className="grid grid-cols-1 md:grid-cols-4 gap-3 p-4 bg-slate-50 border-b border-slate-200 shrink-0">
+                        <div className="bg-white p-3 rounded-2xl border border-slate-200 shadow-2xs">
+                          <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Saldo Total Disponible</div>
+                          <div className="text-xl font-black text-emerald-600 font-outfit mt-0.5">
+                            {totalBalance.toLocaleString("es-ES", { style: "currency", currency: "EUR" })}
+                          </div>
+                        </div>
+                        <div className="bg-white p-3 rounded-2xl border border-slate-200 shadow-2xs">
+                          <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Ingresado en el Año</div>
+                          <div className="text-xl font-black text-slate-800 font-outfit mt-0.5">
+                            {totalDeposited.toLocaleString("es-ES", { style: "currency", currency: "EUR" })}
+                          </div>
+                        </div>
+                        <div className="bg-white p-3 rounded-2xl border border-slate-200 shadow-2xs">
+                          <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Consumido en Reservas</div>
+                          <div className="text-xl font-black text-indigo-600 font-outfit mt-0.5">
+                            {totalConsumed.toLocaleString("es-ES", { style: "currency", currency: "EUR" })}
+                          </div>
+                        </div>
+                        <div className="bg-white p-3 rounded-2xl border border-slate-200 shadow-2xs">
+                          <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Agencias con Saldo</div>
+                          <div className="text-xl font-black text-slate-700 font-outfit mt-0.5">
+                            {agencyDepositsList.length} agencias
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Cuerpo: Lista de Agencias a la Izquierda y Extracto de Movimientos a la Derecha */}
+                  <div className="flex-1 overflow-hidden grid grid-cols-1 md:grid-cols-12">
+                    {/* Panel Izquierdo: Lista de Agencias */}
+                    <div className="md:col-span-5 border-r border-slate-200 flex flex-col h-full bg-slate-50/50">
+                      <div className="p-3 border-b border-slate-200">
+                        <input
+                          type="text"
+                          value={agencySearchFilter}
+                          onChange={(e) => setAgencySearchFilter(e.target.value)}
+                          placeholder="🔍 Buscar agencia..."
+                          className="w-full px-3 py-2 bg-white rounded-xl border border-slate-200 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                        />
+                      </div>
+
+                      <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
+                        {isLoadingDeposits ? (
+                          <div className="p-8 text-center text-xs text-slate-400">Cargando depósitos...</div>
+                        ) : agencyDepositsList.length === 0 ? (
+                          <div className="p-8 text-center space-y-2">
+                            <span className="text-3xl">📭</span>
+                            <p className="text-xs text-slate-500 font-medium">Aún no hay depósitos de agencia registrados.</p>
+                            <button
+                              type="button"
+                              onClick={() => setShowNewDepositForm(true)}
+                              className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-bold"
+                            >
+                              + Crear Primer Depósito
+                            </button>
+                          </div>
+                        ) : (
+                          agencyDepositsList
+                            .filter(a => (a.agencyName || "").toLowerCase().includes((agencySearchFilter || "").toLowerCase()))
+                            .map(ag => {
+                              const isSelected = selectedAgencyKey === ag.agencyKey;
+                              return (
+                                <div
+                                  key={ag.agencyKey}
+                                  onClick={() => selectAgencyForMovements(ag.agencyKey, ag.agencyName)}
+                                  className={"p-3 rounded-2xl cursor-pointer transition border " + (
+                                    isSelected
+                                      ? "bg-white border-emerald-500 shadow-md ring-2 ring-emerald-500/20"
+                                      : "bg-white hover:bg-slate-50 border-slate-200 shadow-2xs"
+                                  )}
+                                >
+                                  <div className="flex items-start justify-between gap-2">
+                                    <span className="font-black text-xs text-slate-800 line-clamp-1">
+                                      {ag.agencyName}
+                                    </span>
+                                    <span className="text-[11px] font-black px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">
+                                      {ag.currentBalance.toLocaleString("es-ES", { style: "currency", currency: "EUR" })}
+                                    </span>
+                                  </div>
+                                  <div className="mt-1 flex items-center justify-between text-[10px] text-slate-400 font-medium">
+                                    <span>Ingresado: {ag.totalDeposited.toFixed(0)} €</span>
+                                    <span>Consumido: {ag.totalConsumed.toFixed(0)} €</span>
+                                  </div>
+                                </div>
+                              );
+                            })
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Panel Derecho: Detalle y Extracto Contable de la Agencia Seleccionada */}
+                    <div className="md:col-span-7 flex flex-col h-full bg-white">
+                      {(() => {
+                        const activeAg = agencyDepositsList.find(a => a.agencyKey === selectedAgencyKey);
+                        if (!activeAg) {
+                          return (
+                            <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-slate-400">
+                              <span className="text-4xl mb-2">👈</span>
+                              <p className="text-xs font-medium">Selecciona una agencia del listado para ver su extracto de movimientos.</p>
+                            </div>
+                          );
+                        }
+
+                        return (
+                          <div className="flex-1 flex flex-col h-full overflow-hidden">
+                            {/* Cabecera de la Agencia Activa */}
+                            <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/40 shrink-0">
+                              <div>
+                                <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Extracto Contable</div>
+                                <h4 className="text-base font-black text-slate-900 font-outfit">{activeAg.agencyName}</h4>
+                              </div>
+                              <div className="flex items-center gap-3">
+                                <div className="text-right">
+                                  <div className="text-[10px] font-bold text-slate-400 uppercase">Saldo Disponible</div>
+                                  <div className="text-lg font-black text-emerald-600 font-outfit">
+                                    {activeAg.currentBalance.toLocaleString("es-ES", { style: "currency", currency: "EUR" })}
+                                  </div>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setNewDepositForm(prev => ({ ...prev, agencyName: activeAg.agencyName }));
+                                    setShowNewDepositForm(true);
+                                  }}
+                                  className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-800 rounded-xl text-xs font-black uppercase tracking-wider transition"
+                                >
+                                  + Añadir Saldo
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Listado de Movimientos */}
+                            <div className="flex-1 overflow-y-auto p-4 space-y-2">
+                              {agencyMovementsList.length === 0 ? (
+                                <div className="p-8 text-center text-xs text-slate-400">
+                                  No hay movimientos registrados para esta agencia.
+                                </div>
+                              ) : (
+                                agencyMovementsList.map(m => {
+                                  const isIncome = m.type === "DEPOSIT_IN" || (m.amount || 0) > 0;
+                                  const isCharge = m.type === "RESERVATION_CHARGE";
+                                  const isRefund = m.type === "RESERVATION_REFUND";
+
+                                  return (
+                                    <div
+                                      key={m.id}
+                                      className="p-3 rounded-2xl border border-slate-100 bg-white hover:border-slate-200 transition shadow-2xs flex items-center justify-between gap-3 text-xs"
+                                    >
+                                      <div className="flex items-center gap-3">
+                                        <div className={"w-8 h-8 rounded-xl flex items-center justify-center font-bold text-sm " + (
+                                          isIncome ? "bg-emerald-100 text-emerald-700" :
+                                          isRefund ? "bg-blue-100 text-blue-700" :
+                                          "bg-rose-100 text-rose-700"
+                                        )}>
+                                          {isIncome ? "↓" : isRefund ? "↺" : "↑"}
+                                        </div>
+                                        <div>
+                                          <div className="font-black text-slate-800 flex items-center gap-2">
+                                            <span>{m.concept || (isIncome ? "Ingreso de Depósito" : "Cargo a Reserva")}</span>
+                                            {m.reservationId && (
+                                              <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-slate-100 text-slate-600">
+                                                Res: #{m.reservationId}
+                                              </span>
+                                            )}
+                                          </div>
+                                          <div className="text-[10px] text-slate-400 flex items-center gap-2 mt-0.5">
+                                            <span>📅 {m.date || m.timestamp?.split("T")[0]}</span>
+                                            {m.reference && <span>· Ref: {m.reference}</span>}
+                                            {m.paymentMethod && <span>· {m.paymentMethod}</span>}
+                                            {m.notes && <span>· 💬 {m.notes}</span>}
+                                          </div>
+                                        </div>
+                                      </div>
+
+                                      <div className="text-right shrink-0">
+                                        <div className={"font-black text-sm font-outfit " + (
+                                          isIncome ? "text-emerald-600" : isRefund ? "text-blue-600" : "text-rose-600"
+                                        )}>
+                                          {isIncome ? "+" : ""}{(m.amount || 0).toLocaleString("es-ES", { style: "currency", currency: "EUR" })}
+                                        </div>
+                                        {m.balanceAfter !== undefined && (
+                                          <div className="text-[9px] text-slate-400 font-medium">
+                                            Saldo: {Number(m.balanceAfter).toFixed(2)} €
+                                          </div>
+                                        )}
+                                      </div>
+                                    </div>
+                                  );
+                                })
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* --- SUB-MODAL REGISTRAR NUEVO DEPÓSITO --- */}
+            {showNewDepositForm && (
+              <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-xs flex items-center justify-center z-[160] p-4 animate-fade-in">
+                <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-6 border border-slate-200 space-y-4">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xl">💰</span>
+                      <h4 className="text-base font-black text-slate-900 font-outfit">
+                        Registrar Nuevo Depósito
+                      </h4>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowNewDepositForm(false)}
+                      className="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 font-bold text-xs"
+                    >
+                      ✕
+                    </button>
+                  </div>
+
+                  <form onSubmit={handleRegisterNewDeposit} className="space-y-3 text-xs">
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">
+                        Nombre de la Agencia *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={newDepositForm.agencyName}
+                        onChange={(e) => setNewDepositForm(prev => ({ ...prev, agencyName: e.target.value }))}
+                        placeholder="Ej: Viajes Halcón, Nautalia..."
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">
+                          Importe Recibido (€) *
+                        </label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="1"
+                          required
+                          value={newDepositForm.amount}
+                          onChange={(e) => setNewDepositForm(prev => ({ ...prev, amount: e.target.value }))}
+                          placeholder="5000.00"
+                          className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-black text-emerald-600 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">
+                          Fecha de Ingreso
+                        </label>
+                        <input
+                          type="date"
+                          value={newDepositForm.date}
+                          onChange={(e) => setNewDepositForm(prev => ({ ...prev, date: e.target.value }))}
+                          className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">
+                          Método de Pago
+                        </label>
+                        <select
+                          value={newDepositForm.paymentMethod}
+                          onChange={(e) => setNewDepositForm(prev => ({ ...prev, paymentMethod: e.target.value }))}
+                          className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                        >
+                          <option value="Transferencia Bancaria">Transferencia Bancaria</option>
+                          <option value="Tarjeta de Crédito">Tarjeta de Crédito</option>
+                          <option value="Pagaré / Cheque">Pagaré / Cheque</option>
+                          <option value="Efectivo">Efectivo</option>
+                          <option value="Otro">Otro</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">
+                          Ref. Bancaria / Localizador
+                        </label>
+                        <input
+                          type="text"
+                          value={newDepositForm.reference}
+                          onChange={(e) => setNewDepositForm(prev => ({ ...prev, reference: e.target.value }))}
+                          placeholder="Ej: TRANSF-8920"
+                          className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">
+                        Concepto / Motivo
+                      </label>
+                      <input
+                        type="text"
+                        value={newDepositForm.concept}
+                        onChange={(e) => setNewDepositForm(prev => ({ ...prev, concept: e.target.value }))}
+                        placeholder="Ej: Depósito inicial temporada 2026"
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">
+                        Notas Adicionales (Opcional)
+                      </label>
+                      <textarea
+                        rows={2}
+                        value={newDepositForm.notes}
+                        onChange={(e) => setNewDepositForm(prev => ({ ...prev, notes: e.target.value }))}
+                        placeholder="Observaciones contables o acuerdos..."
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                      />
+                    </div>
+
+                    <div className="pt-2 flex justify-end gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setShowNewDepositForm(false)}
+                        className="px-4 py-2 text-slate-500 font-bold hover:text-slate-700 text-xs transition"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        type="submit"
+                        className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-black uppercase tracking-wider text-xs shadow-md shadow-emerald-600/20 transition"
+                      >
+                        Guardar Depósito
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            )}
+
+            {/* --- MODAL APLICAR DESCUENTO DE DEPÓSITO A LA RESERVA --- */}
+            {showApplyDepositModal && currentGroupAgencyDeposit && selectedGroupFicha && (
+              <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-xs flex items-center justify-center z-[160] p-4 animate-fade-in">
+                <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-6 border border-slate-200 space-y-4">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xl">💳</span>
+                      <h4 className="text-base font-black text-slate-900 font-outfit">
+                        Cobrar desde Depósito de Agencia
+                      </h4>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowApplyDepositModal(false)}
+                      className="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 font-bold text-xs"
+                    >
+                      ✕
+                    </button>
+                  </div>
+
+                  <div className="p-3 bg-emerald-50/60 border border-emerald-200 rounded-2xl space-y-1 text-xs">
+                    <div className="flex justify-between">
+                      <span className="font-bold text-slate-600">Agencia:</span>
+                      <span className="font-black text-slate-900">{currentGroupAgencyDeposit.agencyName}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="font-bold text-slate-600">Saldo en Depósito disponible:</span>
+                      <span className="font-black text-emerald-700 font-outfit">
+                        {currentGroupAgencyDeposit.currentBalance.toLocaleString("es-ES", { style: "currency", currency: "EUR" })}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="font-bold text-slate-600">Reserva:</span>
+                      <span className="font-black text-slate-900">#{selectedGroupFicha.id}</span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3 text-xs">
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">
+                          Importe a Descontar (€) *
+                        </label>
+                      </div>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="1"
+                        max={currentGroupAgencyDeposit.currentBalance}
+                        value={applyDepositAmount}
+                        onChange={(e) => setApplyDepositAmount(e.target.value)}
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-black text-emerald-600 text-base focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">
+                        Concepto / Observaciones
+                      </label>
+                      <input
+                        type="text"
+                        value={applyDepositNotes}
+                        onChange={(e) => setApplyDepositNotes(e.target.value)}
+                        placeholder="Ej: Pago de anticipo 30% con cargo al depósito anual"
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                      />
+                    </div>
+
+                    <div className="pt-2 flex justify-end gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setShowApplyDepositModal(false)}
+                        className="px-4 py-2 text-slate-500 font-bold hover:text-slate-700 text-xs transition"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        type="button"
+                        disabled={isApplyingDeposit}
+                        onClick={handleConfirmApplyDeposit}
+                        className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-black uppercase tracking-wider text-xs shadow-md shadow-emerald-600/20 transition flex items-center gap-2"
+                      >
+                        {isApplyingDeposit ? "Aplicando..." : "Confirmar y Descontar"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+{isHotelModalOpen && (
 
               <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-md flex items-center justify-center z-[100] p-4">
 
