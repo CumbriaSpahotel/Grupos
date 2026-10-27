@@ -2,15 +2,14 @@
  * NEXUS GROUPS — VERSIÓN ÚNICA GLOBAL DEL SISTEMA
  * ═════════════════════════════════════════════════════════════
  * Versión única compartida por todos los módulos de la aplicación.
- * Cada vez que se realice un cambio de programación en el sistema,
- * se incrementará esta versión única.
+ * Autoincrementada automáticamente en cada compilación y mejora.
  */
 (function (root) {
     "use strict";
 
     var versionInfo = {
-        version: "V2.5.0",
-        buildDate: "27/10/2026 18:25",
+        version: "V2.5.2",
+        buildDate: "27/10/2026 18:54",
         name: "Nexus Groups"
     };
 
