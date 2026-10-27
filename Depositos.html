@@ -52,6 +52,11 @@
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
         
+        .container, .\!container {
+            width: 100% !important;
+            max-width: 100% !important;
+        }
+        
         @media print {
             header, .no-print, nav, .nexus-header {
                 display: none !important;
@@ -78,13 +83,13 @@
     <script src="js/services/agencyDepositService.js"></script>
     <script src="js/navigation.js?v=2-shared-listener"></script>
 
-    <!-- Contenedor Principal -->
-    <main class="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 flex flex-col gap-6">
+    <!-- Contenedor Principal Adaptado al 100% de la Pantalla -->
+    <main class="w-full max-w-full px-4 sm:px-6 lg:px-8 py-4 flex-1 flex flex-col gap-4">
 
         <!-- Cabecera de Página -->
-        <header class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 pt-2">
+        <header class="flex flex-col md:flex-row md:items-center md:justify-between gap-3 pt-1">
             <div>
-                <div class="flex items-center gap-2 text-emerald-600 text-xs font-black uppercase tracking-wider">
+                <div class="flex items-center gap-2 text-emerald-600 text-[11px] font-black uppercase tracking-wider">
                     <span>💼 MÓDULO FINANCIERO</span>
                     <span>·</span>
                     <span>CUENTAS CORRIENTES Y PREPAGOS</span>
@@ -92,7 +97,7 @@
                 <h1 class="text-2xl sm:text-3xl font-black text-slate-900 font-outfit tracking-tight flex items-center gap-2">
                     Depósitos y Saldos de Agencias
                 </h1>
-                <p class="text-xs sm:text-sm text-slate-500 font-medium">
+                <p class="text-xs text-slate-500 font-medium">
                     Gestión de bolsas de depósito anuales · Descuento directo en habitaciones individuales y reservas de grupo
                 </p>
             </div>
@@ -100,7 +105,7 @@
             <div class="flex items-center gap-2 flex-wrap">
                 <button
                     onclick="openNewDepositModal()"
-                    class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl font-black text-xs uppercase tracking-wider transition shadow-lg shadow-emerald-600/20 active:scale-95 flex items-center gap-2"
+                    class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-black text-xs uppercase tracking-wider transition shadow-md shadow-emerald-600/20 active:scale-95 flex items-center gap-2"
                 >
                     <i data-lucide="plus" class="w-4 h-4"></i>
                     <span>Ingresar Saldo</span>
@@ -108,7 +113,7 @@
 
                 <button
                     onclick="openDeductModal()"
-                    class="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-2xl font-black text-xs uppercase tracking-wider transition shadow-lg shadow-slate-900/10 active:scale-95 flex items-center gap-2"
+                    class="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-black text-xs uppercase tracking-wider transition shadow-md shadow-slate-900/10 active:scale-95 flex items-center gap-2"
                 >
                     <i data-lucide="minus" class="w-4 h-4"></i>
                     <span>Descontar Reserva / Habitación</span>
@@ -116,7 +121,7 @@
 
                 <button
                     onclick="window.print()"
-                    class="px-3.5 py-2.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-2xl font-black text-xs transition shadow-xs flex items-center gap-1.5"
+                    class="px-3.5 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-xl font-black text-xs transition shadow-2xs flex items-center gap-1.5"
                     title="Imprimir extracto para la agencia"
                 >
                     <i data-lucide="printer" class="w-4 h-4"></i>
@@ -125,97 +130,97 @@
             </div>
         </header>
 
-        <!-- KPIs Resumen Global -->
-        <section class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-            <div class="premium-card p-4 sm:p-5 flex flex-col justify-between">
+        <!-- KPIs Resumen Global (4 Columnas distribuidas) -->
+        <section class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 shrink-0">
+            <div class="premium-card p-4 flex flex-col justify-between">
                 <div class="flex items-center justify-between text-slate-400">
                     <span class="text-[11px] font-bold uppercase tracking-wider">Saldo Total Disponible</span>
                     <i data-lucide="wallet" class="w-4 h-4 text-emerald-500"></i>
                 </div>
-                <div id="kpi-total-balance" class="text-2xl sm:text-3xl font-black text-emerald-600 font-outfit mt-2">
+                <div id="kpi-total-balance" class="text-2xl sm:text-3xl font-black text-emerald-600 font-outfit mt-1.5">
                     0,00 €
                 </div>
-                <div class="text-[10px] text-slate-400 font-medium mt-1">Fondos disponibles para descontar</div>
+                <div class="text-[10px] text-slate-400 font-medium">Fondos disponibles para descontar</div>
             </div>
 
-            <div class="premium-card p-4 sm:p-5 flex flex-col justify-between">
+            <div class="premium-card p-4 flex flex-col justify-between">
                 <div class="flex items-center justify-between text-slate-400">
                     <span class="text-[11px] font-bold uppercase tracking-wider">Total Ingresado en el Año</span>
                     <i data-lucide="arrow-down-left" class="w-4 h-4 text-slate-600"></i>
                 </div>
-                <div id="kpi-total-deposited" class="text-2xl sm:text-3xl font-black text-slate-800 font-outfit mt-2">
+                <div id="kpi-total-deposited" class="text-2xl sm:text-3xl font-black text-slate-800 font-outfit mt-1.5">
                     0,00 €
                 </div>
-                <div class="text-[10px] text-slate-400 font-medium mt-1">Depósitos recibidos acumulados</div>
+                <div class="text-[10px] text-slate-400 font-medium">Depósitos recibidos acumulados</div>
             </div>
 
-            <div class="premium-card p-4 sm:p-5 flex flex-col justify-between">
+            <div class="premium-card p-4 flex flex-col justify-between">
                 <div class="flex items-center justify-between text-slate-400">
                     <span class="text-[11px] font-bold uppercase tracking-wider">Total Consumido / Descontado</span>
                     <i data-lucide="arrow-up-right" class="w-4 h-4 text-indigo-600"></i>
                 </div>
-                <div id="kpi-total-consumed" class="text-2xl sm:text-3xl font-black text-indigo-600 font-outfit mt-2">
+                <div id="kpi-total-consumed" class="text-2xl sm:text-3xl font-black text-indigo-600 font-outfit mt-1.5">
                     0,00 €
                 </div>
-                <div class="text-[10px] text-slate-400 font-medium mt-1">Imputado a habitaciones y grupos</div>
+                <div class="text-[10px] text-slate-400 font-medium">Imputado a habitaciones y grupos</div>
             </div>
 
-            <div class="premium-card p-4 sm:p-5 flex flex-col justify-between">
+            <div class="premium-card p-4 flex flex-col justify-between">
                 <div class="flex items-center justify-between text-slate-400">
                     <span class="text-[11px] font-bold uppercase tracking-wider">Agencias con Saldo</span>
                     <i data-lucide="building-2" class="w-4 h-4 text-slate-500"></i>
                 </div>
-                <div id="kpi-total-agencies" class="text-2xl sm:text-3xl font-black text-slate-800 font-outfit mt-2">
+                <div id="kpi-total-agencies" class="text-2xl sm:text-3xl font-black text-slate-800 font-outfit mt-1.5">
                     0
                 </div>
-                <div class="text-[10px] text-slate-400 font-medium mt-1">Cuentas activas en el sistema</div>
+                <div class="text-[10px] text-slate-400 font-medium">Cuentas activas en el sistema</div>
             </div>
         </section>
 
-        <!-- Zona Principal: Dos Columnas -->
-        <section class="grid grid-cols-1 lg:grid-cols-12 gap-6 flex-1 min-h-[500px]">
+        <!-- Zona Principal: Dos Columnas Optimizadas para Pantalla Panorámica -->
+        <section class="grid grid-cols-1 lg:grid-cols-12 gap-4 flex-1 min-h-0">
 
-            <!-- Columna Izquierda: Listado de Agencias (4 de 12) -->
-            <div class="lg:col-span-4 flex flex-col gap-3">
+            <!-- Columna Izquierda: Listado de Agencias (3 de 12) -->
+            <div class="lg:col-span-3 xl:col-span-3 flex flex-col h-[calc(100vh-265px)] min-h-[460px]">
                 <div class="premium-card p-4 flex flex-col gap-3 h-full">
-                    <div class="flex items-center justify-between">
-                        <h2 class="text-sm font-black text-slate-800 font-outfit uppercase tracking-wider flex items-center gap-2">
+                    <div class="flex items-center justify-between shrink-0">
+                        <h2 class="text-xs font-black text-slate-800 font-outfit uppercase tracking-wider flex items-center gap-1.5">
                             <span>Agencias Registradas</span>
                             <span id="agencies-count-badge" class="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[10px]">0</span>
                         </h2>
                         <button
                             onclick="openNewDepositModal()"
-                            class="text-xs text-emerald-600 hover:text-emerald-700 font-black flex items-center gap-1"
+                            class="text-[11px] text-emerald-600 hover:text-emerald-700 font-black flex items-center gap-1"
                         >
                             + Nueva
                         </button>
                     </div>
 
                     <!-- Buscador de agencias -->
-                    <div class="relative">
-                        <i data-lucide="search" class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                    <div class="relative shrink-0">
+                        <i data-lucide="search" class="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
                         <input
                             type="text"
                             id="agency-search-input"
                             oninput="filterAgenciesList()"
                             placeholder="Buscar agencia..."
-                            class="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                            class="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
                         />
                     </div>
 
-                    <!-- Lista con scroll -->
-                    <div id="agencies-list-container" class="flex-1 overflow-y-auto space-y-2 max-h-[600px] custom-scrollbar pr-1">
+                    <!-- Lista con scroll interno que llena el alto de pantalla -->
+                    <div id="agencies-list-container" class="flex-1 overflow-y-auto space-y-2 custom-scrollbar pr-1">
                         <div class="p-8 text-center text-xs text-slate-400">Cargando agencias...</div>
                     </div>
                 </div>
             </div>
 
-            <!-- Columna Derecha: Detalle y Extracto Contable (8 de 12) -->
-            <div class="lg:col-span-8 flex flex-col gap-3">
-                <div class="premium-card p-5 sm:p-6 flex flex-col gap-4 flex-1">
+            <!-- Columna Derecha: Detalle y Extracto Contable (9 de 12, Amplio y Panorámico) -->
+            <div class="lg:col-span-9 xl:col-span-9 flex flex-col h-[calc(100vh-265px)] min-h-[460px]">
+                <div class="premium-card p-5 sm:p-6 flex flex-col gap-3 h-full overflow-hidden">
 
                     <!-- Cabecera de la Agencia Seleccionada -->
-                    <div id="selected-agency-header" class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-4 border-b border-slate-100">
+                    <div id="selected-agency-header" class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-slate-100 shrink-0">
                         <div>
                             <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Extracto de Cuenta Corriente</span>
                             <h3 id="selected-agency-name" class="text-xl sm:text-2xl font-black text-slate-900 font-outfit">
@@ -226,23 +231,24 @@
                             </div>
                         </div>
 
-                        <div id="selected-agency-balance-box" class="flex items-center gap-3 bg-emerald-50/70 border border-emerald-200 px-4 py-2.5 rounded-2xl shrink-0 hidden">
+                        <div id="selected-agency-balance-box" class="flex items-center gap-3 bg-emerald-50/70 border border-emerald-200 px-4 py-2 rounded-2xl shrink-0 hidden">
                             <div class="text-right">
                                 <div class="text-[9px] font-bold text-emerald-700 uppercase tracking-wider">Saldo Disponible</div>
                                 <div id="selected-agency-balance" class="text-xl font-black text-emerald-700 font-outfit">0,00 €</div>
                             </div>
                             <button
                                 onclick="openDeductModal()"
-                                class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black uppercase tracking-wider transition shadow-xs"
+                                class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black uppercase tracking-wider transition shadow-xs flex items-center gap-1.5"
                                 title="Descontar reserva o habitación"
                             >
-                                ➖ Descontar
+                                <span>➖</span>
+                                <span>Descontar</span>
                             </button>
                         </div>
                     </div>
 
                     <!-- Filtros rápidos de movimientos -->
-                    <div id="movements-toolbar" class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs hidden">
+                    <div id="movements-toolbar" class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs shrink-0 hidden">
                         <div class="flex items-center gap-2">
                             <span class="text-[11px] font-bold text-slate-400 uppercase">Filtrar:</span>
                             <button onclick="setMovementsFilter('all')" id="filter-all" class="px-2.5 py-1 rounded-lg font-bold bg-slate-900 text-white transition text-xs">Todos</button>
@@ -252,10 +258,10 @@
                         <div class="text-slate-400 text-[11px]" id="movements-count-label">0 movimientos</div>
                     </div>
 
-                    <!-- Tabla de Movimientos / Ledger -->
-                    <div class="flex-1 overflow-x-auto">
+                    <!-- Tabla de Movimientos / Ledger con scroll vertical interno -->
+                    <div class="flex-1 overflow-y-auto overflow-x-auto custom-scrollbar pr-1">
                         <table class="w-full text-left text-xs border-collapse">
-                            <thead>
+                            <thead class="sticky top-0 bg-white z-10 shadow-2xs">
                                 <tr class="border-b border-slate-200 text-slate-400 text-[10px] font-black uppercase tracking-wider">
                                     <th class="py-2.5 px-3">Fecha</th>
                                     <th class="py-2.5 px-3">Tipo / Concepto</th>
