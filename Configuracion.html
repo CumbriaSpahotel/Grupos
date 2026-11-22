@@ -82,6 +82,24 @@
     <script src="js/firebase-init.js?v=2-persistent-cache"></script>
 
     <script src="js/Configuracion.js?v=1.2.0-full-width"></script>
+<script>
+(function(){
+  'use strict';
+  if (new URLSearchParams(location.search).get('tab') === 'users') {
+    location.replace('Usuarios.html'); return;
+  }
+  // Retire the insecure legacy user/PIN editor in the staging build.
+  document.addEventListener('click', function(event) {
+    const target = event.target.closest('button,a');
+    if (!target) return;
+    const text = (target.textContent || '').trim();
+    if (text === 'Usuarios y Accesos' || target.getAttribute('href')?.includes('tab=users')) {
+      event.preventDefault(); event.stopImmediatePropagation();
+      location.assign('Usuarios.html');
+    }
+  }, true);
+})();
+</script>
 </body>
 
 </html>
