@@ -286,10 +286,12 @@
 
     <!-- Firebase SDK (Compat mode - Local con fallback a CDN) -->
     <script src="js/vendor/firebase-app-compat.js"></script>
+    <script src="js/vendor/firebase-auth-9.22.1-compat.js"></script>
     <script src="js/vendor/firebase-firestore-compat.js"></script>
     <script>
         if (typeof firebase === "undefined") {
             document.write('<script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"><\/script>');
+            document.write('<script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"><\/script>');
             document.write('<script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"><\/script>');
         }
     </script>
@@ -297,329 +299,74 @@
     <!-- Configuración Firebase Centralizada -->
     <script src="js/firebase-config.js"></script>
     <script src="js/firebase-init.js?v=2-persistent-cache"></script>
+    <script src="js/firebase-access.staging.js"></script>
 
     <script>
-        // ─── USUARIOS AUTORIZADOS NEXUSGROUPS ─────────────────────────────────
-        const AUTHORIZED_USERS = [
-            { id: "diana", email: "dianahotelguadiana@gmail.com", pass: "1234", name: "Diana", role: "Comercial" },
-            { id: "sergio", email: "ssanchez@hotelguadiana.es", pass: "1234", name: "Sergio", role: "Dirección" },
-            { id: "oscar", email: "osanchez@hotelguadiana.es", pass: "1234", name: "Oscar", role: "Dirección" },
-            { id: "natalio", email: "comunicaciones@hotelguadiana.es", pass: "1234", name: "Natalio", role: "Administrador" }
-        ];
-
-        // Inicialización segura de Lucide con iconos de fallback
-        function refreshIcons() {
-            if (window.lucide && typeof window.lucide.createIcons === 'function') {
-                window.lucide.createIcons();
-            } else {
-                document.querySelectorAll('[data-lucide="user"]').forEach(function(el) {
-                    el.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>';
-                });
-                document.querySelectorAll('[data-lucide="lock"]').forEach(function(el) {
-                    el.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>';
-                });
-                document.querySelectorAll('[data-lucide="eye"]').forEach(function(el) {
-                    el.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>';
-                });
-                document.querySelectorAll('[data-lucide="eye-off"]').forEach(function(el) {
-                    el.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" x2="22" y1="2" y2="22"/></svg>';
-                });
-                document.querySelectorAll('[data-lucide="arrow-right"]').forEach(function(el) {
-                    el.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>';
-                });
-            }
-        }
-        refreshIcons();
-
-        // Elementos del DOM
+        // SEGURIDAD (STAGING): Firebase Authentication, sin PIN ni cuentas
+        // codificadas en el navegador. Cada UID debe existir previamente en
+        // access_members/{uid} creado mediante un servicio administrativo.
         const loginForm = document.getElementById('loginForm');
         const usernameInput = document.getElementById('username');
         const passwordInput = document.getElementById('password');
-        const togglePasswordBtn = document.getElementById('togglePasswordBtn');
-        const rememberMeCheckbox = document.getElementById('rememberMe');
-        const userChips = document.querySelectorAll('.user-chip');
+        const submitBtn = document.getElementById('submitBtn');
         const errorMsg = document.getElementById('errorMessage');
         const errorText = document.getElementById('errorText');
-        const submitBtn = document.getElementById('submitBtn');
-        const btnText = submitBtn.querySelector('.btn-text');
-        const btnSpinner = submitBtn.querySelector('.btn-spinner');
+        const rememberMeCheckbox = document.getElementById('rememberMe');
+        const togglePasswordBtn = document.getElementById('togglePasswordBtn');
+        const chips = document.querySelectorAll('.user-chip');
 
-        const REDIRECT_URL = "Admin.html";
-
-        // Parámetros de URL (logout o acceso directo)
-        const urlParams = new URLSearchParams(window.location.search);
-        if (urlParams.get('logout') === 'true') {
+        if (window.lucide && typeof window.lucide.createIcons === 'function') window.lucide.createIcons();
+        function displayError(message) {
+            errorText.textContent = message;
+            errorMsg.classList.remove('hidden');
+        }
+        function clearError() { errorMsg.classList.add('hidden'); }
+        chips.forEach(chip => chip.addEventListener('click', () => {
+            // Las etiquetas son solo un atajo visual, nunca una credencial.
+            usernameInput.value = chip.getAttribute('data-email') || '';
+            clearError();
+            passwordInput.focus();
+        }));
+        usernameInput.setAttribute('autocomplete','username');
+        usernameInput.setAttribute('placeholder','Correo de Firebase Authentication');
+        passwordInput.setAttribute('autocomplete','current-password');
+        if (togglePasswordBtn) togglePasswordBtn.addEventListener('click', () => {
+            const hide = passwordInput.type === 'password';
+            passwordInput.type = hide ? 'text' : 'password';
+        });
+        if (new URLSearchParams(location.search).get('logout') === 'true') {
+            window.NexusFirebaseAccess.logout().catch(() => {});
+            localStorage.removeItem('nexus_user');
+            sessionStorage.removeItem('nexus_session');
+        }
+        loginForm.addEventListener('submit', async event => {
+            event.preventDefault();
+            clearError();
+            const email = usernameInput.value.trim().toLowerCase();
+            const password = passwordInput.value;
+            if (!email.includes('@') || !password) {
+                displayError('Introduce el correo y la contraseña de Firebase.');
+                return;
+            }
+            submitBtn.disabled = true;
             try {
+                const member = await window.NexusFirebaseAccess.login(email, password);
+                const names = { admin:'Administrador', direction:'Dirección', commercial:'Comercial' };
+                const profile = { id: member.uid, uid: member.uid,
+                    email: member.email, name: member.email.split('@')[0],
+                    role: names[member.role] || 'Usuario', loginTime: Date.now() };
+                // Solo para personalización visual. Los permisos no proceden de
+                // este almacenamiento: Firebase evalúa auth.uid + access_members.
+                sessionStorage.setItem('nexus_session', JSON.stringify(profile));
                 localStorage.removeItem('nexus_user');
-                sessionStorage.removeItem('nexus_session');
-            } catch(e) {}
-        }
-
-        // Selección rápida mediante chips de usuario
-        userChips.forEach(chip => {
-            chip.addEventListener('click', function() {
-                const userKey = this.getAttribute('data-user');
-                usernameInput.value = userKey;
-                userChips.forEach(c => c.classList.remove('active'));
-                this.classList.add('active');
-                showError(false);
-                passwordInput.focus();
-            });
-        });
-
-        // Sincronizar estado de chips al escribir manualmente en el input
-        usernameInput.addEventListener('input', function() {
-            const val = this.value.trim().toLowerCase();
-            userChips.forEach(chip => {
-                const u = chip.getAttribute('data-user').toLowerCase();
-                const em = (chip.getAttribute('data-email') || '').toLowerCase();
-                if (val === u || val === em) {
-                    chip.classList.add('active');
-                } else {
-                    chip.classList.remove('active');
-                }
-            });
-        });
-
-        // Cargar usuario recordado
-        try {
-            const savedUsername = localStorage.getItem('nexus_saved_username');
-            if (savedUsername) {
-                usernameInput.value = savedUsername;
-                rememberMeCheckbox.checked = true;
-                const savedLow = savedUsername.trim().toLowerCase();
-                userChips.forEach(chip => {
-                    const u = chip.getAttribute('data-user').toLowerCase();
-                    const em = (chip.getAttribute('data-email') || '').toLowerCase();
-                    if (savedLow === u || savedLow === em) {
-                        chip.classList.add('active');
-                    }
-                });
-                setTimeout(() => passwordInput.focus(), 100);
-            } else {
-                usernameInput.focus();
-            }
-        } catch(e) {
-            usernameInput.focus();
-        }
-
-        // Alternar visibilidad de contraseña
-        if (togglePasswordBtn) {
-            togglePasswordBtn.addEventListener('click', function() {
-                const isPass = passwordInput.getAttribute('type') === 'password';
-                passwordInput.setAttribute('type', isPass ? 'text' : 'password');
-                const eyeIcon = document.getElementById('eyeIcon');
-                if (eyeIcon) {
-                    eyeIcon.setAttribute('data-lucide', isPass ? 'eye-off' : 'eye');
-                    refreshIcons();
-                }
-            });
-        }
-
-        // Sincronizar chips con usuarios actualizados en Firestore (altas y revocaciones)
-        async function syncCloudUserChips() {
-            if (!window.db || typeof window.db.collection !== "function") return;
-            try {
-                const doc = await window.db.collection("settings").doc("main").get();
-                if (!doc || !doc.exists) return;
-                const data = doc.data();
-                if (!data || !data.system || !Array.isArray(data.system.users)) return;
-
-                const container = document.getElementById('userChipsContainer');
-                if (!container) return;
-
-                const cloudUsers = data.system.users;
-
-                // Actualizar chips existentes (marcar tachados los revocados)
-                container.querySelectorAll('.user-chip').forEach(chip => {
-                    const userKey = (chip.getAttribute('data-user') || '').toLowerCase();
-                    const emailKey = (chip.getAttribute('data-email') || '').toLowerCase();
-                    const found = cloudUsers.find(cu => 
-                        (cu.name && cu.name.toLowerCase() === userKey) ||
-                        (cu.email && cu.email.toLowerCase() === emailKey) ||
-                        (cu.id && cu.id.toLowerCase() === userKey)
-                    );
-                    if (found) {
-                        if (found.revoked === true || found.active === false) {
-                            chip.classList.add('opacity-40', 'line-through');
-                            chip.title = "Acceso revocado por el administrador";
-                        } else {
-                            chip.classList.remove('opacity-40', 'line-through');
-                            chip.removeAttribute('title');
-                        }
-                    }
-                });
-
-                // Añadir chips para nuevos usuarios si no existen ya
-                cloudUsers.forEach(cu => {
-                    if (!cu.name) return;
-                    const cuNameLow = cu.name.toLowerCase();
-                    const cuEmailLow = (cu.email || '').toLowerCase();
-                    const exists = Array.from(container.querySelectorAll('.user-chip')).some(chip => {
-                        const u = (chip.getAttribute('data-user') || '').toLowerCase();
-                        const em = (chip.getAttribute('data-email') || '').toLowerCase();
-                        return u === cuNameLow || (cuEmailLow && em === cuEmailLow);
-                    });
-                    if (!exists) {
-                        const btn = document.createElement('button');
-                        btn.type = 'button';
-                        btn.className = 'user-chip';
-                        btn.setAttribute('data-user', cu.name);
-                        if (cu.email) btn.setAttribute('data-email', cu.email);
-                        btn.textContent = cu.name;
-                        if (cu.revoked === true || cu.active === false) {
-                            btn.classList.add('opacity-40', 'line-through');
-                            btn.title = "Acceso revocado por el administrador";
-                        }
-                        btn.addEventListener('click', function() {
-                            usernameInput.value = this.getAttribute('data-user');
-                            container.querySelectorAll('.user-chip').forEach(c => c.classList.remove('active'));
-                            this.classList.add('active');
-                            showError(false);
-                            passwordInput.focus();
-                        });
-                        container.appendChild(btn);
-                    }
-                });
-            } catch(e) {
-                console.warn("[Login] Error sincronizando chips con la nube:", e);
-            }
-        }
-        syncCloudUserChips();
-
-        function setLoading(loading) {
-            submitBtn.classList.toggle('btn-loading', loading);
-            submitBtn.disabled = loading;
-            if (btnSpinner) btnSpinner.classList.toggle('hidden', !loading);
-        }
-
-        function showError(show, message) {
-            if (message) errorText.textContent = message;
-            errorMsg.classList.toggle('hidden', !show);
-            usernameInput.setAttribute('aria-invalid', show ? 'true' : 'false');
-            passwordInput.setAttribute('aria-invalid', show ? 'true' : 'false');
-        }
-
-        [usernameInput, passwordInput].forEach(input => {
-            if (input) {
-                input.addEventListener('input', () => showError(false));
-            }
-        });
-
-        // Envío del formulario
-        loginForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            showError(false);
-
-            const usernameVal = usernameInput.value.trim().toLowerCase();
-            const passwordVal = passwordInput.value.trim();
-
-            if (!usernameVal) {
-                usernameInput.focus();
-                showError(true, "Por favor, introduce tu usuario o correo.");
-                return;
-            }
-
-            if (!passwordVal) {
-                passwordInput.focus();
-                showError(true, "Por favor, introduce tu contraseña.");
-                return;
-            }
-
-            setLoading(true);
-
-            try {
-                // Lista de usuarios válidos con fallback Firestore
-                let validUsers = [...AUTHORIZED_USERS];
-                if (window.db && typeof window.db.collection === "function") {
-                    try {
-                        const doc = await window.db.collection("settings").doc("main").get();
-                        if (doc && doc.exists) {
-                            const data = doc.data();
-                            if (data && data.system && Array.isArray(data.system.users) && data.system.users.length > 0) {
-                                // Combinar usuarios de la nube sin duplicar emails o nombres
-                                data.system.users.forEach(cloudUser => {
-                                    if (cloudUser && (cloudUser.email || cloudUser.name)) {
-                                        const idx = validUsers.findIndex(u => 
-                                            (cloudUser.email && u.email && u.email.toLowerCase() === cloudUser.email.toLowerCase()) ||
-                                            (cloudUser.name && u.name && u.name.toLowerCase() === cloudUser.name.toLowerCase()) ||
-                                            (cloudUser.id && u.id && u.id.toLowerCase() === cloudUser.id.toLowerCase())
-                                        );
-                                        if (idx >= 0) {
-                                            validUsers[idx] = { ...validUsers[idx], ...cloudUser };
-                                        } else {
-                                            validUsers.push(cloudUser);
-                                        }
-                                    }
-                                });
-                            }
-                        }
-                    } catch(netErr) {
-                        console.warn("[Login] Firestore no accesible, usando usuarios locales:", netErr);
-                    }
-                }
-
-                // Buscar usuario por correo, nombre o ID de usuario (insensible a mayúsculas/minúsculas)
-                const matchedUser = validUsers.find(u => {
-                    const email = (u.email || '').toLowerCase();
-                    const name = (u.name || '').toLowerCase();
-                    const id = (u.id || '').toLowerCase();
-                    return email === usernameVal || name === usernameVal || id === usernameVal;
-                });
-
-                if (matchedUser) {
-                    // Comprobar si el acceso ha sido revocado
-                    if (matchedUser.revoked === true || matchedUser.active === false) {
-                        setLoading(false);
-                        showError(true, "Acceso revocado para esta cuenta. Contacta con el Administrador.");
-                        return;
-                    }
-
-                    if (String(matchedUser.pass) === passwordVal) {
-                        // Login correcto: Guardar sesión
-                        const sessionData = {
-                            id: matchedUser.id || (matchedUser.name ? matchedUser.name.toLowerCase() : "user"),
-                            email: matchedUser.email,
-                            name: matchedUser.name,
-                            role: matchedUser.role || "Usuario",
-                            avatar: (matchedUser.name || 'U').charAt(0).toUpperCase(),
-                            loginTime: Date.now()
-                        };
-
-                        try {
-                            localStorage.setItem('nexus_user', JSON.stringify(sessionData));
-                            sessionStorage.setItem('nexus_session', JSON.stringify(sessionData));
-                            if (rememberMeCheckbox.checked) {
-                                localStorage.setItem('nexus_saved_username', usernameInput.value.trim());
-                            } else {
-                                localStorage.removeItem('nexus_saved_username');
-                            }
-                        } catch(storageErr) {
-                            console.warn("[Login] Error de almacenamiento de sesión:", storageErr);
-                        }
-
-                        window.location.href = REDIRECT_URL;
-                        return;
-                    }
-                }
-
-                // Si no coincide
-                setLoading(false);
-                showError(true, "Usuario o contraseña incorrectos. Revisa tus datos.");
-                passwordInput.value = "";
-                passwordInput.focus();
-
-                loginForm.animate([
-                    { transform: 'translateX(0)' },
-                    { transform: 'translateX(-10px)' },
-                    { transform: 'translateX(10px)' },
-                    { transform: 'translateX(0)' }
-                ], { duration: 300 });
-
+                if (rememberMeCheckbox.checked) localStorage.setItem('nexus_saved_username', email);
+                else localStorage.removeItem('nexus_saved_username');
+                location.href = 'Admin.html';
             } catch (error) {
-                console.warn("Error en proceso de login:", error);
-                setLoading(false);
-                showError(true, "Error de conexión al verificar credenciales.");
+                displayError('No se ha podido acceder: comprueba las credenciales y autorización de la cuenta.');
+                passwordInput.value = '';
+            } finally {
+                submitBtn.disabled = false;
             }
         });
     </script>
