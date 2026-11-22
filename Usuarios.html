@@ -64,21 +64,29 @@ async function refresh(){
   const r=await api('nexusListUsers');items=r.users||[];$('users').replaceChildren();
   for(const u of items){
     const tr=document.createElement('tr');
-    for(const value of [u.name,u.email,roles[u.role]||u.role,u.active?'Activo':'Inhabilitado']){
+    for(const value of [u.name,u.email,u.linked?(roles[u.role]||u.role):'Sin vincular',u.disabled?'Inhabilitado':(u.linked&&u.active?'Activo':'Sin permiso')]){
       const td=document.createElement('td');td.textContent=value;tr.appendChild(td);
     }
     const actions=document.createElement('td'),wrap=document.createElement('div');wrap.className='actions';
-    wrap.append(button('Editar',async()=>{
+    if(u.testAccount) { actions.textContent='Cuenta demo: no asignar acceso';tr.appendChild(actions);$('users').appendChild(tr);continue; }
+    if(!u.linked && !u.disabled){wrap.append(button('Vincular cuenta',async()=>{
+      const name=prompt('Nombre del empleado',u.name||'');if(name===null)return;
+      const role=prompt('Rol: admin, direction o commercial','commercial');if(role===null)return;
+      if(!['admin','direction','commercial'].includes(role)){message('Rol incorrecto');return;}
+      if(!confirm('¿Vincular '+u.email+' como '+role+'?'))return;
+      try{await api('nexusLinkUser',{email:u.email,name,role});await refresh();message('Cuenta existente vinculada sin duplicarla.');}catch(e){error(e)}
+    },'primary')}
+    if(u.linked)wrap.append(button('Editar',async()=>{
       const name=prompt('Nombre del empleado',u.name);if(name===null)return;
       const role=prompt('Rol: admin, direction o commercial',u.role);if(role===null)return;
       if(!['admin','direction','commercial'].includes(role)){message('Rol incorrecto');return;}
       try{await api('nexusUpdateUser',{uid:u.uid,name,role});await refresh();message('Perfil actualizado');}catch(e){error(e)}
     }));
-    if(u.uid!==ownUid)wrap.append(button(u.active?'Revocar':'Reactivar',async()=>{
+    if(u.linked&&u.uid!==ownUid)wrap.append(button(u.active?'Revocar':'Reactivar',async()=>{
       if(!confirm('¿Confirmas el cambio de acceso de '+u.email+'?'))return;
       try{await api('nexusUpdateUser',{uid:u.uid,active:!u.active});await refresh();message('Acceso actualizado');}catch(e){error(e)}
     },u.active?'danger':''));
-    if(u.active)wrap.append(button('Restablecer clave',async()=>{
+    if(u.linked&&u.active)wrap.append(button('Restablecer clave',async()=>{
       if(!confirm('¿Generar un enlace privado para '+u.email+'?'))return;
       try{const r=await api('nexusResetUser',{uid:u.uid});secureLink(r.email,r.resetLink);}catch(e){error(e)}
     }));
