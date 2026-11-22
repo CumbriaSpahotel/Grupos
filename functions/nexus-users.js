@@ -58,20 +58,61 @@ async function activeAdminCount() {
 
 exports.nexusListUsers = onCall(options, async request => {
   await requireAdmin(request);
-  const snap = await members.limit(150).get();
-  const results = await Promise.all(snap.docs.map(async d => {
-    try {
-      const u = await auth.getUser(d.id);
-      const v = d.data();
-      return { uid: u.uid, email: u.email || '', name: v.name || u.displayName || '',
-        role: v.role, active: v.active === true && !u.disabled, disabled: u.disabled,
-        linked: true };
-    } catch (err) {
-      return { uid: d.id, email: '', name: d.data().name || '',
-        role: d.data().role || 'unknown', active: false, disabled: true, linked: false };
-    }
+  // Authentication is the source of truth for identities; Firestore membership
+  // only determines permission. Existing Firebase users must remain visible
+  // even before being linked to Nexus.
+  const users = [];
+  let token;
+  do {
+    const page = await auth.listUsers(1000, token);
+    users.push(...page.users);
+    if (users.length > 5000) throw new HttpsError('resource-exhausted', 'Demasiados usuarios.');
+    token = page.pageToken;
+  } while (token);
+  const results = await Promise.all(users.map(async u => {
+    const doc = await members.doc(u.uid).get();
+    const membership = doc.exists ? doc.data() : null;
+    return {
+      uid: u.uid,
+      email: u.email || '',
+      name: membership?.name || u.displayName || '',
+      role: membership?.role || null,
+      active: membership?.active === true && !u.disabled,
+      disabled: u.disabled,
+      linked: !!membership,
+      testAccount: (u.email || '').toLowerCase() === 'demo@hotel.com'
+    };
   }));
-  return { users: results };
+  return { users: results.sort((a, b) => a.email.localeCompare(b.email)) };
+});
+
+exports.nexusLinkUser = onCall(options, async request => {
+  await requireAdmin(request);
+  const data = input(request.data);
+  const email = ensureEmail(data.email);
+  const role = ensureRole(data.role);
+  const name = ensureName(data.name);
+  if (email === 'demo@hotel.com')
+    throw new HttpsError('failed-precondition', 'No se puede vincular la cuenta de demostración.');
+  let record;
+  try { record = await auth.getUserByEmail(email); }
+  catch (err) {
+    if (err.code === 'auth/user-not-found')
+      throw new HttpsError('not-found', 'La cuenta no existe; usa Crear usuario.');
+    throw new HttpsError('internal', 'No se pudo comprobar la identidad.');
+  }
+  if (record.disabled)
+    throw new HttpsError('failed-precondition', 'La cuenta está inhabilitada en Firebase.');
+  const ref = members.doc(record.uid);
+  const existing = await ref.get();
+  if (existing.exists)
+    throw new HttpsError('already-exists', 'Esta cuenta ya tiene un perfil Nexus; utiliza Editar.');
+  await ref.create({
+    email: record.email || email, name, role, active: true,
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    updatedAt: admin.firestore.FieldValue.serverTimestamp()
+  });
+  return { ok: true, uid: record.uid, email };
 });
 
 exports.nexusCreateUser = onCall(options, async request => {
