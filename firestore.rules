@@ -1,34 +1,14 @@
 rules_version = '2';
 
+// SAFE DEPLOY DEFAULT (22-11-2026)
+// This file deliberately mirrors the production emergency lock-down.
+// Do not replace it with the staging permissions until Firebase Authentication,
+// membership documents, sanitized settings, and server-side payment writes
+// have all been deployed and tested.
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // ═══════════════════════════════════════════════════════
-    // NEXUS GROUPS — Firestore Security Rules
-    // ═══════════════════════════════════════════════════════
-    // TODO: Implementar Firebase Auth y cambiar todas las
-    //       reglas a `request.auth != null`
-    // ═══════════════════════════════════════════════════════
-
-    // Colección de grupos: lectura y escritura
-    match /groups/{groupId} {
-      allow read: if true;
-      allow write: if true;
-      // FUTURO: allow write: if request.auth != null;
-    }
-
-    // Colección de configuración: solo lectura pública, escritura protegida
-    match /settings/{settingId} {
-      allow read: if true;
-      allow write: if true;
-      // FUTURO: allow write: if request.auth != null
-      //         && request.auth.token.admin == true;
-    }
-
-    // Cualquier otra colección: denegar por defecto
     match /{document=**} {
-      allow read: if false;
-      allow write: if false;
+      allow read, write: if false;
     }
   }
 }
