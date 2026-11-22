@@ -25,21 +25,30 @@
         return;
     }
 
-    // Si Firebase SDK no cargó por bloqueo de red, DNS o tracking, activar fallback offline
-    if (typeof firebase === "undefined") {
-        console.warn("[Firebase] SDK no disponible (sin conexión o CDN bloqueado). Activando fallback local/offline.");
-        window.db = window.db || {
-            collection: function() {
+    // MODO SEGURO: si el SDK no está disponible, NO simular escrituras
+    // exitosas. En la versión anterior set/update devolvían Promise.resolve()
+    // sin guardar datos; eso podía aparentar operaciones completadas.
+    if (typeof firebase === "undefined" || typeof firebase.firestore !== "function") {
+        console.error("[Firebase] Servicio no disponible: se bloquean operaciones de datos.");
+        window.nexusCloudUnavailable = true;
+        var unavailable = function () {
+            return Promise.reject(new Error("Firestore no disponible. No se ha guardado ningún cambio."));
+        };
+        window.db = {
+            collection: function () {
                 return {
-                    doc: function() {
+                    doc: function () {
                         return {
-                            get: function() { return Promise.resolve({ exists: false, data: function() { return {}; } }); },
-                            set: function() { return Promise.resolve(); },
-                            update: function() { return Promise.resolve(); }
+                            get: unavailable, set: unavailable, update: unavailable,
+                            delete: unavailable
                         };
                     },
-                    get: function() { return Promise.resolve({ docs: [], forEach: function() {} }); },
-                    onSnapshot: function() { return function() {}; }
+                    get: unavailable,
+                    add: unavailable,
+                    onSnapshot: function (next, error) {
+                        if (typeof error === "function") error(new Error("Firestore no disponible"));
+                        return function () {};
+                    }
                 };
             }
         };
