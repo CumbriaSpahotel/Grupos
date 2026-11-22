@@ -5,6 +5,8 @@
 
 
 <head>
+<style>html.nexus-auth-pending body { visibility: hidden !important; }</style>
+<script>document.documentElement.classList.add('nexus-auth-pending');</script>
 
   <meta charset="UTF-8" />
 
@@ -625,6 +627,7 @@
   <script src="js/icons.js"></script>
   <script src="js/navigation.js?v=2-shared-listener"></script>
   <script src="js/firebase-init.js?v=2-persistent-cache"></script>
+<script src="js/nexus-auth-guard.staging.js"></script>
   <script src="js/services/splitSeriesReservation.js?v=1.3-commercial-status"></script>
   <script src="js/services/groupOccupancyService.js?v=1.0.0"></script>
   <script src="js/services/boardPricingService.js?v=2.0-official"></script>
