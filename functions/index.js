@@ -96,5 +96,6 @@ Genera un informe estratégico en Markdown con:
 const nexusUsers = require('./nexus-users');
 exports.nexusListUsers = nexusUsers.nexusListUsers;
 exports.nexusCreateUser = nexusUsers.nexusCreateUser;
+exports.nexusLinkUser = nexusUsers.nexusLinkUser;
 exports.nexusUpdateUser = nexusUsers.nexusUpdateUser;
 exports.nexusResetUser = nexusUsers.nexusResetUser;
