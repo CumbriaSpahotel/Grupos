@@ -1,12 +1,15 @@
 rules_version = '2';
 
-// SAFE DEPLOY DEFAULT (22-11-2026)
-// This file deliberately mirrors the production emergency lock-down.
-// Do not replace it with the staging permissions until Firebase Authentication,
-// membership documents, sanitized settings, and server-side payment writes
-// have all been deployed and tested.
+// NEXUS GROUPS: BOOTSTRAP MINIMUM - do NOT confuse with full production rules.
+// Allows a signed-in user to read only their own server-created role document.
+// ALL groups, settings, payments, deposits and every other collection stay locked.
+// Deploy only after administrator has been verified and backed up.
 service cloud.firestore {
   match /databases/{database}/documents {
+    match /access_members/{uid} {
+      allow get: if request.auth != null && request.auth.uid == uid;
+      allow list, create, update, delete: if false;
+    }
     match /{document=**} {
       allow read, write: if false;
     }
