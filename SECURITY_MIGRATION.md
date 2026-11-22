@@ -33,3 +33,30 @@ El archivo `firestore.auth-staging.rules` NO aparece en firebase.json y no se de
 - Solo el servidor, tras validar el pago contra fuente bancaria fiable, declara una operación cobrada.
 - La aplicación NO muestra «BD Online» antes de verificar una lectura autorizada.
 - Las contraseñas/PIN no aparecen en Firestore accesible a personal común ni en código publicado.
+
+
+## Panel unificado de usuarios — implementación en esta rama
+
+- `Usuarios.html` sustituye al antiguo directorio basado en PIN: lista las identidades asociadas, permite altas, cambios de rol, revocación/reactivación y genera enlaces privados para restablecer claves.
+- `functions/nexus-users.js` contiene cuatro funciones callable con Firebase Admin SDK. Solo un UID autenticado, activo y con rol `admin` en `access_members` puede ejecutarlas. No devuelve contraseñas.
+- `functions/index.js` exporta las funciones. No se desplegaron.
+- `Configuracion.html` envía la antigua pestaña de usuarios a `Usuarios.html`; `js/navigation.js` sustituye el cambio de PIN antiguo por restablecimiento gestionado por Firebase.
+
+### Puesta en marcha administrativa (requiere acceso al proyecto Firebase)
+
+1. Hacer copia de seguridad. Verificar que la cuenta admin de Authentication existe y está habilitada.
+2. Con una credencial administrativa confiable de Google Cloud, crear el primer documento `access_members/<UID_ADMIN_REAL>` usando `node tools/provision-access.js <UID_ADMIN_REAL> admin --apply`. **Jamás** escribir o subir esa credencial a GitHub; no usar la cuenta `demo@hotel.com`.
+3. Publicar las funciones callable (solo después de revisar y probar en emulador) mediante `firebase deploy --only functions`, teniendo en cuenta que el proyecto despliega también otras funciones existentes.
+4. Probar `nexusListUsers` con cuenta admin y cuenta no autorizada; debe denegarse a la segunda. Dar de alta a Óscar desde `Usuarios.html` y entregarle de modo privado el enlace para crear su clave; el enlace no debe guardarse en bases de datos ni registrarse en logs.
+5. Probar revocación y reactivación con cuenta de pruebas controlada. Comprobar que los tokens antiguos no permiten nuevas operaciones y no dejar copias del enlace de invitación.
+6. Desvincular la gestión antigua `settings/main.system.users` en todas las pantallas. **Aún no está realizada**: configuración, navegación y aplicaciones pueden seguir leyendo ese directorio para mostrar perfiles.
+7. Implementar reglas de Firestore y funciones de negocio que permitan leer/escribir reservas autorizadas, pero nieguen cambiar los importes y estados bancarios desde el navegador. **Aún pendiente**; la regla `allow false` debe seguir vigente.
+8. Probar integración completa en una copia de ensayo con datos ficticios, incluido el guardado de presupuestos, depósitos, correo y calendario. Recién entonces fusionar/publicar.
+
+**No publicar la rama directamente.** La nueva pantalla requiere primero membresía de administrador y permisos de lectura de `access_members/<uid>`; con las reglas actuales `allow false`, la administración de usuarios no estará disponible. Las reglas de ensayo son parciales y tampoco habilitan el uso normal del programa.
+
+### Riesgos identificados que no resuelve la administración de usuarios
+
+- Un usuario real con permiso comercial no debe poder certificar pagos, alterar los depósitos conciliados ni cambiar importes mediante modificaciones directas de Firestore.
+- La aplicación actual mezcla cambios comerciales y bancarios en documentos; se necesita separación de datos/funciones y una migración conservadora.
+- Los archivos Javascript/HTML siguen siendo visibles para los visitantes si se publican con GitHub Pages; control de acceso al servidor y privado GitHub son tareas independientes.
