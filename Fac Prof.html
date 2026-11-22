@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
+<style>html.nexus-auth-pending body {visibility:hidden!important}</style><script>document.documentElement.classList.add('nexus-auth-pending')</script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title id="page-title">Generador de Facturas</title>
@@ -1045,7 +1046,8 @@
 
     <!-- Firebase SDK (Compat mode) -->
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
 
     <!-- Configuración Centralizada -->
     <script src="js/firebase-config.js"></script>
@@ -1053,6 +1055,7 @@
     <script src="js/utils.js"></script>
     <script src="js/gemini.js"></script>
     <script src="js/firebase-init.js?v=2-persistent-cache"></script>
+<script src="js/nexus-auth-guard.staging.js"></script>
     <script src="js/navigation.js?v=2-shared-listener"></script>
 
     <script>
