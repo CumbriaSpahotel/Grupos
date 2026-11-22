@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
+<style>html.nexus-auth-pending body { visibility: hidden !important; }</style>
+<script>document.documentElement.classList.add('nexus-auth-pending');</script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Nexus Groups - Depósitos y Saldos de Agencias</title>
@@ -22,7 +24,8 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Outfit:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
     <script src="https://cdn.jsdelivr.net/npm/lucide/dist/umd/lucide.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
 
     <style>
         :root {
@@ -80,6 +83,7 @@
     <!-- Configuración Firebase y Servicios -->
     <script src="js/firebase-config.js"></script>
     <script src="js/firebase-init.js"></script>
+<script src="js/nexus-auth-guard.staging.js"></script>
     <script src="js/services/agencyDepositService.js"></script>
     <script src="js/navigation.js?v=2-shared-listener"></script>
 
