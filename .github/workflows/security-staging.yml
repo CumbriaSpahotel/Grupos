@@ -1,0 +1,25 @@
+name: Nexus security staging checks
+on:
+  pull_request:
+    paths:
+      - 'functions/**'
+      - 'js/**'
+      - '*.html'
+      - 'firestore*.rules'
+      - 'tests/**'
+      - '.github/workflows/security-staging.yml'
+  workflow_dispatch:
+jobs:
+  security:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: node --check functions/nexus-users.js
+      - run: node --check js/nexus-auth-guard.staging.js
+      - run: node --check js/firebase-access.staging.js
+      - run: node --test tests/security-staging.test.js tests/security-integration-static.test.js
