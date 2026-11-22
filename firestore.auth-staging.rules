@@ -1,0 +1,62 @@
+rules_version = '2';
+
+// STAGING ONLY — do not deploy until Firebase Auth has been integrated,
+// user memberships provisioned server-side, and legacy credentials migrated.
+// All financial mutations must be performed through trusted server functions.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+    function memberPath() {
+      return /databases/$(database)/documents/access_members/$(request.auth.uid);
+    }
+    function activeMember() {
+      return signedIn()
+        && exists(memberPath())
+        && get(memberPath()).data.active == true;
+    }
+    function management() {
+      return activeMember()
+        && get(memberPath()).data.role in ['admin', 'direction'];
+    }
+    function commercial() {
+      return activeMember()
+        && get(memberPath()).data.role in ['admin', 'direction', 'commercial'];
+    }
+
+    // Membership documents may only be provisioned/changed using Admin SDK.
+    match /access_members/{uid} {
+      allow get: if signedIn() && request.auth.uid == uid;
+      allow list, create, update, delete: if false;
+    }
+
+    // Existing groups may be viewed by approved staff, but editing remains
+    // blocked until a server-side validator separates commercial changes
+    // from money, deposit, and bank-confirmation fields.
+    match /groups/{groupId} {
+      allow read: if commercial();
+      allow write: if false;
+    }
+
+    // Existing settings/main includes the legacy user directory/PIN values.
+    // NEVER expose it to all signed-in users. Split into sanitized settings
+    // and server-private user credentials first.
+    match /settings/{settingId} {
+      allow read, write: if false;
+    }
+
+    match /agency_deposits/{id} {
+      allow read: if management();
+      allow write: if false;
+      match /{nested=**} {
+        allow read: if management();
+        allow write: if false;
+      }
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
