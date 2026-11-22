@@ -2,6 +2,8 @@
 <html lang="es">
 
 <head>
+<style>html.nexus-auth-pending body { visibility: hidden !important; }</style>
+<script>document.documentElement.classList.add('nexus-auth-pending');</script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Nexus Groups - Configuración del Sistema</title>
@@ -42,7 +44,8 @@
 
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
 
     <style>
         body {
@@ -80,8 +83,27 @@
     <script src="js/icons.js"></script>
     <script src="js/navigation.js?v=2-shared-listener"></script>
     <script src="js/firebase-init.js?v=2-persistent-cache"></script>
+<script src="js/nexus-auth-guard.staging.js"></script>
 
     <script src="js/Configuracion.js?v=1.2.0-full-width"></script>
+<script>
+(function(){
+  'use strict';
+  if (new URLSearchParams(location.search).get('tab') === 'users') {
+    location.replace('Usuarios.html'); return;
+  }
+  // Retire the insecure legacy user/PIN editor in the staging build.
+  document.addEventListener('click', function(event) {
+    const target = event.target.closest('button,a');
+    if (!target) return;
+    const text = (target.textContent || '').trim();
+    if (text === 'Usuarios y Accesos' || target.getAttribute('href')?.includes('tab=users')) {
+      event.preventDefault(); event.stopImmediatePropagation();
+      location.assign('Usuarios.html');
+    }
+  }, true);
+})();
+</script>
 </body>
 
 </html>

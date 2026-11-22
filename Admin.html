@@ -2,6 +2,8 @@
 <html lang="es">
 
 <head>
+<style>html.nexus-auth-pending body { visibility: hidden !important; }</style>
+<script>document.documentElement.classList.add('nexus-auth-pending');</script>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Nexus Groups - Panel de Gestión Estratégica</title>
@@ -235,6 +237,7 @@
   <script src="js/icons.js"></script>
   <script src="js/navigation.js?v=2-shared-listener"></script>
   <script src="js/firebase-init.js?v=2-persistent-cache"></script>
+<script src="js/nexus-auth-guard.staging.js"></script>
   <script src="js/services/mesachefService.js?v=1.7-service-order"></script>
 
   <script src="js/Admin.js?v=1.4.16-comercial-filter"></script>

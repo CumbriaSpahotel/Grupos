@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
+<style>html.nexus-auth-pending body {visibility:hidden!important}</style><script>document.documentElement.classList.add('nexus-auth-pending')</script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Rooming List y Resumen de Servicios</title>
@@ -326,11 +327,13 @@ Hab. 3 - Doble - Morales García, Francisca y Ferrer Ferrer, Pepi. Obs: Francisc
 
     <!-- Firebase & IA SDKs (Compat Mode) -->
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
     <script src="js/firebase-config.js"></script>
     <script src="js/utils.js"></script>
     <script src="js/gemini.js"></script>
     <script src="js/firebase-init.js?v=2-persistent-cache"></script>
+<script src="js/nexus-auth-guard.staging.js"></script>
     <!-- Mammoth.js for DOCX parsing and PDF.js for PDF parsing client-side -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>

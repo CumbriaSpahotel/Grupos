@@ -91,3 +91,11 @@ Genera un informe estratégico en Markdown con:
     }
   }
 );
+
+// Nexus Groups: synchronized identity and role management (admin-only).
+const nexusUsers = require('./nexus-users');
+exports.nexusListUsers = nexusUsers.nexusListUsers;
+exports.nexusCreateUser = nexusUsers.nexusCreateUser;
+exports.nexusLinkUser = nexusUsers.nexusLinkUser;
+exports.nexusUpdateUser = nexusUsers.nexusUpdateUser;
+exports.nexusResetUser = nexusUsers.nexusResetUser;

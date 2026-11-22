@@ -1,0 +1,24 @@
+const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
+const root=path.join(__dirname,'..');const read=p=>fs.readFileSync(path.join(root,p),'utf8');
+const html=['Admin.html','AltaEmail.html','Calendario.html','Configuracion.html','Depositos.html','Fac Prof.html','Gestion-de-Grupos.html','Objetivos-Grupos.html','Orden Servicio.html','Presupuestos.html','Proformas.html','Rooming-Servicios.html'];
+test('every Firestore module has a verified navigation gate',()=>{for(const p of html){const s=read(p);assert.match(s,/nexus-auth-guard\.staging\.js/,p);assert.match(s,/nexus-auth-pending/,p);assert.match(s,/firebase-auth(?:-9\.22\.1)?-compat\.js/,p);}});
+test('authorization gate only accepts Firestore membership with Firebase Auth',()=>{const s=read('js/nexus-auth-guard.staging.js');assert.match(s,/firebase\.auth\(\)\.onAuthStateChanged/);assert.match(s,/collection\('access_members'\)/);assert.match(s,/access\.active !== true/);});
+test('only admin may call user management',()=>{const s=read('functions/nexus-users.js');assert.match(s,/role !== 'admin'/);for(const fn of ['nexusCreateUser','nexusUpdateUser','nexusResetUser','nexusListUsers']) assert.match(s,new RegExp('exports\\.'+fn+' = onCall'));assert.doesNotMatch(s,/allow\s+read,\s*write:\s*if true/);});
+test('never write raw password to Firestore user directory',()=>{const s=read('functions/nexus-users.js');assert.doesNotMatch(s,/password:\s*data\.password/);assert.match(s,/randomBytes/);assert.match(s,/generatePasswordResetLink/);});
+test('Firestore deploy rule remains locked until approved',()=>{const s=read('firestore.rules');assert.match(s,/allow read, write:\s*if false/);assert.doesNotMatch(s,/if true/);});
+
+test('deployment script is isolated to the five user-management functions',()=>{
+ const script=read('tools/deploy-nexus-users.ps1');
+ for(const name of ['nexusListUsers','nexusCreateUser','nexusLinkUser','nexusUpdateUser','nexusResetUser']) assert.match(script,new RegExp('functions:'+name));
+ assert.match(script,/--project gest-grupos-hotel/);
+ assert.match(script,/DESPLEGAR-USUARIOS/);
+});
+test('existing Authentication users can be linked without recreating accounts',()=>{
+ const server=read('functions/nexus-users.js');
+ const client=read('Usuarios.html');
+ assert.match(server,/exports\.nexusLinkUser = onCall/);
+ assert.match(server,/auth\.getUserByEmail/);
+ assert.match(server,/await ref\.create/);
+ assert.match(client,/nexusLinkUser/);
+ assert.match(server,/demo@hotel\.com/);
+});

@@ -1,0 +1,17 @@
+rules_version = '2';
+
+// NEXUS GROUPS: BOOTSTRAP MINIMUM - do NOT confuse with full production rules.
+// Allows a signed-in user to read only their own server-created role document.
+// ALL groups, settings, payments, deposits and every other collection stay locked.
+// Deploy only after administrator has been verified and backed up.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /access_members/{uid} {
+      allow get: if request.auth != null && request.auth.uid == uid;
+      allow list, create, update, delete: if false;
+    }
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

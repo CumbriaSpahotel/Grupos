@@ -337,7 +337,7 @@
 
                     ${isAdmin ? `
                     <!-- Gestión de usuarios (Solo Administrador) -->
-                    <a href="Configuracion.html?tab=users" class="nexus-nav-btn p-1 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-full transition-colors flex items-center justify-center shrink-0" title="Gestión de usuarios y accesos (Admin)">
+                    <a href="Usuarios.html" class="nexus-nav-btn p-1 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-full transition-colors flex items-center justify-center shrink-0" title="Gestión de usuarios y accesos (Admin)">
                         <i data-lucide="shield-check" class="w-3.5 h-3.5"></i>
                     </a>
                     ` : ''}
@@ -581,7 +581,20 @@
     }
 
     // ─── Modal de Cambio de Contraseña de Usuario ─────────────────────────────
-    window.nexusOpenPasswordModal = function () {
+    window.nexusOpenPasswordModal = async function () {
+        if (!window.firebase || typeof firebase.auth !== 'function' || !firebase.auth().currentUser) {
+            alert('Debes iniciar sesión con Firebase para restablecer tu contraseña.'); return;
+        }
+        const email = firebase.auth().currentUser.email;
+        if (!email || !confirm('¿Enviar al correo ' + email + ' el enlace para cambiar la contraseña?')) return;
+        try {
+            await firebase.auth().sendPasswordResetEmail(email);
+            alert('Consulta tu correo para establecer una nueva contraseña.');
+        } catch (e) { alert('No se pudo solicitar el cambio de contraseña.'); }
+        return;
+    };
+    // LEGACY MODAL DISABLED
+    window.nexusLegacyPasswordModal = function () {
         var user = getCurrentUser();
         if (!user) {
             alert("No hay sesión de usuario activa.");
@@ -692,7 +705,7 @@
 
                     ${isAdmin ? `
                     <div class="pt-3 border-t border-slate-100 text-center">
-                        <a href="Configuracion.html?tab=users" class="text-[11px] text-emerald-700 hover:text-emerald-800 font-bold hover:underline inline-flex items-center gap-1.5">
+                        <a href="Usuarios.html" class="text-[11px] text-emerald-700 hover:text-emerald-800 font-bold hover:underline inline-flex items-center gap-1.5">
                             <i data-lucide="shield-check" class="w-3.5 h-3.5"></i>
                             Ir al Panel de Gestión de Usuarios
                         </a>
