@@ -43,7 +43,17 @@
     });
   }
   async function login(email, password) {
-    return getAuth().signInWithEmailAndPassword(email, password);
+    const credential = await getAuth().signInWithEmailAndPassword(email, password);
+    try {
+      const member = await getMember(credential.user);
+      state.user = credential.user;
+      state.member = member;
+      state.ready = true;
+      return { uid: credential.user.uid, email: credential.user.email, role: member.role };
+    } catch (error) {
+      await getAuth().signOut();
+      throw error;
+    }
   }
   async function logout() {
     state.ready = false;
